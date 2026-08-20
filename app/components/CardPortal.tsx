@@ -3,10 +3,11 @@
 import Image from "next/image";
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
+import type { MotionValue } from "framer-motion";
 
 interface CardPortalProps {
   index: number;
-  scrollYProgress: any;
+  scrollYProgress: MotionValue<number>;
   align?: "left" | "right";
 }
 
@@ -88,7 +89,7 @@ export function CardPortal({
           className="absolute inset-0"
           style={{
             background:
-              "linear-gradient(180deg, rgba(15, 23, 42, 0.55) 0%, rgba(2, 6, 23, 0.15) 45%, rgba(6, 78, 59, 0.35) 100%)",
+              "linear-gradient(180deg, rgba(87, 22, 35, 0.55) 0%, rgba(6, 20, 81, 0.15) 45%, rgba(0, 15, 49, 0.35) 100%)",
           }}
         />
 

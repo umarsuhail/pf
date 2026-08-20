@@ -135,13 +135,13 @@ const sectionProgressMap: Record<string, number> = {
 
 // Dark gray-blue-emerald gradient per card, each with its own blend
 const cardGradients = [
-  "linear-gradient(135deg, #1e293b 0%, #0c2f4a 48%, #064e3b 100%)",
-  "linear-gradient(160deg, #111827 0%, #1e3a5f 55%, #065f46 100%)",
-  "linear-gradient(120deg, #0f172a 0%, #134e4a 52%, #1d4ed8 115%)",
-  "linear-gradient(150deg, #1f2937 0%, #0e3a5c 42%, #047857 96%)",
-  "linear-gradient(125deg, #0b1120 0%, #155e75 58%, #065f46 100%)",
-  "linear-gradient(165deg, #1e293b 0%, #064e3b 46%, #1e40af 112%)",
-  "linear-gradient(140deg, #111827 8%, #0f3d5c 50%, #059669 108%)",
+  "radial-gradient(120% 120% at 15% 20%, rgba(0,108,159,0.85) 0%, rgba(0,108,159,0.25) 55%, rgba(0,108,159,0) 100%), linear-gradient(135deg, #00273f 0%, #003f5f 50%, #006c9f 100%)",
+  "linear-gradient(160deg, #111827 0%, #1e3a5f 55%, #00294a 100%)",
+  "linear-gradient(120deg, #0f172a 0%, #25397c 52%, #1d4ed8 115%)",
+  "linear-gradient(150deg, #1f2937 0%, #0e3a5c 42%, #540615 96%)",
+  "linear-gradient(125deg, #0b1120 0%, #155e75 58%, #10427a 100%)",
+  "linear-gradient(165deg, #1e293b 0%, #50260b 46%, #1e40af 112%)",
+  "linear-gradient(140deg, #111827 8%, #0f3d5c 50%, #41272a 108%)",
 ];
 
 const sectionProgressStops = cards.map((card) => sectionProgressMap[card.id]);
