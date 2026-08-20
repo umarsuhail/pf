@@ -108,17 +108,34 @@ export default function Space({ tint }: { tint?: string }) {
     resize();
     window.addEventListener("resize", resize);
 
+    // Every card in the flight mounts its own Space instance up front (see
+    // MultiverseFlight/CardPortal), so with seven of these all drawing every
+    // frame the six the visitor isn't looking at were burning main-thread
+    // time for nothing. The 3D transforms that carry a distant/departed card
+    // off to the side or into the perspective vanishing point still register
+    // as "not intersecting" here, so this only keeps drawing the ones
+    // actually contributing a visible pixel.
+    let isVisible = true;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisible = entry?.isIntersecting ?? true;
+      },
+      { threshold: 0 },
+    );
+    observer.observe(canvas);
+
     let rafId = 0;
     if (!reduceMotion) {
       const animate = (time: number) => {
         rafId = requestAnimationFrame(animate);
-        draw(time);
+        if (isVisible) draw(time);
       };
       rafId = requestAnimationFrame(animate);
     }
 
     return () => {
       cancelAnimationFrame(rafId);
+      observer.disconnect();
       window.removeEventListener("resize", resize);
     };
   }, [tint]);

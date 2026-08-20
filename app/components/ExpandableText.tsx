@@ -31,9 +31,15 @@ export default function ExpandableText({
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
+  // Reacts to forceExpanded's rising edge during render (React's documented
+  // pattern for adjusting state from a prop) rather than in an effect, so
+  // there's no extra commit between the prop changing and expanded catching
+  // up to it.
+  const [prevForceExpanded, setPrevForceExpanded] = useState(forceExpanded);
+  if (forceExpanded !== prevForceExpanded) {
+    setPrevForceExpanded(forceExpanded);
     if (forceExpanded) setExpanded(true);
-  }, [forceExpanded]);
+  }
 
   useEffect(() => {
     onExpandedChange?.(expanded);

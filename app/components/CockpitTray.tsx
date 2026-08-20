@@ -330,6 +330,10 @@ export default function CockpitTray() {
   // Plays NARRATION_SPANS[spanIndexRef.current] on the shared narration
   // element, advancing sequentially — each clip cuts straight into the
   // next (spoken sentences, not music, so no crossfade between them).
+  // The recursive call in .catch() goes through a ref rather than closing
+  // over playNextSpan directly, since the const isn't assigned until after
+  // this initializer returns.
+  const playNextSpanRef = useRef<() => void>(() => {});
   const playNextSpan = useCallback(() => {
     const narration = narrationRef.current;
     if (!narration) return;
@@ -351,9 +355,14 @@ export default function CockpitTray() {
       // sentence rather than going silent on just one span.
       .catch(() => {
         spanIndexRef.current += 1;
-        playNextSpan();
+        playNextSpanRef.current();
       });
   }, [handOverToMain]);
+  // Keeps the ref current after every render — writing to a ref during
+  // render itself (rather than in an effect) isn't allowed.
+  useEffect(() => {
+    playNextSpanRef.current = playNextSpan;
+  });
 
   const onNarrationEnded = useCallback(() => {
     spanIndexRef.current += 1;

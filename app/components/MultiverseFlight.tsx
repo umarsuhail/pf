@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AnimatePresence,
   motion,
   useMotionTemplate,
   useMotionValue,
@@ -10,6 +9,7 @@ import {
   useTransform,
   type MotionValue,
 } from "motion/react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useRef, useState } from "react";
@@ -21,7 +21,6 @@ import ExpandableText from "./ExpandableText";
 import NarrationHighlights from "./NarrationHighlights";
 import NarratedText from "./NarratedText";
 import { NARRATION_DURATION } from "../data/narration";
-import SpaceParticles from "./SpaceParticles";
 import { getSkillGroups } from "../data/skillGroups";
 import Greeting from "./Greeting";
 
@@ -31,7 +30,14 @@ import {
   sectionProgressMap,
   type FlightCard,
 } from "../data/sections";
-import ParticleLogo from "./HeroLogo";
+
+// Pulls in the whole `three` library (WebGLRenderer et al. — ~150KB gzipped)
+// for a background starfield that isn't needed to render the first frame.
+// Splitting it into its own chunk keeps that weight from blocking the rest
+// of the flight's (already dynamically-imported) bundle from being usable.
+const SpaceParticles = dynamic(() => import("./SpaceParticles"), {
+  ssr: false,
+});
 
 const sectionProgressStops = cards.map((card) => sectionProgressMap[card.id]);
 
@@ -226,6 +232,7 @@ function BillboardCard({
   card,
   index,
   isMobile,
+  portrait,
   smoothScrollProgress,
   revealStart,
   revealEnd,
@@ -233,10 +240,18 @@ function BillboardCard({
   card: FlightCard;
   index: number;
   isMobile: boolean;
+  portrait: boolean;
   smoothScrollProgress: MotionValue<number>;
   revealStart: number;
   revealEnd: number;
 }) {
+
+  // A portrait phone doesn't have the width for the text/portrait side-by-
+  // side split every other layout uses — it gets the same top-visual,
+  // bottom-text stack the entry card already uses (see `stacked` below),
+  // rather than the old fallback of dropping out of the 3D flight entirely
+  // and reading a flat list of cards instead.
+  const stacked = index === 0 || portrait;
 
   // The flight only ever renders on desktop or on a landscape phone, and both
   // should read the same way: billboards staggered left and right through the
@@ -312,6 +327,7 @@ function BillboardCard({
   const activeRotateX = useTransform(straightening, (v) => baseRotateX * Math.max(0, 1 - v * 2));
 
   const activeReadabilityBoost = useTransform(straightening, [0, 1], [0, 1]);
+  const textOpacity = useTransform(activeReadabilityBoost, [0, 1], [0.85, 1]);
   const effectiveBlur = useTransform(() => upcomingBlur.get() * (1 - straightening.get()));
   const effectiveOpacity = useTransform(() => Math.min(1, upcomingOpacity.get() + activeReadabilityBoost.get() * 0.38));
   const cardFilter = useMotionTemplate`blur(${effectiveBlur}px)`;
@@ -356,54 +372,84 @@ function BillboardCard({
          wrapper's gentle float animation below, so it doesn't jitter. */}
       {card.id === "home" && <NarrationHighlights />}
 
-      <motion.div
-       animate={{
-  y: [0, -12, 0, 12, 0],
-  opacity: [0.7, 1, 0.85, 1, 0.7],
-}}
-transition={{
-  duration: 7 + index * 0.5,
-  repeat: Infinity,
-  ease: "easeInOut",
-}}
-        className={`flex w-full items-stretch ${isMobile ? "gap-3" : "gap-5 sm:gap-8"} ${
-          card.align === "right" ? "flex-row-reverse" : "flex-row"
-        }`}
-        style={{ transformStyle: "preserve-3d" }}
-      >
+      {stacked ? (
+        // Top visual, bottom text — used by the entry card (no room set aside
+        // for two columns; the portrait fills the whole card) and, now, by
+        // every card once the viewport is portrait: a phone held upright
+        // doesn't have the width for the side-by-side split below, so it
+        // gets this instead of dropping out of the 3D flight entirely.
         <motion.div
-          className={`flex min-w-0 flex-1 flex-col ${alignmentClass}`}
-          style={{ opacity: useTransform(activeReadabilityBoost, [0, 1], [0.85, 1]) }}
+          animate={{
+            y: [0, -12, 0, 12, 0],
+            opacity: [0.7, 1, 0.85, 1, 0.7],
+          }}
+          transition={{
+            duration: 7 + index * 0.5,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className={`flex w-full flex-col ${isMobile ? "gap-3" : "gap-5 sm:gap-7"}`}
+          style={{ transformStyle: "preserve-3d" }}
         >
-          {/* Tailwind breakpoints are width-based, so they can't tell a 956px
-             landscape phone from a laptop — the compact scale is driven off
-             the isMobile prop instead. */}
-          {/* No self-start here — the column's items-start/items-end from
-             alignmentClass is what sides these with the card. */}
-          {/* The expanded home portal carries the particle logo. */}
-          <span
-            className={`inline-flex items-center rounded-full border font-semibold uppercase tracking-[0.24em] ${
-              isMobile ? "gap-1 px-2.5 py-1 text-[9px]" : "gap-1.5 px-4 py-2 text-xs tracking-[0.32em]"
-            } ${badgeClass}`}
+          <motion.div
+            className="flex items-center justify-between gap-3"
+            style={{ opacity: textOpacity }}
           >
-            <CardIcon id={card.id} size={isMobile ? 10 : 13} />
-            {card.eyebrow}
-          </span>
-          <h2
-            className={`max-w-[22ch] font-semibold leading-tight ${
-              isMobile
-                ? "mt-2.5 text-lg"
-                : "mt-5 text-2xl sm:mt-6 sm:text-3xl lg:text-5xl"
-            } ${titleClass}`}
+            <span
+              className={`inline-flex items-center rounded-full border font-semibold uppercase tracking-[0.24em] ${
+                isMobile ? "gap-1 px-2.5 py-1 text-[9px]" : "gap-1.5 px-4 py-2 text-xs tracking-[0.32em]"
+              } ${badgeClass}`}
+            >
+              <CardIcon id={card.id} size={isMobile ? 10 : 13} />
+              {card.eyebrow}
+            </span>
+            {isEntry && (
+              <span
+                className={`font-semibold ${isMobile ? "text-base" : "text-xl sm:text-2xl lg:text-3xl"} ${titleClass}`}
+              >
+                <Greeting />
+              </span>
+            )}
+          </motion.div>
+
+          <motion.div
+            initial={false}
+            className={`relative w-full shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)] ${
+              isMobile ? "h-[min(14rem,36vh)]" : "h-[min(30rem,58vh)]"
+            }`}
           >
-            {card.id === "home" ? <Greeting /> : card.title}
-          </h2>
-          {/* Home carries the full narrated bio (all four paragraphs) — too
-             long for a billboard card to show outright, so it collapses to a
-             short preview with a "Read more" that grows the card in place. */}
-          {card.id === "home" ? (
+            <CardPortal
+              index={index}
+              scrollYProgress={smoothScrollProgress}
+              align={card.align}
+              targetId={targetCard.id}
+              actionLabel={actionLabel}
+              ariaLabel={`Fly to ${targetCard.eyebrow.replace(/^\d+\s*\/\s*/, "")}`}
+              isExpanded={isEntry && isHomeExpanded}
+            />
+          </motion.div>
+
+          <motion.div
+            className={`flex min-w-0 flex-col ${alignmentClass}`}
+            style={{ opacity: textOpacity }}
+          >
+            <h2
+              className={`max-w-[36ch] font-semibold leading-tight ${
+                isMobile ? "text-lg" : "text-2xl sm:text-3xl lg:text-4xl"
+              } ${titleClass}`}
+            >
+              {card.title}
+            </h2>
+            {/* Home carries the full narrated bio (all four paragraphs) — too
+               long for a billboard card to show outright, so it collapses to
+               a short preview with a "Read more" that grows the card in
+               place. Every other stacked card gets the same treatment here
+               (rather than the row layout's plain truncated paragraph)
+               since there's no hover/detail-page affordance as handy on a
+               phone — forceExpanded/onExpandedChange are the autopilot's
+               home-only hook and a no-op for every other card. */}
             <ExpandableText
-              className={`max-w-[46ch] ${isMobile ? "mt-2" : "mt-4 max-w-[38ch] sm:mt-5"}`}
+              className={`max-w-[60ch] ${isMobile ? "mt-2" : "mt-4 sm:mt-5"}`}
               collapsedHeight={isMobile ? "3.3em" : "4.5em"}
               forceExpanded={autoExpandHome}
               onExpandedChange={setIsHomeExpanded}
@@ -418,49 +464,6 @@ transition={{
                 <NarratedText id={card.id} text={card.description} />
               </p>
             </ExpandableText>
-          ) : card.id !== "resume" ? (
-            <p
-              className={`max-w-[46ch] ${
-                isMobile
-                  ? "mt-2 line-clamp-4 text-[11px] leading-[1.45]"
-                  : "mt-4 max-w-[38ch] text-sm leading-6 sm:mt-5 sm:text-base sm:leading-7 lg:text-xl"
-              } ${bodyClass}`}
-            >
-              <NarratedText id={card.id} text={card.description} />
-            </p>
-          ) : null}
-          {card.id === "resume" ? (
-            // The resume card downloads the file directly instead of opening
-            // a details page — there's no extra copy to elaborate on.
-            <div className={`flex items-center gap-3 ${isMobile ? "mt-3" : "mt-6 sm:mt-8"}`}>
-              <a
-                href={RESUME_PDF_URL}
-                download
-                onMouseEnter={() => pdfDownloadRef.current?.startAnimation()}
-                onMouseLeave={() => pdfDownloadRef.current?.stopAnimation()}
-                className={`inline-flex items-center gap-2 rounded-full border font-semibold transition duration-300 ${
-                  isMobile ? "px-4 py-1.5 text-[11px]" : "px-6 py-3 text-sm hover:-translate-y-1"
-                } ${buttonClass}`}
-              >
-                <DownloadIcon ref={pdfDownloadRef} size={isMobile ? 12 : 16} aria-hidden="true" />
-                PDF
-              </a>
-              <a
-                href={RESUME_TEX_URL}
-                download
-                onMouseEnter={() => texDownloadRef.current?.startAnimation()}
-                onMouseLeave={() => texDownloadRef.current?.stopAnimation()}
-                className={`inline-flex items-center gap-2 rounded-full border font-semibold transition duration-300 ${
-                  isMobile ? "px-4 py-1.5 text-[11px]" : "px-6 py-3 text-sm hover:-translate-y-1"
-                } ${buttonClass}`}
-              >
-                <DownloadIcon ref={texDownloadRef} size={isMobile ? 12 : 16} aria-hidden="true" />
-                TeX
-              </a>
-            </div>
-          ) : (
-            // Opens the section's own page rather than expanding in place, so
-            // each section is a real, crawlable URL.
             <Link
               href={`/${card.id}`}
               className={`inline-block rounded-full border font-semibold transition duration-300 ${
@@ -471,27 +474,124 @@ transition={{
             >
               {card.cta}
             </Link>
-          )}
+          </motion.div>
         </motion.div>
-
-
+      ) : (
         <motion.div
-          initial={false}
-          animate={{ width: isMobile ? COMPACT_PORTAL_WIDTH : PORTAL_WIDTH }}
-          transition={PHYSICS.expansion}
-          className="relative hidden min-h-[min(16.25rem,42vh)] shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] sm:block lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]"
+          animate={{
+            y: [0, -12, 0, 12, 0],
+            opacity: [0.7, 1, 0.85, 1, 0.7],
+          }}
+          transition={{
+            duration: 7 + index * 0.5,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className={`flex w-full items-stretch ${isMobile ? "gap-3" : "gap-5 sm:gap-8"} ${
+            card.align === "right" ? "flex-row-reverse" : "flex-row"
+          }`}
+          style={{ transformStyle: "preserve-3d" }}
         >
-          <CardPortal
-            index={index}
-            scrollYProgress={smoothScrollProgress}
-            align={card.align}
-            targetId={targetCard.id}
-            actionLabel={actionLabel}
-            ariaLabel={`Fly to ${targetCard.eyebrow.replace(/^\d+\s*\/\s*/, "")}`}
-            isExpanded={card.id === "home" && isHomeExpanded}
-          />
+          <motion.div
+            className={`flex min-w-0 flex-1 flex-col ${alignmentClass}`}
+            style={{ opacity: textOpacity }}
+          >
+            {/* Tailwind breakpoints are width-based, so they can't tell a 956px
+               landscape phone from a laptop — the compact scale is driven off
+               the isMobile prop instead. */}
+            {/* No self-start here — the column's items-start/items-end from
+               alignmentClass is what sides these with the card. */}
+            <span
+              className={`inline-flex items-center rounded-full border font-semibold uppercase tracking-[0.24em] ${
+                isMobile ? "gap-1 px-2.5 py-1 text-[9px]" : "gap-1.5 px-4 py-2 text-xs tracking-[0.32em]"
+              } ${badgeClass}`}
+            >
+              <CardIcon id={card.id} size={isMobile ? 10 : 13} />
+              {card.eyebrow}
+            </span>
+            <h2
+              className={`max-w-[22ch] font-semibold leading-tight ${
+                isMobile
+                  ? "mt-2.5 text-lg"
+                  : "mt-5 text-2xl sm:mt-6 sm:text-3xl lg:text-5xl"
+              } ${titleClass}`}
+            >
+              {card.title}
+            </h2>
+            {card.id !== "resume" ? (
+              <p
+                className={`max-w-[46ch] ${
+                  isMobile
+                    ? "mt-2 line-clamp-4 text-[11px] leading-[1.45]"
+                    : "mt-4 max-w-[38ch] text-sm leading-6 sm:mt-5 sm:text-base sm:leading-7 lg:text-xl"
+                } ${bodyClass}`}
+              >
+                <NarratedText id={card.id} text={card.description} />
+              </p>
+            ) : null}
+            {card.id === "resume" ? (
+              // The resume card downloads the file directly instead of opening
+              // a details page — there's no extra copy to elaborate on.
+              <div className={`flex items-center gap-3 ${isMobile ? "mt-3" : "mt-6 sm:mt-8"}`}>
+                <a
+                  href={RESUME_PDF_URL}
+                  download
+                  onMouseEnter={() => pdfDownloadRef.current?.startAnimation()}
+                  onMouseLeave={() => pdfDownloadRef.current?.stopAnimation()}
+                  className={`inline-flex items-center gap-2 rounded-full border font-semibold transition duration-300 ${
+                    isMobile ? "px-4 py-1.5 text-[11px]" : "px-6 py-3 text-sm hover:-translate-y-1"
+                  } ${buttonClass}`}
+                >
+                  <DownloadIcon ref={pdfDownloadRef} size={isMobile ? 12 : 16} aria-hidden="true" />
+                  PDF
+                </a>
+                <a
+                  href={RESUME_TEX_URL}
+                  download
+                  onMouseEnter={() => texDownloadRef.current?.startAnimation()}
+                  onMouseLeave={() => texDownloadRef.current?.stopAnimation()}
+                  className={`inline-flex items-center gap-2 rounded-full border font-semibold transition duration-300 ${
+                    isMobile ? "px-4 py-1.5 text-[11px]" : "px-6 py-3 text-sm hover:-translate-y-1"
+                  } ${buttonClass}`}
+                >
+                  <DownloadIcon ref={texDownloadRef} size={isMobile ? 12 : 16} aria-hidden="true" />
+                  TeX
+                </a>
+              </div>
+            ) : (
+              // Opens the section's own page rather than expanding in place, so
+              // each section is a real, crawlable URL.
+              <Link
+                href={`/${card.id}`}
+                className={`inline-block rounded-full border font-semibold transition duration-300 ${
+                  isMobile
+                    ? "mt-3 px-4 py-1.5 text-[11px]"
+                    : "mt-6 px-6 py-3 text-sm hover:-translate-y-1 sm:mt-8"
+                } ${buttonClass}`}
+              >
+                {card.cta}
+              </Link>
+            )}
+          </motion.div>
+
+          <motion.div
+            initial={false}
+            animate={{ width: isMobile ? COMPACT_PORTAL_WIDTH : PORTAL_WIDTH }}
+            transition={PHYSICS.expansion}
+            className="relative hidden min-h-[min(16.25rem,42vh)] shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] sm:block lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]"
+          >
+            <CardPortal
+              index={index}
+              scrollYProgress={smoothScrollProgress}
+              align={card.align}
+              targetId={targetCard.id}
+              actionLabel={actionLabel}
+              ariaLabel={`Fly to ${targetCard.eyebrow.replace(/^\d+\s*\/\s*/, "")}`}
+              isExpanded={false}
+            />
+          </motion.div>
         </motion.div>
-      </motion.div>
+      )}
     </motion.div>
   );
 }
@@ -569,87 +669,16 @@ function SkillLayoverCluster({
   );
 }
 
-function MobileCard({
-  card,
-  index,
-}: {
-  card: FlightCard;
-  index: number;
-}) {
-  const panelClass = "border-white/15 shadow-[0_18px_40px_rgba(2,8,23,0.35)]";
-
-  return (
-    <section
-      id={`section-${card.id}`}
-      className={`w-full rounded-3xl border p-5 sm:p-6 ${panelClass}`}
-      style={{ background: cardGradients[index % cardGradients.length] }}
-    >
-      <div className="flex w-full flex-col items-start text-left">
-        {card.id === "home" && (
-          <div className="relative mb-4 h-28 w-full overflow-hidden rounded-2xl border border-white/15 bg-slate-950/30">
-            <ParticleLogo
-              src="/images/us.png"
-              particleCount={420}
-              speed={1}
-              disperseStrength={150}
-              size={80}
-              loop
-            />
-          </div>
-        )}
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/20 bg-emerald-200/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-100">
-          <CardIcon id={card.id} size={13} />
-          {card.eyebrow}
-        </span>
-        <h2 className="mt-4 text-2xl font-semibold leading-tight text-[#f0f9ff]">
-          {card.id === "home" ? <Greeting /> : card.title}
-        </h2>
-        {card.id !== "resume" && (
-          <p className="mt-3 text-sm leading-6 text-slate-100/90">
-            <NarratedText id={card.id} text={card.description} />
-          </p>
-        )}
-        {card.id === "resume" ? (
-          <div className="mt-5 flex items-center gap-3">
-            <a
-              href={RESUME_PDF_URL}
-              download
-              className="inline-flex items-center gap-2 rounded-full border border-sky-200/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-sky-50 transition duration-300"
-            >
-              <DownloadIcon size={14} aria-hidden="true" />
-              PDF
-            </a>
-            <a
-              href={RESUME_TEX_URL}
-              download
-              className="inline-flex items-center gap-2 rounded-full border border-sky-200/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-sky-50 transition duration-300"
-            >
-              <DownloadIcon size={14} aria-hidden="true" />
-              TeX
-            </a>
-          </div>
-        ) : (
-          <Link
-            href={`/${card.id}`}
-            className="mt-5 inline-block rounded-full border border-sky-200/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-sky-50 transition duration-300"
-          >
-            {card.cta}
-          </Link>
-        )}
-      </div>
-    </section>
-  );
-}
 
 export default function MultiverseFlight() {
   const containerRef = useRef<HTMLDivElement>(null);
-  // `compact` drives the smaller in-flight card sizing; `portrait` decides
-  // whether a small screen gets the flight at all. A phone held sideways has
-  // the aspect ratio the 3D scene needs, so it flies — held upright it falls
-  // back to the stacked reading layout with a nudge to rotate.
+  // `compact` drives the smaller in-flight card sizing; `portrait` now only
+  // decides each card's own internal layout (stacked vs. side-by-side, see
+  // BillboardCard's `stacked`) — a phone held upright used to fall back to a
+  // flat reading list with a "rotate your phone" nudge instead of the 3D
+  // flight at all; it flies in every orientation now.
   const [compact, setCompact] = useState(false);
   const [portrait, setPortrait] = useState(false);
-  const [rotateDismissed, setRotateDismissed] = useState(false);
 
   useEffect(() => {
     const onResize = () => {
@@ -667,13 +696,6 @@ export default function MultiverseFlight() {
   }, []);
 
   const isMobile = compact;
-  const showStackedLayout = compact && portrait;
-  // The navigation listener is registered once, so it can't close over this
-  // directly without going stale on rotate.
-  const stackedLayoutRef = useRef(showStackedLayout);
-  useEffect(() => {
-    stackedLayoutRef.current = showStackedLayout;
-  }, [showStackedLayout]);
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -881,15 +903,6 @@ export default function MultiverseFlight() {
       const targetId = customEvent.detail?.id;
       const targetProgress = targetId ? getNavTargetProgress(targetId) : undefined;
       const container = containerRef.current;
-
-      // Must match the layout actually rendered, not just the width. A
-      // landscape phone is under 1024px wide but shows the *flight*, where no
-      // `section-*` anchors exist — testing width alone sent every "Next" tap
-      // into a getElementById that returned null, so nothing happened.
-      if (stackedLayoutRef.current && targetId) {
-        document.getElementById(`section-${targetId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-        return;
-      }
 
       if (targetProgress === undefined || !container) return;
       const containerTop = window.scrollY + container.getBoundingClientRect().top;
@@ -1141,26 +1154,6 @@ export default function MultiverseFlight() {
       raf = requestAnimationFrame(holdAtStart);
     };
 
-    // Portrait phones get the stacked reading layout, which has no flight to
-    // fly — the tour walks the anchors instead.
-    const runStacked = () => {
-      let index = 0;
-      const step = () => {
-        if (index >= cards.length) {
-          stop();
-          return;
-        }
-        document
-          .getElementById(`section-${cards[index].id}`)
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-        emit(true, index);
-        index += 1;
-        timer = window.setTimeout(step, AUTOPILOT_SECTION_SECONDS * 1000);
-      };
-      // Kept non-zero so `timer` marks the tour as running immediately.
-      timer = window.setTimeout(step, 1);
-    };
-
     const onCommand = (event: Event) => {
       const action = (event as CustomEvent<{ action?: "start" | "stop" }>)
         .detail?.action;
@@ -1177,8 +1170,7 @@ export default function MultiverseFlight() {
       // announcement and the snap-to-start read as one launch, not two
       // separate things.
       window.dispatchEvent(new CustomEvent("flight-autopilot-launch"));
-      if (stackedLayoutRef.current) runStacked();
-      else runFlight();
+      runFlight();
     };
 
     window.addEventListener("flight-autopilot", onCommand as EventListener);
@@ -1212,91 +1204,18 @@ export default function MultiverseFlight() {
     return () => unsubscribe();
   }, [scrollYProgress]);
 
-  if (showStackedLayout) {
-    return (
-      <div ref={containerRef} className="relative min-h-screen w-full overflow-x-hidden bg-transparent pt-24">
-        <div className="mx-auto flex w-full max-w-xl flex-col gap-5">
-          {cards.map((card, index) => (
-            <MobileCard key={card.id} card={card} index={index} />
-          ))}
-        </div>
-
-        {/* The content stays readable underneath — this only invites the
-           visitor into the full 3D flight, and can be waved off. */}
-        <AnimatePresence>
-          {rotateDismissed && (
-            <motion.div
-              key="rotate-prompt"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.35 }}
-              className="fixed inset-0 z-90 flex flex-col items-center justify-center gap-6 bg-slate-950/92 px-8 text-center backdrop-blur-sm"
-            >
-              <motion.svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="72"
-                height="72"
-                viewBox="0 0 24 24"
-                className="text-(--accent)"
-                animate={{ rotate: [0, -90, -90, 0] }}
-                transition={{
-                  duration: 3,
-                  times: [0, 0.35, 0.75, 1],
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-                aria-hidden="true"
-              >
-                <rect
-                  x="7"
-                  y="2"
-                  width="10"
-                  height="20"
-                  rx="2.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-                <line
-                  x1="10.5"
-                  y1="19"
-                  x2="13.5"
-                  y2="19"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </motion.svg>
-
-              <div>
-                <h2 className="text-xl font-semibold text-sky-50">Rotate your phone</h2>
-                <p className="mt-2 max-w-xs text-sm leading-6 text-slate-300">
-                  Turn your device sideways for a different view.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setRotateDismissed(true)}
-                className="rounded-full border border-white/20 bg-white/10 px-6 py-2.5 text-sm font-semibold text-sky-50 transition-colors hover:bg-white/20"
-              >
-                Keep reading instead
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    );
-  }
-
   return (
     // Taller track = more scrolling for the same camera distance, i.e. a
     // slower flight. Everything else is keyed off normalised progress, so
     // stretching this is the one knob that changes pace without disturbing
     // any of the per-card reveal/focus/depart windows.
     <div ref={containerRef} className="relative h-[1800vh] w-full bg-transparent">
-      <div className="sticky top-0 flex h-screen w-screen items-center justify-center overflow-hidden [perspective:1100px]">
+      {/* h-dvh, not h-screen — 100vh is sized for the largest possible
+         viewport (address bar hidden), so on mobile it runs taller than
+         what's actually visible while the bar is shown, cutting the bottom
+         of the stage off behind it. The dynamic viewport unit tracks the
+         real visible height as the bar shows/hides. */}
+      <div className="sticky top-0 flex h-dvh w-screen items-center justify-center overflow-hidden [perspective:1100px]">
         {/* Furthest plane — barely moves, and is over-sized so translating it
            never drags an edge into frame. */}
         <motion.div
@@ -1390,6 +1309,7 @@ export default function MultiverseFlight() {
               card={card}
               index={index}
               isMobile={isMobile}
+              portrait={portrait}
               smoothScrollProgress={smoothScrollProgress}
               revealStart={getRevealWindow(index).start}
               revealEnd={getRevealWindow(index).end}

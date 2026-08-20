@@ -96,6 +96,21 @@ export default function ParticleLogo({
         let destroyed = false;
         const timeouts: number[] = [];
 
+        // The entry card (and its logo) stay mounted for the whole flight —
+        // scrolling past it used to leave this canvas drawing every particle,
+        // sparks' shadowBlur included, on every frame indefinitely. Only
+        // actually drawing while some part of the canvas is on screen is
+        // what stops that from taxing the main thread for the rest of the
+        // session.
+        let isVisible = true;
+        const visibilityObserver = new IntersectionObserver(
+            ([entry]) => {
+                isVisible = entry?.isIntersecting ?? true;
+            },
+            { threshold: 0 },
+        );
+        visibilityObserver.observe(canvas);
+
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
         const particles: Particle[] = [];
@@ -304,6 +319,11 @@ export default function ParticleLogo({
         const draw = () => {
             if (destroyed) return;
 
+            if (!isVisible) {
+                animationFrame = requestAnimationFrame(draw);
+                return;
+            }
+
             const rect = canvas.getBoundingClientRect();
 
             ctx.clearRect(
@@ -408,7 +428,12 @@ export default function ParticleLogo({
 
                 if (particle.isSpark) {
                     const arm = particle.size * 2.1;
-                    ctx.shadowBlur = 7;
+                    // Canvas shadow blur is a CPU-side blur pass per call —
+                    // by far the most expensive thing drawn here, done for
+                    // ~10% of every particle every frame. Kept small rather
+                    // than dropped entirely since the sparks read as flat
+                    // crosses without any glow at all.
+                    ctx.shadowBlur = 3;
                     ctx.shadowColor = "rgba(56, 189, 248, 0.8)";
                     ctx.fillRect(-particle.size * 0.38, -arm, particle.size * 0.76, arm * 2);
                     ctx.fillRect(-arm, -particle.size * 0.38, arm * 2, particle.size * 0.76);
@@ -628,6 +653,8 @@ export default function ParticleLogo({
             cancelAnimationFrame(
                 animationFrame
             );
+
+            visibilityObserver.disconnect();
 
             timeouts.forEach((id) => window.clearTimeout(id));
 

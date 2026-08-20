@@ -1,15 +1,16 @@
 "use client";
 
-import Image from "next/image";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
-  AnimatePresence,
   animate,
+  AnimatePresence,
   motion,
   useMotionTemplate,
   useMotionValue,
   type MotionValue,
 } from "motion/react";
+import Image from "next/image";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+
 import {
   POWER1_IN,
   POWER2_IN,
@@ -492,7 +493,7 @@ export function CardPortal({
       }}
     >
       {/* 1. Static Mask Wrapper - enforces perfect clipping boundaries that never scale */}
-      <div className="absolute inset-0 overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]">
+      <div className="absolute inset-0 overflow-hidden rounded-2xl ">
 
         {/* 2. Scaling container */}
         <motion.div
@@ -557,11 +558,21 @@ export function CardPortal({
                     className="absolute inset-0"
                   >
                     <ParticleLogo
-                      src="/images/us.png"
-                      particleCount={720}
+                      src="/us.png"
+                      // 1100 (bumped from the original 720 to read bigger in
+                      // this enlarged portal) turned out to be the direct
+                      // cause of a slow initial reveal and ongoing scroll
+                      // jank — ~10% of these are "spark" particles drawn
+                      // with an expensive canvas shadow blur every frame,
+                      // for as long as this stays mounted (the whole flight,
+                      // not just while it's on screen). 850 keeps the denser,
+                      // bigger-reading mark without the compute spike; the
+                      // larger `size` below carries most of the "bigger" ask
+                      // on its own.
+                      particleCount={850}
                       speed={0.8}
-                      disperseStrength={110}
-                      size={150}
+                      disperseStrength={170}
+                      size={280}
                       loop
                       className="object-contain object-bottom"
                     />

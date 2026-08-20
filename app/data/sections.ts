@@ -40,7 +40,10 @@ export const cards: FlightCard[] = [
   {
     id: "home",
     eyebrow: "01 / Hello",
-    title: "Hi, I'm Umar Suhail",
+    // The bio below opens with "Hi, I'm Umar Suhail" verbatim (see
+    // NARRATION_SCRIPT) — this title sits right above it now that the intro
+    // card stacks portrait-then-bio, so it can't repeat that line.
+    title: "Welcome to My Portfolio",
     description: NARRATION_SCRIPT,
     details: [
       "Next.js developer and frontend developer based in Abu Dhabi",
@@ -53,7 +56,9 @@ export const cards: FlightCard[] = [
     align: "left",
     x: -80,
     z: 0,
-    width: "clamp(420px, 58vw, 900px)",
+    // Wider than the rest — the intro stacks its portrait on top of the bio
+    // rather than sitting beside it, so it reads better as a broad banner.
+    width: "clamp(480px, 74vw, 1040px)",
     tone: "light",
   },
   {

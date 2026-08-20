@@ -109,7 +109,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className={`${grenze.variable} ${twinkleStar.variable} relative min-h-screen antialiased`}>
+      <body className={`${grenze.variable} ${twinkleStar.variable} relative min-h-dvh antialiased`}>
         <PageLoader />
         <AppChrome>{children}</AppChrome>
       </body>

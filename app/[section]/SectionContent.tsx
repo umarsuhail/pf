@@ -384,9 +384,8 @@ export function SectionContent({
               </div>
             </div>
 
-            {/* Placeholder visual — swap for real product screenshots later */}
-            <div className="relative h-64 overflow-hidden rounded-[2rem] border border-white/10 bg-black/10 sm:h-80 lg:h-full lg:min-h-[320px]">
-              <Image src="/images/pro1.png" alt="" fill className="object-cover" />
+            <div className="relative h-64 overflow-hidden rounded-4xl sm:h-80 lg:h-full lg:min-h-[320px]">
+              <Image src="/images/pro-hero.png" alt="" fill className="object-cover" />
             </div>
           </motion.header>
         )}
