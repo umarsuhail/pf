@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+:root {
+  --background: #020617;
+  --foreground: #e2e8f0;
+  --accent: #7dd3fc;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-urbanist);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-urbanist), "Segoe UI", Arial, sans-serif;
+  font-size: clamp(1rem, 0.95rem + 0.2vw, 1.1rem);
+  line-height: 1.65;
+  letter-spacing: 0.005em;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  text-rendering: optimizeLegibility;
+  position: relative;
+  overflow-x: hidden;
+  transition: color 220ms ease;
+}
+
+p,
+li {
+  text-wrap: pretty;
+}
+
+a,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--accent);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-urbanist), "Segoe UI", Arial, sans-serif;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: clamp(2rem, 1.5rem + 2.3vw, 4rem);
+  font-weight: 760;
+}
+
+h2 {
+  font-size: clamp(1.6rem, 1.2rem + 1.5vw, 2.8rem);
+  font-weight: 720;
+}
+
+h3 {
+  font-size: clamp(1.3rem, 1.08rem + 1vw, 2.1rem);
+  font-weight: 680;
+}
+
+h4,
+h5,
+h6 {
+  font-size: clamp(1.08rem, 1rem + 0.45vw, 1.45rem);
+  font-weight: 640;
+}
+
+a {
+  text-underline-offset: 0.16em;
+  text-decoration-thickness: 0.09em;
+  transition: color 160ms ease;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Soft neumorphic panel used by the floating navbar */
+.neumorphic-panel {
+  background: #f3f5f9;
+  box-shadow:
+    8px 8px 18px rgba(163, 177, 198, 0.45),
+    -8px -8px 18px rgba(255, 255, 255, 0.85);
+}
+
+.neumorphic-inset {
+  background: #eef0f5;
+  box-shadow:
+    inset 3px 3px 6px rgba(163, 177, 198, 0.4),
+    inset -3px -3px 6px rgba(255, 255, 255, 0.8);
+}
+
+@keyframes logoPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+.logo-pulse {
+  animation: logoPulse 6s ease-in-out infinite;
+}
