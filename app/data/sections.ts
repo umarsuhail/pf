@@ -18,6 +18,7 @@ export type FlightCard = {
   tone: "light" | "dark";
   // Optional hero art for the standalone /[section] detail page
   image?: string;
+<<<<<<< HEAD
   // Structured content backing the bespoke /[section] layouts below —
   // only set on the cards that actually use them (projects, experience).
   projects?: {
@@ -34,16 +35,22 @@ export type FlightCard = {
     location: string;
     summary: string;
   }[];
+=======
+>>>>>>> 8a13a2e (ccc)
 };
 
 export const cards: FlightCard[] = [
   {
     id: "home",
     eyebrow: "01 / Hello",
+<<<<<<< HEAD
     // The bio below opens with "Hi, I'm Umar Suhail" verbatim (see
     // NARRATION_SCRIPT) — this title sits right above it now that the intro
     // card stacks portrait-then-bio, so it can't repeat that line.
     title: "Welcome to My Portfolio",
+=======
+    title: "Hi, I'm Umar Suhail",
+>>>>>>> 8a13a2e (ccc)
     description: NARRATION_SCRIPT,
     details: [
       "Next.js developer and frontend developer based in Abu Dhabi",
@@ -56,22 +63,57 @@ export const cards: FlightCard[] = [
     align: "left",
     x: -80,
     z: 0,
+<<<<<<< HEAD
     // Wider than the rest — the intro stacks its portrait on top of the bio
     // rather than sitting beside it, so it reads better as a broad banner.
     width: "clamp(480px, 74vw, 1040px)",
+=======
+    width: "clamp(420px, 58vw, 900px)",
+    tone: "light",
+  },
+  {
+    id: "about",
+    eyebrow: "02 / About Me",
+    title: "Software Developer from Kerala, set in Abu Dhabi",
+    description:
+      "My path spans UI Developer at Uvionics Tech, Software Engineer at Aspire Systems, Development Team Lead at Epixel Solutions, and Application Developer at EFR.",
+    details: [
+      "Full name: Umar Suhail",
+      "Role: Lead Frontend Engineer",
+      "Nationality: Indian",
+      "Languages: English, Hindi, Urdu, Malayalam, Tamil",
+      "Education: KMP College of Engineering",
+      "Current location: Abu Dhabi, United Arab Emirates",
+      "Hometown: Thrissur, Kerala",
+      "Open to remote and relocation opportunities",
+    ],
+    cta: "About Details",
+    align: "right",
+    x: 280,
+    z: -950,
+    width: "clamp(400px, 54vw, 840px)",
+>>>>>>> 8a13a2e (ccc)
     tone: "light",
   },
   {
     id: "skills",
+<<<<<<< HEAD
     eyebrow: "02 / Skills",
     title: "React, Next.js, TypeScript, UI/UX, and Performance",
     description:
       "I specialise in high-performance frontend architecture with React, Next.js, TypeScript, Redux Toolkit, and Tailwind CSS, design interfaces end-to-end in Figma and Adobe Creative Suite, and round it out with Node.js and MongoDB on the backend.",
+=======
+    eyebrow: "03 / Skills",
+    title: "React, Next.js, TypeScript, UI/UX, and Performance",
+    description:
+      "I specialise in high-performance frontend architecture with React, Next.js, TypeScript, Redux Toolkit, Tailwind CSS, Figma, and Adobe Creative Suite.",
+>>>>>>> 8a13a2e (ccc)
     details: [
       "React JS — Expert",
       "Next.js — Expert",
       "TypeScript — Expert",
       "JavaScript — Expert",
+<<<<<<< HEAD
       "HTML5 — Expert",
       "CSS3 — Expert",
       "Tailwind CSS — Expert",
@@ -88,6 +130,15 @@ export const cards: FlightCard[] = [
       "Git — Intermediate",
       "Jenkins — Intermediate",
       "Docker — Intermediate",
+=======
+      "HTML5 / CSS3 — Expert",
+      "Tailwind CSS — Expert",
+      "Redux — Expert",
+      "Material-UI — Expert",
+      "Node.js — Intermediate",
+      "Git — Intermediate",
+      "Jenkins — Intermediate",
+>>>>>>> 8a13a2e (ccc)
     ],
     cta: "Skill Details",
     align: "left",
@@ -98,16 +149,27 @@ export const cards: FlightCard[] = [
   },
   {
     id: "projects",
+<<<<<<< HEAD
     eyebrow: "03 / Projects",
     title: "Enterprise Products, Intelligent Platforms & Digital Experiences",
     description:
       "A selection of products I’ve designed and built across enterprise dashboards, biometric and identity platforms, AI-powered applications, workflow systems, and developer-focused tools — combining scalable frontend architecture with thoughtful, high-performance user experiences..",
+=======
+    eyebrow: "04 / Projects",
+    title: "Enterprise Dashboards, Biometric Platforms, and Resume Tools",
+    description:
+      "Recent work includes AI-powered face-recognition systems, biometric transaction monitoring dashboards, tenant configuration workflows, MLM software, and a free resume builder.",
+>>>>>>> 8a13a2e (ccc)
     details: [
       "Dashboard v2 — Transaction & Revenue Monitoring: migrated a legacy Angular multi-tenant dashboard to Next.js + TypeScript, with role/permission access, KYC workflows, and billing analytics (Next.js, React, TypeScript, Node.js, Docker)",
       "AI Chatbots: AI-powered chatbot interfaces and a real-time monitoring dashboard for accident assessment and reporting (React.js, JavaScript, HTML, CSS, Bootstrap)",
       "Loyalty Platform: a high-performance Next.js app built to boost customer engagement and retention (Next.js, TypeScript, Tailwind CSS)",
       "Get-Life: dynamic UI components and pages for GetLife Insurance UK (Gatsby.js, TypeScript, Tailwind CSS)",
       "Confidential: UI components and pages for a leading U.S.-based insurance company (React.js, Node.js, Redux-saga, Bootstrap)",
+<<<<<<< HEAD
+=======
+      "Resume Builder: ATS-friendly templates with editing, styling, preview, and PDF export",
+>>>>>>> 8a13a2e (ccc)
       "Portfolio: interactive scroll-driven 3D portfolio experience",
     ],
     cta: "Project Details",
@@ -116,6 +178,7 @@ export const cards: FlightCard[] = [
     z: -4700,
     width: "clamp(420px, 60vw, 950px)",
     tone: "dark",
+<<<<<<< HEAD
     projects: [
       {
         title: "Enterprise Dashboard — Transaction & Revenue Monitoring",
@@ -171,6 +234,12 @@ export const cards: FlightCard[] = [
   {
     id: "experience",
     eyebrow: "04 / Experience",
+=======
+  },
+  {
+    id: "experience",
+    eyebrow: "05 / Experience",
+>>>>>>> 8a13a2e (ccc)
     title: "Professional Experience Across UAE and India",
     description:
       "A track record of delivering impactful frontend solutions across biometric systems, MLM platforms, enterprise web apps, and reusable UI component libraries.",
@@ -188,6 +257,7 @@ export const cards: FlightCard[] = [
     z: -5750,
     width: "clamp(390px, 52vw, 800px)",
     tone: "dark",
+<<<<<<< HEAD
     timeline: [
       {
         company: "Emirates Face Recognition",
@@ -227,6 +297,35 @@ export const cards: FlightCard[] = [
     title: "Ready to Build Something Amazing?",
     description:
       "Have a project in mind or just want to talk frontend? I'm based in Abu Dhabi, open to new opportunities, and always happy to connect.",
+=======
+  },
+  {
+    id: "resume",
+    eyebrow: "06 / Resume Builder",
+    title: "Build a Professional Resume Online for Free",
+    description:
+      "The resume builder edits, styles, previews, and exports ATS-friendly resumes without leaving the page, with templates for software, healthcare, aviation, and business roles.",
+    details: [
+      "Professional templates with live preview",
+      "PDF viewing and PDF download",
+      "Career template switcher with content-only swaps",
+      "Editable sections for basic info, contact, education, work experience, projects, skills, certifications, languages, personal details, achievements, and declaration",
+      "Example aviation template includes IATA, Sabre, Amadeus, airport operations, cargo operations, and customer communication content",
+    ],
+    cta: "Builder Details",
+    align: "right",
+    x: 300,
+    z: -6800,
+    width: "clamp(410px, 55vw, 880px)",
+    tone: "dark",
+  },
+  {
+    id: "contact",
+    eyebrow: "07 / Contact",
+    title: "Ready to Build Something Amazing?",
+    description:
+      "I'm always excited to work on new projects and collaborate with innovative teams. Reach me in Abu Dhabi, UAE, or connect online.",
+>>>>>>> 8a13a2e (ccc)
     details: [
       "Email: umarsuhail112@gmail.com",
       "Phone: +971 551 912 074 / +971 568 323 258 / +91 949 765 6243",
@@ -247,9 +346,17 @@ export const cards: FlightCard[] = [
 
 export const sectionProgressMap: Record<string, number> = {
   home: 0,
+<<<<<<< HEAD
   skills: 0.22,
   projects: 0.56,
   experience: 0.69,
+=======
+  about: 0.11,
+  skills: 0.22,
+  projects: 0.56,
+  experience: 0.69,
+  resume: 0.81,
+>>>>>>> 8a13a2e (ccc)
   contact: 0.92,
 };
 

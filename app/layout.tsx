@@ -2,7 +2,13 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import PageLoader from "./components/PageLoader";
+<<<<<<< HEAD
 import AppChrome from "./components/AppChrome";
+=======
+import HoloChat from "./components/HoloChat";
+import CockpitTray from "./components/CockpitTray";
+import AutopilotStartToast from "./components/AutopilotStartToast";
+>>>>>>> 8a13a2e (ccc)
 
 const grenze = localFont({
   src: [
@@ -109,9 +115,19 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
+<<<<<<< HEAD
       <body className={`${grenze.variable} ${twinkleStar.variable} relative min-h-dvh antialiased`}>
         <PageLoader />
         <AppChrome>{children}</AppChrome>
+=======
+      <body className={`${urbanist.variable} relative min-h-screen antialiased`}>
+        <PageLoader />
+        <CockpitTray />
+        <AutopilotStartToast />
+        <RouteMap />
+        <main className="relative z-10">{children}</main>
+        <HoloChat />
+>>>>>>> 8a13a2e (ccc)
       </body>
     </html>
   );

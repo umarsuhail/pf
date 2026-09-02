@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 // Assets the very first screen depends on — gate the loader on these
+<<<<<<< HEAD
 // actually finishing, not a fake timer. a1.png/a2.png (the end-of-flight
 // earth/moon) used to be listed here too, but they're only ever seen after
 // scrolling to ~90% of the flight — holding the opening loader on ~1.7MB of
@@ -10,6 +11,11 @@ import { useEffect, useState } from "react";
 // longer for no visible benefit. next/image's own lazy loading fetches them
 // once the visitor is actually approaching that point in the scroll.
 const CRITICAL_ASSETS = ["/bg.jpg"];
+=======
+// actually finishing, not a fake timer. (earth.png no longer exists; the
+// entry portal and the end-of-flight globe both use a1.png now.)
+const CRITICAL_ASSETS = ["/bg.jpg", "/a1.png"];
+>>>>>>> 8a13a2e (ccc)
 const MIN_VISIBLE_MS = 900;
 const EXIT_DURATION_MS = 700;
 const RADIUS = 26;
@@ -21,6 +27,23 @@ export default function PageLoader() {
   const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);
   const [hidden, setHidden] = useState(false);
+  // Nudge the visitor to turn the phone while the assets are still loading,
+  // so the flight is already in its proper orientation by the time it starts.
+  const [needsRotate, setNeedsRotate] = useState(false);
+
+  useEffect(() => {
+    const check = () =>
+      setNeedsRotate(
+        window.innerWidth < 1024 && window.innerHeight > window.innerWidth,
+      );
+    check();
+    window.addEventListener("resize", check);
+    window.addEventListener("orientationchange", check);
+    return () => {
+      window.removeEventListener("resize", check);
+      window.removeEventListener("orientationchange", check);
+    };
+  }, []);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -132,6 +155,42 @@ export default function PageLoader() {
         <p className="px-6 text-center text-xs font-semibold uppercase tracking-[0.32em] text-sky-100/80">
           Loading his world. thanks for visiting.
         </p>
+
+        {needsRotate && (
+          <div className="flex items-center gap-2.5 rounded-full border border-white/15 bg-white/5 px-4 py-2 backdrop-blur-sm">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              className="loader-rotate-hint shrink-0 text-(--accent)"
+              aria-hidden="true"
+            >
+              <rect
+                x="7"
+                y="2"
+                width="10"
+                height="20"
+                rx="2.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <line
+                x1="10.5"
+                y1="19"
+                x2="13.5"
+                y2="19"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span className="text-[11px] font-medium text-sky-100/90">
+              Rotate your phone for the full experience
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -15,14 +15,22 @@ import Link from "next/link";
 import React, { useEffect, useRef, useState } from "react";
 import { CardPortal } from "./CardPortal";
 import { CardIcon } from "./icons/card-icon";
+<<<<<<< HEAD
 import { DownloadIcon, type DownloadIconHandle } from "./icons/download";
 import { BrandIcon } from "./icons/brand-icon";
+=======
+import EndCredits from "./EndCredits";
+>>>>>>> 8a13a2e (ccc)
 import ExpandableText from "./ExpandableText";
 import NarrationHighlights from "./NarrationHighlights";
 import NarratedText from "./NarratedText";
 import { NARRATION_DURATION } from "../data/narration";
+<<<<<<< HEAD
 import { getSkillGroups } from "../data/skillGroups";
 import Greeting from "./Greeting";
+=======
+import SpaceParticles from "./SpaceParticles";
+>>>>>>> 8a13a2e (ccc)
 
 import {
   cardGradients,
@@ -30,6 +38,7 @@ import {
   sectionProgressMap,
   type FlightCard,
 } from "../data/sections";
+<<<<<<< HEAD
 
 // Pulls in the whole `three` library (WebGLRenderer et al. — ~150KB gzipped)
 // for a background starfield that isn't needed to render the first frame.
@@ -73,6 +82,11 @@ const SKILL_LAYOVERS = getSkillGroups(cards[skillsCardIndex]?.details ?? []).map
   },
 );
 
+=======
+
+const sectionProgressStops = cards.map((card) => sectionProgressMap[card.id]);
+
+>>>>>>> 8a13a2e (ccc)
 const PORTAL_WIDTH = "clamp(150px, 20vw, 320px)";
 // Landscape phones are short, so the portal is sized off viewport *height*
 // there — a width-based clamp would hand it 190px of a 440px-tall screen and
@@ -87,8 +101,13 @@ const PHYSICS = {
 
 const NAV_ZOOM_FRACTION = 0.55;
 
+<<<<<<< HEAD
 // Cards whose gap to the next card is tight (home, about, experience,
 // contact — all ~0.11-0.13 apart) clamp the zoom below to their own depart window's
+=======
+// Cards whose gap to the next card is tight (home, about, resume, contact —
+// all ~0.11-0.13 apart) clamp the zoom below to their own depart window's
+>>>>>>> 8a13a2e (ccc)
 // exact start, with zero room to spare. That's fine for a quick scroll-past,
 // but the autopilot tour *holds* there for seconds — arriving with no
 // margin read as landing right on the lip of its own fade-out rather than
@@ -123,9 +142,12 @@ function getActiveSectionId(progress: number) {
   return activeId;
 }
 
+<<<<<<< HEAD
 const RESUME_PDF_URL = "/umar-suhail-resume-2026.pdf";
 const RESUME_TEX_URL = "/resume.tex";
 
+=======
+>>>>>>> 8a13a2e (ccc)
 function getRevealWindow(index: number) {
   if (index === 0) return { start: 0, end: 0.01 };
   const previous = sectionProgressStops[index - 1];
@@ -169,6 +191,7 @@ const AUTOPILOT_TRAVEL = AUTOPILOT_SECTION_SECONDS - AUTOPILOT_HOLD;
 
 // The opening leg (home) runs on its own clock instead of the standard 10s
 // slot — it holds through the whole 43s intro narration with a slow,
+<<<<<<< HEAD
 // continuously-drifting camera that travels the *entire* way to the next
 // card's own arrival point over that whole span, landing there exactly as
 // the narration hands off. Earlier this crept to a barely-there target and
@@ -176,6 +199,15 @@ const AUTOPILOT_TRAVEL = AUTOPILOT_SECTION_SECONDS - AUTOPILOT_HOLD;
 // handoff — reading as a sudden jump/zoom instead of one continuous motion.
 const AUTOPILOT_INTRO_HOLD = NARRATION_DURATION;
 const AUTOPILOT_INTRO_EXPAND_AT = 10;
+=======
+// continuously-drifting camera (never a dead-still parked hold, so it never
+// reads as "stuck"), opens the home card's full bio partway through at the
+// EXPAND mark, then makes a quick 1s hop into about right on the narration's
+// handover to the second track — landing on the second section at 0:44.
+const AUTOPILOT_INTRO_HOLD = NARRATION_DURATION;
+const AUTOPILOT_INTRO_EXPAND_AT = 10;
+const AUTOPILOT_INTRO_HANDOFF = 1;
+>>>>>>> 8a13a2e (ccc)
 
 // The last real card (contact) and the tail beyond it (the earth/moon/end-
 // credits payoff) both get more time than the standard mid-tour hold —
@@ -183,6 +215,7 @@ const AUTOPILOT_INTRO_EXPAND_AT = 10;
 const AUTOPILOT_CONTACT_HOLD = 7;
 const AUTOPILOT_TAIL_HOLD = 8;
 
+<<<<<<< HEAD
 // Each skill layover (frontend/UI/backend) gets a real, brief stop of its
 // own during the Skills → Projects transit, rather than just a fade the
 // camera happens to pass while travelling — a quick hop in, then a short
@@ -190,6 +223,8 @@ const AUTOPILOT_TAIL_HOLD = 8;
 const AUTOPILOT_LAYOVER_TRAVEL = 1.4;
 const AUTOPILOT_LAYOVER_HOLD = 2.6;
 
+=======
+>>>>>>> 8a13a2e (ccc)
 // Forward travel a "go to section" jump adds on top of the card's own stop,
 // in progress units — the fixed span's hang time scaled by the zoom fraction.
 const NAV_ZOOM_PROGRESS = DEPART_SPAN * 0.3 * NAV_ZOOM_FRACTION;
@@ -232,7 +267,10 @@ function BillboardCard({
   card,
   index,
   isMobile,
+<<<<<<< HEAD
   portrait,
+=======
+>>>>>>> 8a13a2e (ccc)
   smoothScrollProgress,
   revealStart,
   revealEnd,
@@ -240,12 +278,16 @@ function BillboardCard({
   card: FlightCard;
   index: number;
   isMobile: boolean;
+<<<<<<< HEAD
   portrait: boolean;
+=======
+>>>>>>> 8a13a2e (ccc)
   smoothScrollProgress: MotionValue<number>;
   revealStart: number;
   revealEnd: number;
 }) {
 
+<<<<<<< HEAD
   // A portrait phone doesn't have the width for the text/portrait side-by-
   // side split every other layout uses — it gets the same top-visual,
   // bottom-text stack the entry card already uses (see `stacked` below),
@@ -253,6 +295,8 @@ function BillboardCard({
   // and reading a flat list of cards instead.
   const stacked = index === 0 || portrait;
 
+=======
+>>>>>>> 8a13a2e (ccc)
   // The flight only ever renders on desktop or on a landscape phone, and both
   // should read the same way: billboards staggered left and right through the
   // corridor, not a stack of centred full-width slabs. `isMobile` now only
@@ -261,6 +305,7 @@ function BillboardCard({
   // The autopilot tour opens the home card's full bio partway through its
   // intro hold, rather than leaving it collapsed while the narration reads
   // straight through it.
+<<<<<<< HEAD
   const pdfDownloadRef = useRef<DownloadIconHandle>(null);
   const texDownloadRef = useRef<DownloadIconHandle>(null);
   const [autoExpandHome, setAutoExpandHome] = useState(false);
@@ -268,6 +313,9 @@ function BillboardCard({
   // the one-way autopilot trigger) so the portal can swap its visual to
   // match — the astronaut only belongs on screen while the full bio reads.
   const [isHomeExpanded, setIsHomeExpanded] = useState(false);
+=======
+  const [autoExpandHome, setAutoExpandHome] = useState(false);
+>>>>>>> 8a13a2e (ccc)
   useEffect(() => {
     if (card.id !== "home") return;
     const onExpand = (event: Event) => {
@@ -327,7 +375,10 @@ function BillboardCard({
   const activeRotateX = useTransform(straightening, (v) => baseRotateX * Math.max(0, 1 - v * 2));
 
   const activeReadabilityBoost = useTransform(straightening, [0, 1], [0, 1]);
+<<<<<<< HEAD
   const textOpacity = useTransform(activeReadabilityBoost, [0, 1], [0.85, 1]);
+=======
+>>>>>>> 8a13a2e (ccc)
   const effectiveBlur = useTransform(() => upcomingBlur.get() * (1 - straightening.get()));
   const effectiveOpacity = useTransform(() => Math.min(1, upcomingOpacity.get() + activeReadabilityBoost.get() * 0.38));
   const cardFilter = useMotionTemplate`blur(${effectiveBlur}px)`;
@@ -372,6 +423,7 @@ function BillboardCard({
          wrapper's gentle float animation below, so it doesn't jitter. */}
       {card.id === "home" && <NarrationHighlights />}
 
+<<<<<<< HEAD
       {stacked ? (
         // Top visual, bottom text — used by the entry card (no room set aside
         // for two columns; the portrait fills the whole card) and, now, by
@@ -629,8 +681,17 @@ function SkillLayoverCluster({
       <span
         className={`font-semibold uppercase tracking-[0.32em] text-sky-100/70 ${
           isMobile ? "text-[9px]" : "text-xs"
+=======
+      <motion.div
+        animate={{ y: [0, -8, 0], scale: 0.98 }}
+        transition={{ duration: 5 + index * 0.5, repeat: Infinity, ease: "easeInOut" }}
+        className={`flex w-full items-stretch ${isMobile ? "gap-3" : "gap-5 sm:gap-8"} ${
+          card.align === "right" ? "flex-row-reverse" : "flex-row"
+>>>>>>> 8a13a2e (ccc)
         }`}
+        style={{ transformStyle: "preserve-3d" }}
       >
+<<<<<<< HEAD
         {layover.group.name}
       </span>
       <div
@@ -665,10 +726,100 @@ function SkillLayoverCluster({
           </div>
         ))}
       </div>
+=======
+        <motion.div
+          className={`flex min-w-0 flex-1 flex-col ${alignmentClass}`}
+          style={{ opacity: useTransform(activeReadabilityBoost, [0, 1], [0.85, 1]) }}
+        >
+          {/* Tailwind breakpoints are width-based, so they can't tell a 956px
+             landscape phone from a laptop — the compact scale is driven off
+             the isMobile prop instead. */}
+          {/* No self-start here — the column's items-start/items-end from
+             alignmentClass is what sides these with the card. */}
+          <span
+            className={`inline-flex items-center rounded-full border font-semibold uppercase tracking-[0.24em] ${
+              isMobile ? "gap-1 px-2.5 py-1 text-[9px]" : "gap-1.5 px-4 py-2 text-xs tracking-[0.32em]"
+            } ${badgeClass}`}
+          >
+            <CardIcon id={card.id} size={isMobile ? 10 : 13} />
+            {card.eyebrow}
+          </span>
+          <h2
+            className={`max-w-[22ch] font-semibold leading-tight ${
+              isMobile
+                ? "mt-2.5 text-lg"
+                : "mt-5 text-2xl sm:mt-6 sm:text-3xl lg:text-5xl"
+            } ${titleClass}`}
+          >
+            {card.title}
+          </h2>
+          {/* Home carries the full narrated bio (all four paragraphs) — too
+             long for a billboard card to show outright, so it collapses to a
+             short preview with a "Read more" that grows the card in place. */}
+          {card.id === "home" ? (
+            <ExpandableText
+              className={`max-w-[46ch] ${isMobile ? "mt-2" : "mt-4 max-w-[38ch] sm:mt-5"}`}
+              collapsedHeight={isMobile ? "3.3em" : "4.5em"}
+              forceExpanded={autoExpandHome}
+            >
+              <p
+                className={`${
+                  isMobile
+                    ? "text-[11px] leading-[1.45]"
+                    : "text-sm leading-6 sm:text-base sm:leading-7 lg:text-xl"
+                } ${bodyClass}`}
+              >
+                <NarratedText id={card.id} text={card.description} />
+              </p>
+            </ExpandableText>
+          ) : (
+            <p
+              className={`max-w-[46ch] ${
+                isMobile
+                  ? "mt-2 line-clamp-4 text-[11px] leading-[1.45]"
+                  : "mt-4 max-w-[38ch] text-sm leading-6 sm:mt-5 sm:text-base sm:leading-7 lg:text-xl"
+              } ${bodyClass}`}
+            >
+              <NarratedText id={card.id} text={card.description} />
+            </p>
+          )}
+          {/* Opens the section's own page rather than expanding in place, so
+             each section is a real, crawlable URL. */}
+          <Link
+            href={`/${card.id}`}
+            className={`inline-block rounded-full border font-semibold transition duration-300 ${
+              isMobile
+                ? "mt-3 px-4 py-1.5 text-[11px]"
+                : "mt-6 px-6 py-3 text-sm hover:-translate-y-1 sm:mt-8"
+            } ${buttonClass}`}
+          >
+            {card.cta}
+          </Link>
+        </motion.div>
+
+
+        <motion.div
+          initial={false}
+          animate={{ width: isMobile ? COMPACT_PORTAL_WIDTH : PORTAL_WIDTH }}
+          transition={PHYSICS.expansion}
+          className="relative hidden min-h-[min(16.25rem,42vh)] shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] sm:block lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]"
+        >
+          <CardPortal
+            index={index}
+            scrollYProgress={smoothScrollProgress}
+            align={card.align}
+            targetId={targetCard.id}
+            actionLabel={actionLabel}
+            ariaLabel={`Fly to ${targetCard.eyebrow.replace(/^\d+\s*\/\s*/, "")}`}
+          />
+        </motion.div>
+      </motion.div>
+>>>>>>> 8a13a2e (ccc)
     </motion.div>
   );
 }
 
+<<<<<<< HEAD
 
 export default function MultiverseFlight() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -679,6 +830,55 @@ export default function MultiverseFlight() {
   // flight at all; it flies in every orientation now.
   const [compact, setCompact] = useState(false);
   const [portrait, setPortrait] = useState(false);
+=======
+function MobileCard({
+  card,
+  index,
+}: {
+  card: FlightCard;
+  index: number;
+}) {
+  const panelClass = "border-white/15 shadow-[0_18px_40px_rgba(2,8,23,0.35)]";
+
+  return (
+    <section
+      id={`section-${card.id}`}
+      className={`w-full rounded-3xl border p-5 sm:p-6 ${panelClass}`}
+      style={{ background: cardGradients[index % cardGradients.length] }}
+    >
+      <div className="flex w-full flex-col items-start text-left">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/20 bg-emerald-200/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-100">
+          <CardIcon id={card.id} size={13} />
+          {card.eyebrow}
+        </span>
+        <h2 className="mt-4 text-2xl font-semibold leading-tight text-[#f0f9ff]">
+          {card.title}
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-slate-100/90">
+          <NarratedText id={card.id} text={card.description} />
+        </p>
+        <Link
+          href={`/${card.id}`}
+          className="mt-5 inline-block rounded-full border border-sky-200/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-sky-50 transition duration-300"
+        >
+          {card.cta}
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+export default function MultiverseFlight() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  // `compact` drives the smaller in-flight card sizing; `portrait` decides
+  // whether a small screen gets the flight at all. A phone held sideways has
+  // the aspect ratio the 3D scene needs, so it flies — held upright it falls
+  // back to the stacked reading layout with a nudge to rotate.
+  const [compact, setCompact] = useState(false);
+  const [portrait, setPortrait] = useState(false);
+  const [rotateDismissed, setRotateDismissed] = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
+>>>>>>> 8a13a2e (ccc)
 
   useEffect(() => {
     const onResize = () => {
@@ -696,6 +896,14 @@ export default function MultiverseFlight() {
   }, []);
 
   const isMobile = compact;
+<<<<<<< HEAD
+=======
+  const showStackedLayout = compact && portrait;
+  // The navigation listener is registered once, so it can't close over this
+  // directly without going stale on rotate.
+  const stackedLayoutRef = useRef(showStackedLayout);
+  stackedLayoutRef.current = showStackedLayout;
+>>>>>>> 8a13a2e (ccc)
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -773,6 +981,17 @@ export default function MultiverseFlight() {
   const endEarthT = useTransform(scrollYProgress, [0.88, 1], [0, 1]);
   const endEarthReveal = useTransform(endEarthT, [0, 0.35, 1], [0, 1, 1]);
 
+<<<<<<< HEAD
+=======
+  // The credits crawl is a boolean mount, not a MotionValue-driven fade —
+  // it self-animates on a timer once it appears, so it needs a plain state
+  // flip rather than a continuous transform.
+  useEffect(() => {
+    const unsubscribe = endEarthT.on("change", (v) => setShowCredits(v > 0.55));
+    return () => unsubscribe();
+  }, [endEarthT]);
+
+>>>>>>> 8a13a2e (ccc)
   // --- Overscroll "approach" -------------------------------------------
   // At max scroll the browser has nothing left to give, so the journey
   // would just dead-stop on a static globe. Instead we capture the wheel /
@@ -904,6 +1123,18 @@ export default function MultiverseFlight() {
       const targetProgress = targetId ? getNavTargetProgress(targetId) : undefined;
       const container = containerRef.current;
 
+<<<<<<< HEAD
+=======
+      // Must match the layout actually rendered, not just the width. A
+      // landscape phone is under 1024px wide but shows the *flight*, where no
+      // `section-*` anchors exist — testing width alone sent every "Next" tap
+      // into a getElementById that returned null, so nothing happened.
+      if (stackedLayoutRef.current && targetId) {
+        document.getElementById(`section-${targetId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+
+>>>>>>> 8a13a2e (ccc)
       if (targetProgress === undefined || !container) return;
       const containerTop = window.scrollY + container.getBoundingClientRect().top;
       const scrollableHeight = container.offsetHeight - window.innerHeight;
@@ -979,6 +1210,7 @@ export default function MultiverseFlight() {
 
       const toScrollTop = (p: number) => containerTop + scrollable * p;
 
+<<<<<<< HEAD
       // One leg per stop the tour actually parks on: the intro's continuous
       // drift into Skills, each remaining card in turn (with the three skill
       // layovers inserted as their own brief stops between Skills and
@@ -1048,6 +1280,39 @@ export default function MultiverseFlight() {
         holdMs: AUTOPILOT_TAIL_HOLD * 1000,
         cardIndex: cards.length,
       });
+=======
+      // Every section's arrival point, then the tail of the track so the tour
+      // ends on the closing shot rather than on the last card.
+      const legs = [
+        ...cards.map((card) => getNavTargetProgress(card.id) ?? 0),
+        1,
+      ];
+
+      // Per-leg timing. Every leg after the intro uses the standard 10s
+      // slot, unchanged. The first two are custom: home holds through the
+      // full 43s narration on a slow continuous drift instead of a quick
+      // travel-then-park, and about's arrival is compressed to a 1s hop so
+      // it lands exactly as the narration hands off to the second track.
+      const legPlans = legs.map((target, i) => {
+        if (i === 0) return { target, travelMs: AUTOPILOT_INTRO_HOLD * 1000, linear: true };
+        if (i === 1) return { target, travelMs: AUTOPILOT_INTRO_HANDOFF * 1000, linear: false };
+        return { target, travelMs: AUTOPILOT_TRAVEL * 1000, linear: false };
+      });
+      // Home's own "hold" already happened during its narrated travel — no
+      // extra pause after it, or the quick hop into about would miss landing
+      // right on the narration's handoff. Contact (the last real card) and
+      // the tail beyond it (the earth/moon/credits payoff) both get extra
+      // time — 1.4s was barely enough to register the ending existed before
+      // the tour disengaged itself.
+      const holdMsFor = (i: number) =>
+        i === 0
+          ? 0
+          : i === legs.length - 1
+            ? AUTOPILOT_TAIL_HOLD * 1000
+            : i === legs.length - 2
+              ? AUTOPILOT_CONTACT_HOLD * 1000
+              : AUTOPILOT_HOLD * 1000;
+>>>>>>> 8a13a2e (ccc)
 
       // Always departs from the beginning — a tour that starts halfway is not
       // a tour. The camera spring is snapped along with the scroll so the
@@ -1076,10 +1341,17 @@ export default function MultiverseFlight() {
 
       const beginLeg = (now: number) => {
         from = currentProgress;
+<<<<<<< HEAD
         legMs = legs[index].travelMs;
         legStart = now;
         if (index === 0) introExpandFired = false;
         if (legs[index].cardIndex < cards.length) emit(true, legs[index].cardIndex);
+=======
+        legMs = legPlans[index].travelMs;
+        legStart = now;
+        if (index === 0) introExpandFired = false;
+        if (index < cards.length) emit(true, index);
+>>>>>>> 8a13a2e (ccc)
       };
 
       // Landing on "/" right before this runs (the cross-page engage flow)
@@ -1128,8 +1400,13 @@ export default function MultiverseFlight() {
         }
 
         const t = Math.min(1, (now - legStart) / legMs);
+<<<<<<< HEAD
         const eased = legs[index].linear ? t : ease(t);
         const p = from + (legs[index].target - from) * eased;
+=======
+        const eased = legPlans[index].linear ? t : ease(t);
+        const p = from + (legs[index] - from) * eased;
+>>>>>>> 8a13a2e (ccc)
         currentProgress = p;
         window.scrollTo({ top: toScrollTop(p), behavior: "auto" });
         // window.scrollTo doesn't move the camera directly — every card's
@@ -1147,13 +1424,40 @@ export default function MultiverseFlight() {
         smoothScrollProgress.jump(p);
 
         if (t >= 1) {
+<<<<<<< HEAD
           dwellUntil = now + legs[index].holdMs;
+=======
+          dwellUntil = now + holdMsFor(index);
+>>>>>>> 8a13a2e (ccc)
         }
       };
 
       raf = requestAnimationFrame(holdAtStart);
     };
 
+<<<<<<< HEAD
+=======
+    // Portrait phones get the stacked reading layout, which has no flight to
+    // fly — the tour walks the anchors instead.
+    const runStacked = () => {
+      let index = 0;
+      const step = () => {
+        if (index >= cards.length) {
+          stop();
+          return;
+        }
+        document
+          .getElementById(`section-${cards[index].id}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        emit(true, index);
+        index += 1;
+        timer = window.setTimeout(step, AUTOPILOT_SECTION_SECONDS * 1000);
+      };
+      // Kept non-zero so `timer` marks the tour as running immediately.
+      timer = window.setTimeout(step, 1);
+    };
+
+>>>>>>> 8a13a2e (ccc)
     const onCommand = (event: Event) => {
       const action = (event as CustomEvent<{ action?: "start" | "stop" }>)
         .detail?.action;
@@ -1170,7 +1474,12 @@ export default function MultiverseFlight() {
       // announcement and the snap-to-start read as one launch, not two
       // separate things.
       window.dispatchEvent(new CustomEvent("flight-autopilot-launch"));
+<<<<<<< HEAD
       runFlight();
+=======
+      if (stackedLayoutRef.current) runStacked();
+      else runFlight();
+>>>>>>> 8a13a2e (ccc)
     };
 
     window.addEventListener("flight-autopilot", onCommand as EventListener);
@@ -1204,6 +1513,7 @@ export default function MultiverseFlight() {
     return () => unsubscribe();
   }, [scrollYProgress]);
 
+<<<<<<< HEAD
   return (
     // Taller track = more scrolling for the same camera distance, i.e. a
     // slower flight. Everything else is keyed off normalised progress, so
@@ -1326,6 +1636,209 @@ export default function MultiverseFlight() {
             smoothScrollProgress={smoothScrollProgress}
           />
         ))}
+=======
+  if (showStackedLayout) {
+    return (
+      <div ref={containerRef} className="relative min-h-screen w-full overflow-x-hidden bg-transparent pt-24">
+        <div className="mx-auto flex w-full max-w-xl flex-col gap-5">
+          {cards.map((card, index) => (
+            <MobileCard key={card.id} card={card} index={index} />
+          ))}
+        </div>
+
+        {/* The content stays readable underneath — this only invites the
+           visitor into the full 3D flight, and can be waved off. */}
+        <AnimatePresence>
+          {rotateDismissed && (
+            <motion.div
+              key="rotate-prompt"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.35 }}
+              className="fixed inset-0 z-90 flex flex-col items-center justify-center gap-6 bg-slate-950/92 px-8 text-center backdrop-blur-sm"
+            >
+              <motion.svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="72"
+                height="72"
+                viewBox="0 0 24 24"
+                className="text-(--accent)"
+                animate={{ rotate: [0, -90, -90, 0] }}
+                transition={{
+                  duration: 3,
+                  times: [0, 0.35, 0.75, 1],
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                aria-hidden="true"
+              >
+                <rect
+                  x="7"
+                  y="2"
+                  width="10"
+                  height="20"
+                  rx="2.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+                <line
+                  x1="10.5"
+                  y1="19"
+                  x2="13.5"
+                  y2="19"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </motion.svg>
+
+              <div>
+                <h2 className="text-xl font-semibold text-sky-50">Rotate your phone</h2>
+                <p className="mt-2 max-w-xs text-sm leading-6 text-slate-300">
+                  Turn your device sideways for a different view.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setRotateDismissed(true)}
+                className="rounded-full border border-white/20 bg-white/10 px-6 py-2.5 text-sm font-semibold text-sky-50 transition-colors hover:bg-white/20"
+              >
+                Keep reading instead
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  return (
+    // Taller track = more scrolling for the same camera distance, i.e. a
+    // slower flight. Everything else is keyed off normalised progress, so
+    // stretching this is the one knob that changes pace without disturbing
+    // any of the per-card reveal/focus/depart windows.
+    <div ref={containerRef} className="relative h-[1800vh] w-full bg-transparent">
+      <div className="sticky top-0 flex h-screen w-screen items-center justify-center overflow-hidden [perspective:1100px]">
+        {/* Furthest plane — barely moves, and is over-sized so translating it
+           never drags an edge into frame. */}
+        <motion.div
+          className="absolute -inset-y-1/4 inset-x-0"
+          style={{
+            background: sceneBackground,
+            y: parallaxFar,
+            scale: parallaxFarScale,
+          }}
+        />
+        {/* Mid plane — the opening sky glow, travelling further than the void
+           behind it. */}
+        <motion.div
+          className="absolute inset-x-0 top-[-10vh] h-[60vh] bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.22),_transparent_62%)]"
+          style={{ opacity: lightGlowOpacity, y: parallaxMid }}
+        />
+        {/* Nearest plane — drifts against the others, so the depth between
+           them is legible rather than everything sliding as one sheet. */}
+        <motion.div
+          className="absolute -inset-y-1/4 inset-x-0 bg-[radial-gradient(circle_at_50%_55%,_rgba(56,189,248,0.12),_transparent_48%)]"
+          style={{ opacity: deepGlowOpacity, y: parallaxNear }}
+        />
+        
+        <SpaceParticles />
+
+        <motion.div
+          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          style={{ opacity: endEarthOpacity }}
+        >
+          {/* Void closes in the harder you strain toward it */}
+          <motion.div
+            className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_transparent_25%,_#000_100%)]"
+            style={{ opacity: approachVignette }}
+          />
+
+          <motion.div
+            className="relative h-[15vh] w-[15vh] max-h-36 max-w-36"
+            style={{ scale: endEarthScale }}
+          >
+            {/* Atmosphere halo — brightens as the globe fills the view */}
+            <motion.div
+              className="absolute inset-[-22%] rounded-full blur-2xl"
+              style={{
+                opacity: approachGlow,
+                background:
+                  "radial-gradient(circle, rgba(125,211,252,0.45) 0%, rgba(125,211,252,0.14) 45%, transparent 72%)",
+              }}
+            />
+            <motion.div
+              className="relative h-full w-full"
+              style={{ rotate: endEarthRotate }}
+            >
+              <Image src="/a1.png" alt="" fill sizes="60vh" className="object-contain" />
+            </motion.div>
+
+            {/* Moon — orbits the earth on its own wrapper, so its rotate
+               sweeps position around the center rather than spinning the
+               moon image itself in place. */}
+            <motion.div
+              className="absolute inset-0"
+              style={{ rotate: moonOrbit }}
+            >
+              <div className="absolute left-1/2 top-0 h-[34%] w-[34%] -translate-x-1/2 -translate-y-[110%]">
+                <Image
+                  src="/a2.png"
+                  alt=""
+                  fill
+                  sizes="20vh"
+                  className="object-contain drop-shadow-[0_0_10px_rgba(226,232,240,0.35)]"
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+
+          {/* Invitation to keep pushing — fades the moment they do */}
+          <motion.p
+            className="absolute bottom-16 text-[10px] font-semibold uppercase tracking-[0.42em] text-sky-100/60"
+            style={{ opacity: hintOpacity }}
+          >
+            THE END,THANK YOU. PLEASE GO BACK TO THE BEGINNING TO START NEW FLIGHT.
+          </motion.p>
+        </motion.div>
+
+        {/* End-title crawl — self-playing once the globe scene is reached,
+           independent of the earth's own pull-dissolve opacity so the credits
+           stay legible even while straining toward it. */}
+        <AnimatePresence>
+          {showCredits && (
+            <motion.div
+              key="end-credits"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.2 }}
+            >
+              <EndCredits />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.div
+          style={{ translateZ: zCamera, transformStyle: "preserve-3d" }}
+          className="absolute inset-0 flex items-center justify-center"
+        >
+          {cards.map((card, index) => (
+            <BillboardCard
+              key={card.id}
+              card={card}
+              index={index}
+              isMobile={isMobile}
+              smoothScrollProgress={smoothScrollProgress}
+              revealStart={getRevealWindow(index).start}
+              revealEnd={getRevealWindow(index).end}
+            />
+          ))}
+        </motion.div>
+>>>>>>> 8a13a2e (ccc)
       </div>
     </div>
   );

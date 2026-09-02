@@ -231,13 +231,36 @@ html {
   animation-delay: -0.8s;
 }
 
+/* Phone icon on the loader tipping over to suggest turning the device */
+@keyframes loaderRotateHint {
+
+  0%,
+  30% {
+    transform: rotate(0deg);
+  }
+
+  55%,
+  85% {
+    transform: rotate(-90deg);
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.loader-rotate-hint {
+  animation: loaderRotateHint 3s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   .motif-breathe,
   .motif-drift,
   .motif-float-slow,
   .motif-float-med,
-  .motif-float-fast {
+  .motif-float-fast,
+  .loader-rotate-hint {
     animation: none;
   }
 }

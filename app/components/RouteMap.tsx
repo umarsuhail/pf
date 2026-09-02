@@ -13,6 +13,10 @@ const stops: RouteStop[] = [
   { id: "skills", label: "Skills", progress: 0.22 },
   { id: "projects", label: "Projects", progress: 0.56 },
   { id: "experience", label: "Experience", progress: 0.69 },
+<<<<<<< HEAD
+=======
+  { id: "resume", label: "Resume Builder", progress: 0.81 },
+>>>>>>> 8a13a2e (ccc)
   { id: "contact", label: "Contact", progress: 0.92 },
 ];
 
