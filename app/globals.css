@@ -14,7 +14,8 @@
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(180deg, #002d54 0%, #00101f 100%);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-urbanist), "Segoe UI", Arial, sans-serif;
   font-size: clamp(1rem, 0.95rem + 0.2vw, 1.1rem);
@@ -24,6 +25,7 @@ body {
   text-rendering: optimizeLegibility;
   position: relative;
   overflow-x: hidden;
+  overscroll-behavior-y: none;
   transition: color 220ms ease;
 }
 
@@ -219,13 +221,36 @@ html {
   animation-delay: -0.8s;
 }
 
+/* Phone icon on the loader tipping over to suggest turning the device */
+@keyframes loaderRotateHint {
+
+  0%,
+  30% {
+    transform: rotate(0deg);
+  }
+
+  55%,
+  85% {
+    transform: rotate(-90deg);
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.loader-rotate-hint {
+  animation: loaderRotateHint 3s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   .motif-breathe,
   .motif-drift,
   .motif-float-slow,
   .motif-float-med,
-  .motif-float-fast {
+  .motif-float-fast,
+  .loader-rotate-hint {
     animation: none;
   }
 }

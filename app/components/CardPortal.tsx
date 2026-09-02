@@ -4,7 +4,8 @@ import Image from "next/image";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import gsap from "gsap";
 import type { MotionValue } from "framer-motion";
-import { FiArrowUpRight } from "react-icons/fi";
+import { ArrowUpRightIcon } from "./icons/arrow-up-right";
+import type { AnimatedIconHandle } from "./icons/card-icon";
 import Space from "./Space";
 
 interface CardPortalProps {
@@ -74,6 +75,18 @@ const atmospheres: { overlay: string; motif: MotifType; accent: string }[] = [
     accent: "#7dd3fc",
   },
 ];
+
+// Non-entry cards that have a real hero image, keyed by card index (1-based
+// after the entry/earth card at index 0); indices without an entry fall back
+// to the drawn PortalMotif below.
+const imageSrcByIndex: Record<number, string> = {
+  1: "/a2.svg",
+  2: "/a3.svg",
+  3: "/a4.svg",
+  4: "/a5.svg",
+  5: "/a6.svg",
+  6: "/a7.svg",
+};
 
 function PortalMotif({ motif, accent }: { motif: MotifType; accent: string }) {
   switch (motif) {
@@ -191,8 +204,10 @@ export function CardPortal({
 }: CardPortalProps) {
   const earthRef = useRef<HTMLDivElement>(null);
   const motifRef = useRef<HTMLDivElement>(null);
+  const spinRef = useRef<HTMLDivElement>(null);
   const visualRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
+  const arrowRef = useRef<AnimatedIconHandle>(null);
   const hasEnteredRef = useRef(false);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
   const [isActivating, setIsActivating] = useState(false);
@@ -210,11 +225,25 @@ export function CardPortal({
     // Reveals only when very close to the card's focus point
     const revealStart = Math.max(currentStop - approachSpan * 0.3, 0);
     const revealPeak = currentStop;
+    // Past its own stop the camera is pushing through the card, and because
+    // every card's z is set so it sits at the camera plane exactly at its own
+    // stop, the card balloons toward CSS perspective's singularity at roughly
+    // stop + 0.131 (1100px perspective / 8400px camera travel; mobile's
+    // shorter 7800px travel puts it a touch later, ~0.141, so 0.131 is the
+    // earlier, safer bound to fade against on both). That's much sooner than
+    // the old +0.1..+0.29 window — the fade had barely started by the time
+    // the globe was blowing up to fill the frame, reading as a huge image
+    // stuck at full opacity rather than dissolving as it passed. Finishing
+    // the fade well before the singularity means the globe is gone before it
+    // would otherwise explode in size.
+    const departFadeStart = currentStop + 0.03;
+    const departFadeEnd = currentStop + 0.11;
     const ease = gsap.parseEase("power3.out");
     let lastReveal = -1;
+    let lastFade = -1;
 
     // Quick setters keep per-scroll updates cheap (percent-based, GPU-composited)
-    let applyReveal: (eased: number) => void;
+    let applyReveal: (eased: number, fade: number) => void;
     if (isEntry) {
       // Earth rises from the bottom corner, staying clipped inside the window
       const cornerDirection = align === "left" ? 1 : -1;
@@ -230,6 +259,7 @@ export function CardPortal({
         earthX(cornerDirection * 30 * (1 - eased));
         earthY(105 * (1 - eased));
       };
+      // Entry card rises rather than fading — no depart dim to apply.
     } else {
       // Other universes' motifs fade and settle into view instead of rising
       const motifOpacity = gsap.quickTo(target, "opacity", {
@@ -240,8 +270,8 @@ export function CardPortal({
         duration: 0.6,
         ease: "power3.out",
       });
-      applyReveal = (eased) => {
-        motifOpacity(eased);
+      applyReveal = (eased, fade) => {
+        motifOpacity(eased * fade);
         motifScale(0.85 + eased * 0.15);
       };
     }
@@ -258,17 +288,51 @@ export function CardPortal({
       if (isEntry) reveal = Math.max(reveal, 1 - progress / 0.06);
       reveal = Math.min(Math.max(reveal, 0), 1);
 
-      // Skip redundant work while the card is far away (or fully revealed)
-      if (reveal === lastReveal) return;
-      lastReveal = reveal;
+      let fade = 1;
+      if (!isEntry && progress > departFadeStart) {
+        fade =
+          1 -
+          Math.min(
+            (progress - departFadeStart) / (departFadeEnd - departFadeStart),
+            1,
+          );
+      }
 
-      applyReveal(ease(reveal));
+      // Skip redundant work while the card is far away (or fully revealed)
+      if (reveal === lastReveal && fade === lastFade) return;
+      lastReveal = reveal;
+      lastFade = fade;
+
+      applyReveal(ease(reveal), fade);
     };
 
     update(scrollYProgress.get());
     const unsubscribe = scrollYProgress.on("change", update);
     return () => unsubscribe();
   }, [index, align, scrollYProgress, isEntry]);
+
+  // Scroll-driven spin for the per-section globes, mirroring the distant
+  // a1.png earth at the end of the flight: rotation tracks how far the
+  // visitor has travelled rather than a wall-clock timer, so the globes are
+  // already mid-turn when a card comes into view and freeze when scrolling
+  // stops. Lives on its own wrapper so it never fights the opacity/scale
+  // quickTo already driving motifRef.
+  useEffect(() => {
+    const target = spinRef.current;
+    if (!target || isEntry) return;
+
+    const spinTo = gsap.quickTo(target, "rotation", {
+      duration: 0.8,
+      ease: "power2.out",
+    });
+    // Staggered start angle so the globes aren't all locked in unison
+    const offset = index * 40;
+    const update = (progress: number) => spinTo(offset + progress * 260);
+
+    update(scrollYProgress.get());
+    const unsubscribe = scrollYProgress.on("change", update);
+    return () => unsubscribe();
+  }, [index, isEntry, scrollYProgress]);
 
   // Snap the entry portal back to rest if the user manually scrolls back near the top
   useEffect(() => {
@@ -349,6 +413,8 @@ export function CardPortal({
       aria-label={ariaLabel}
       aria-disabled={isActivating}
       onClick={handleActivate}
+      onMouseEnter={() => arrowRef.current?.startAnimation()}
+      onMouseLeave={() => arrowRef.current?.stopAnimation()}
       onKeyDown={(e: KeyboardEvent) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -356,46 +422,62 @@ export function CardPortal({
         }
       }}
     >
-      <div
-        ref={visualRef}
-        className="relative h-full w-full transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]"
-      >
-        {/* Space backdrop filling the window, carrying this section's portal color */}
-        <Space tint={atmosphere.accent} />
+      {/* 1. Static Mask Wrapper - enforces perfect clipping boundaries that never scale */}
+      <div className="absolute inset-0 overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]">
+        
+        {/* 2. Scaling container (with visualRef) */}
+        <div ref={visualRef} className="relative h-full w-full transform-flat">
+          {/* Space backdrop filling the window, carrying this section's portal color */}
+          <Space tint={atmosphere.accent} />
 
-        {/* Color overlay giving this section's universe its own tone */}
-        <div
-          className="absolute inset-0"
-          style={{ background: atmosphere.overlay }}
-        />
-
-        {isEntry ? (
+          {/* Color overlay giving this section's universe its own tone */}
           <div
-            ref={earthRef}
-            className="absolute inset-x-0 bottom-0 h-[65%]"
-            style={{
-              transform: "translateY(105%)",
-              willChange: "transform",
-            }}
-          >
-            <Image
-              src="/earth.png"
-              alt=""
-              fill
-              className="object-cover object-top"
-            />
-          </div>
-        ) : (
-          <div
-            ref={motifRef}
             className="absolute inset-0"
-            style={{ opacity: 0, willChange: "opacity, transform" }}
-          >
-            <PortalMotif motif={atmosphere.motif} accent={atmosphere.accent} />
-          </div>
-        )}
+            style={{ background: atmosphere.overlay }}
+          />
 
-        {/* Punch-through flash masking the seam into the real camera flight */}
+          {isEntry ? (
+            <div
+              ref={earthRef}
+              className="absolute inset-x-0 bottom-0 h-[65%]"
+              style={{
+                transform: "translateY(105%)",
+                willChange: "transform",
+              }}
+            >
+              <Image
+                src="/a1.png"
+                alt=""
+                fill
+                sizes="(min-width: 1024px) 30vw, 40vh"
+                className="object-contain object-bottom"
+                priority
+              />
+            </div>
+          ) : (
+            <div
+              ref={motifRef}
+              className="absolute inset-0"
+              style={{ opacity: 0, willChange: "opacity, transform" }}
+            >
+              {imageSrcByIndex[index] ? (
+                <div ref={spinRef} className="absolute inset-0">
+                  <Image
+                    src={imageSrcByIndex[index]}
+                    alt=""
+                    fill
+                    sizes="(min-width: 1024px) 30vw, 30vh"
+                    className="object-contain"
+                  />
+                </div>
+              ) : (
+                <PortalMotif motif={atmosphere.motif} accent={atmosphere.accent} />
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 3. Punch-through flash layer - inside mask but outside visualRef so it doesn't scale strangely */}
         {isEntry && (
           <div
             ref={flashRef}
@@ -411,7 +493,7 @@ export function CardPortal({
       {/* Action label — faint baseline (touch), brightens on hover-capable pointer hover */}
       <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center opacity-70 transition-opacity duration-300 group-hover:opacity-100">
         <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/30 px-4 py-2 text-xs font-medium text-sky-50 backdrop-blur-sm">
-          <FiArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+          <ArrowUpRightIcon ref={arrowRef} size={14} aria-hidden="true" />
           {actionLabel}
         </span>
       </div>

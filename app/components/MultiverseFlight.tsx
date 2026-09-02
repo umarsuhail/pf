@@ -4,246 +4,88 @@ import {
   AnimatePresence,
   motion,
   useMotionTemplate,
-  useMotionValueEvent,
+  useMotionValue,
   useScroll,
+  useSpring,
   useTransform,
   type MotionValue,
 } from "framer-motion";
 import Image from "next/image";
+import Link from "next/link";
 import React, { useEffect, useRef, useState } from "react";
 import { CardPortal } from "./CardPortal";
+import { CardIcon } from "./icons/card-icon";
+import EndCredits from "./EndCredits";
+import ExpandableText from "./ExpandableText";
+import NarrationHighlights from "./NarrationHighlights";
+import NarratedText from "./NarratedText";
+import { NARRATION_DURATION } from "../data/narration";
 import SpaceParticles from "./SpaceParticles";
 
-type FlightCard = {
-  id: string;
-  eyebrow: string;
-  eyebrowIcon?: React.ReactNode;
-  title: string;
-  description: string;
-  details: string[];
-  cta: string;
-  align: "left" | "right";
-  x: number;
-  z: number;
-  width: string;
-  tone: "light" | "dark";
-};
-
-const cards: FlightCard[] = [
-  {
-    id: "home",
-    eyebrowIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
-  <path fill="currentColor" d="M5 19v-8.692q0-.384.172-.727t.474-.565l5.385-4.078q.423-.323.966-.323t.972.323l5.385 4.077q.303.222.474.566q.172.343.172.727V19q0 .402-.299.701T18 20h-3.384q-.344 0-.576-.232q-.232-.233-.232-.576v-4.769q0-.343-.232-.575q-.233-.233-.576-.233h-2q-.343 0-.575.233q-.233.232-.233.575v4.77q0 .343-.232.575T9.385 20H6q-.402 0-.701-.299T5 19"></path>
-</svg>`,
-    eyebrow: "01 / Hello",
-    title: "Umar Suhail — Frontend Developer Crafting Immersive Web Experiences",
-    description:
-      "I build fast, accessible interfaces with React, Next.js, and TypeScript — and add creative WebGL and motion touches that turn product ideas into polished, production-ready UI.",
-    details: [
-      "Frontend developer focused on React, Next.js, and TypeScript",
-      "Adds WebGL and motion craft on top of solid component architecture",
-      "This portfolio's own scroll-driven 3D flight is a working example",
-    ],
-    cta: "View My Work",
-    align: "left",
-    x: -320,
-    z: 0,
-    width: "clamp(420px, 62vw, 980px)",
-    tone: "light",
-  },
-  {
-    id: "about",
-    eyebrow: "02 / About Me",
-    title: "A Design-Minded Engineer Who Sweats the Details",
-    description:
-      "Years of shipping component systems, design tokens, and animation-rich pages. I care about clean architecture, readable code, and interfaces that feel effortless to use.",
-    details: [
-      "Built and maintained design-token-driven component systems at scale",
-      "Cares about readable code as much as polished pixels",
-      "Believes the best interfaces are the ones users stop noticing",
-    ],
-    cta: "More About Me",
-    align: "right",
-    x: 280,
-    z: -950,
-    width: "clamp(380px, 50vw, 780px)",
-    tone: "light",
-  },
-  {
-    id: "skills",
-    eyebrow: "03 / Skills",
-    title: "A Toolbox Built for the Modern Web",
-    description:
-      "React, Next.js, TypeScript, Tailwind CSS, Framer Motion, GSAP, Three.js, Node.js, REST and GraphQL — with testing in Jest and Playwright, and CI/CD pipelines that keep releases boring.",
-    details: [
-      "Core: React, Next.js, TypeScript, Tailwind CSS",
-      "Motion & 3D: Framer Motion, GSAP, Three.js",
-      "Backend & data: Node.js, REST, GraphQL",
-      "Quality: Jest, Playwright, CI/CD pipelines",
-    ],
-    cta: "See Full Stack",
-    align: "left",
-    x: -250,
-    z: -1850,
-    width: "clamp(400px, 54vw, 840px)",
-    tone: "light",
-  },
-  {
-    id: "projects",
-    eyebrow: "04 / Projects",
-    title: "Featured Work: From Admin Dashboards to 3D Storytelling",
-    description:
-      "Highlights include a biometric admin platform, an e-commerce storefront with 95+ Lighthouse scores, and this multiverse portfolio — scroll-driven WebGL flight and all.",
-    details: [
-      "Biometric admin platform — dense data views, real-time device state",
-      "E-commerce storefront — 95+ Lighthouse across performance and a11y",
-      "This site — scroll-driven camera flight through 3D billboard cards",
-    ],
-    cta: "Browse Projects",
-    align: "right",
-    x: 260,
-    z: -4700,
-    width: "clamp(420px, 60vw, 950px)",
-    tone: "dark",
-  },
-  {
-    id: "experience",
-    eyebrow: "05 / Experience",
-    title: "Teams, Products, and Production Lessons",
-    description:
-      "From startup sprints to enterprise release trains — building admin platforms, migrating legacy UI to React, owning performance budgets, and mentoring juniors on frontend fundamentals.",
-    details: [
-      "Startup sprints and enterprise release trains alike",
-      "Led legacy-to-React migrations without breaking the lights on",
-      "Owned performance budgets end to end",
-      "Mentored junior engineers on frontend fundamentals",
-    ],
-    cta: "View Timeline",
-    align: "left",
-    x: -290,
-    z: -5750,
-    width: "clamp(390px, 52vw, 800px)",
-    tone: "dark",
-  },
-  {
-    id: "opensource",
-    eyebrow: "06 / Open Source",
-    title: "Sharing Code, Writing, and Small Tools",
-    description:
-      "I contribute to UI libraries, publish small utilities, and write about animation performance, rendering internals, and pragmatic TypeScript patterns for real projects.",
-    details: [
-      "Contributes to open-source UI libraries",
-      "Publishes small, focused utility packages",
-      "Writes about animation performance and rendering internals",
-    ],
-    cta: "Read & Explore",
-    align: "right",
-    x: 300,
-    z: -6800,
-    width: "clamp(410px, 55vw, 880px)",
-    tone: "dark",
-  },
-  {
-    id: "contact",
-    eyebrow: "07 / Contact",
-    title: "Let's Build Something Great Together",
-    description:
-      "Open to frontend roles and freelance collaborations. Reach me at umarsuhail112@gmail.com, or connect on LinkedIn and GitHub to talk shop.",
-    details: [
-      "Open to full-time frontend roles and freelance collaborations",
-      "Email: umarsuhail112@gmail.com",
-      "Also reachable on LinkedIn and GitHub",
-    ],
-    cta: "Get In Touch",
-    align: "left",
-    x: -220,
-    z: -7900,
-    width: "clamp(420px, 58vw, 940px)",
-    tone: "dark",
-  },
-];
-
-const sectionProgressMap: Record<string, number> = {
-  home: 0,
-  about: 0.11,
-  skills: 0.22,
-  projects: 0.56,
-  experience: 0.69,
-  opensource: 0.81,
-  contact: 0.92,
-};
-
-// Dark gray-blue-emerald gradient per card, each with its own blend
-const cardGradients = [
-  "radial-gradient(120% 120% at 15% 20%, rgba(0,108,159,0.85) 0%, rgba(0,108,159,0.25) 55%, rgba(0,108,159,0) 100%), linear-gradient(135deg, #00273f 0%, #003f5f 50%, #006c9f 100%)",
-  "linear-gradient(160deg, #111827 0%, #1e3a5f 55%, #00294a 100%)",
-  "linear-gradient(120deg, #0f172a 0%, #25397c 52%, #1d4ed8 115%)",
-  "linear-gradient(150deg, #1f2937 0%, #0e3a5c 42%, #540615 96%)",
-  "linear-gradient(125deg, #0b1120 0%, #155e75 58%, #10427a 100%)",
-  "linear-gradient(165deg, #1e293b 0%, #50260b 46%, #1e40af 112%)",
-  "linear-gradient(140deg, #111827 8%, #0f3d5c 50%, #41272a 108%)",
-];
+import {
+  cardGradients,
+  cards,
+  sectionProgressMap,
+  type FlightCard,
+} from "../data/sections";
 
 const sectionProgressStops = cards.map((card) => sectionProgressMap[card.id]);
 
-// Expanded-state sizing — EXPANDED_CARD_WIDTH deliberately mirrors the same
-// clamp(px, vw, px) shape as every card.width value above, so Framer Motion
-// can numerically tween the matching tokens in each string every frame.
-// Every expand-driven value (card width, portal width, translateX) is
-// animated through this one spring so they all move on the same rAF loop —
-// mixing a CSS transition on width with FM-driven transform on the same
-// element caused the two engines to desync and stutter under load.
-const EXPANDED_CARD_WIDTH = "clamp(760px, 92vw, 1400px)";
-const DETAILS_PANEL_WIDTH = "clamp(200px, 24vw, 320px)";
-// Replaces the old `w-[38%]`-of-row sizing — a fixed clamp() the same shape
-// as EXPANDED_PORTAL_WIDTH so the two can be tweened by Framer Motion.
 const PORTAL_WIDTH = "clamp(150px, 20vw, 320px)";
-const EXPANDED_PORTAL_WIDTH = "clamp(220px, 30vw, 360px)";
-const EXPAND_SPRING = {
-  type: "spring",
-  stiffness: 260,
-  damping: 30,
-  mass: 0.9,
-} as const;
-const AUTO_COLLAPSE_STRAIGHTENING_THRESHOLD = 0.15;
+// Landscape phones are short, so the portal is sized off viewport *height*
+// there — a width-based clamp would hand it 190px of a 440px-tall screen and
+// leave the headline squeezed into a sliver.
+const COMPACT_PORTAL_WIDTH = "clamp(96px, 30vh, 150px)";
 
-// How far past a card's own scroll stop to land the camera when a nav
-// link jumps straight to it — a fraction of the headroom between that stop
-// and where the depart (shrink/fade) window kicks in, so the camera sits
-// closer to the card's z-depth (bigger, more "zoomed") without tipping into
-// the shrink-out.
+// Unified ultra-smooth physics configurations
+const PHYSICS = {
+  camera: { stiffness: 60, damping: 20, mass: 0.8, restDelta: 0.0001 },
+  expansion: { type: "spring", stiffness: 180, damping: 22, mass: 0.9 },
+} as const;
+
 const NAV_ZOOM_FRACTION = 0.55;
+
+// Cards whose gap to the next card is tight (home, about, resume, contact —
+// all ~0.11-0.13 apart) clamp the zoom below to their own depart window's
+// exact start, with zero room to spare. That's fine for a quick scroll-past,
+// but the autopilot tour *holds* there for seconds — arriving with no
+// margin read as landing right on the lip of its own fade-out rather than
+// settling cleanly. This pulls the clamp back a hair so there's always a
+// sliver of steady, undimmed hold before the card would start to fade.
+const NAV_ARRIVAL_MARGIN = 0.01;
 
 function getNavTargetProgress(targetId: string) {
   const base = sectionProgressMap[targetId];
   const index = cards.findIndex((c) => c.id === targetId);
   if (base === undefined || index === -1) return base;
-  const depart = getDepartWindow(index);
-  return base + (depart.start - base) * NAV_ZOOM_FRACTION;
+  // Navigating should always land the same distance in front of the card's
+  // stop, so every section arrives at the same size. Taking that distance as
+  // a fraction of the card's *own* depart window made it collapse for the
+  // cards near the end of the track, whose windows are squeezed by having no
+  // room left before progress hits 1 — contact ended up landing barely past
+  // its stop, still small and mid-reveal. Only the clamp below is per-card:
+  // the zoom must never push a card into the fade that carries it past the
+  // camera, or navigating to it would show it already dissolving.
+  return Math.min(
+    base + NAV_ZOOM_PROGRESS,
+    getDepartWindow(index).start - NAV_ARRIVAL_MARGIN,
+  );
 }
 
 function getActiveSectionId(progress: number) {
   let activeId = cards[0]?.id ?? "home";
-
   for (let i = 0; i < cards.length; i++) {
     const stop = sectionProgressMap[cards[i].id];
-    if (progress >= stop) {
-      activeId = cards[i].id;
-    }
+    if (progress >= stop) activeId = cards[i].id;
   }
-
   return activeId;
 }
 
 function getRevealWindow(index: number) {
-  if (index === 0) {
-    return { start: 0, end: 0.01 };
-  }
-
+  if (index === 0) return { start: 0, end: 0.01 };
   const previous = sectionProgressStops[index - 1];
   const current = sectionProgressStops[index];
   const span = Math.max(current - previous, 0.08);
-
   return {
     start: Math.max(previous + span * 0.74, 0),
     end: Math.min(current + span * 0.16, 1),
@@ -253,11 +95,7 @@ function getRevealWindow(index: number) {
 function getFocusWindow(index: number) {
   const current = sectionProgressStops[index];
   const previous = index > 0 ? sectionProgressStops[index - 1] : 0;
-  const next =
-    index < sectionProgressStops.length - 1
-      ? sectionProgressStops[index + 1]
-      : 1;
-
+  const next = index < sectionProgressStops.length - 1 ? sectionProgressStops[index + 1] : 1;
   const leftSpan = Math.max(current - previous, 0.08);
   const rightSpan = Math.max(next - current, 0.08);
 
@@ -268,27 +106,68 @@ function getFocusWindow(index: number) {
   };
 }
 
-// Once the camera has flown well past a card, it needs to fade/blur/shrink
-// back out — otherwise it stays pinned at full opacity forever, and the
-// camera's translateZ eventually passes close enough to that card's own z
-// depth (a real singularity in CSS perspective projection) to blow its
-// projected size up hugely while still fully sharp and opaque.
+// Fixed span (matching the skills card's natural gap-to-next-card width) so
+// every card gets the same pass-through hang time near the camera's
+// perspective singularity, instead of it varying with how far away each
+// card's own next-card progress stop happens to be.
+const DEPART_SPAN = 0.34;
+
+// Autopilot pacing: every section gets the same slot of wall-clock time, so
+// the tour is on a fixed, predictable clock the soundtrack can be cut
+// against — section one lands at 0:10, section two at 0:20, and so on.
+// Pacing by distance instead made each leg a different length and the audio
+// drifted out of sync with the cards. Within a slot the camera flies for
+// TRAVEL and then parks on the card for the remainder.
+const AUTOPILOT_SECTION_SECONDS = 10;
+const AUTOPILOT_HOLD = 3.5;
+const AUTOPILOT_TRAVEL = AUTOPILOT_SECTION_SECONDS - AUTOPILOT_HOLD;
+
+// The opening leg (home) runs on its own clock instead of the standard 10s
+// slot — it holds through the whole 43s intro narration with a slow,
+// continuously-drifting camera (never a dead-still parked hold, so it never
+// reads as "stuck"), opens the home card's full bio partway through at the
+// EXPAND mark, then makes a quick 1s hop into about right on the narration's
+// handover to the second track — landing on the second section at 0:44.
+const AUTOPILOT_INTRO_HOLD = NARRATION_DURATION;
+const AUTOPILOT_INTRO_EXPAND_AT = 10;
+const AUTOPILOT_INTRO_HANDOFF = 1;
+
+// The last real card (contact) and the tail beyond it (the earth/moon/end-
+// credits payoff) both get more time than the standard mid-tour hold —
+// they're the close of the tour, not a stop along the way.
+const AUTOPILOT_CONTACT_HOLD = 7;
+const AUTOPILOT_TAIL_HOLD = 8;
+
+// Forward travel a "go to section" jump adds on top of the card's own stop,
+// in progress units — the fixed span's hang time scaled by the zoom fraction.
+const NAV_ZOOM_PROGRESS = DEPART_SPAN * 0.3 * NAV_ZOOM_FRACTION;
+
 function getDepartWindow(index: number) {
   const current = sectionProgressStops[index];
   const next =
-    index < sectionProgressStops.length - 1
-      ? sectionProgressStops[index + 1]
-      : 1;
-  const span = Math.max(next - current, 0.08);
-
+    index < sectionProgressStops.length - 1 ? sectionProgressStops[index + 1] : 1;
+  // Cards near the very end of the scroll don't have a full DEPART_SPAN of
+  // room left before progress hits 1 — clamping start/end independently
+  // would collapse the window to nothing and leave the card stuck fully
+  // opaque forever (progress can never exceed 1 to reach the "faded" end
+  // keyframe). Shrink the span itself so `end` always lands under 1.
+  //
+  // Most cards sit far closer together (0.11-0.13 apart) than DEPART_SPAN
+  // (0.34) — that gap was sized for skills->projects, the one genuinely wide
+  // hop. Everywhere else, a departing card's own fade-out window ran well
+  // past the next card's arrival/nav-zoom point, so navigating (or the
+  // autopilot tour holding) on the next card caught the previous one still
+  // 60-70% opaque and blown up to its pass-through size — a giant blurred
+  // ghost hanging over the new card instead of a clean handoff. Cap the span
+  // by the gap to the next card too, so a departing card always finishes
+  // clearing before the next one is reached.
+  const span = Math.min(DEPART_SPAN, (1 - current) / 0.85, (next - current) / 0.85);
   return {
     start: Math.min(current + span * 0.3, 1),
     end: Math.min(current + span * 0.85, 1),
   };
 }
 
-// Guards useTransform against non-monotonic breakpoints (which can happen
-// when a card's reveal window and the next card's depart window overlap)
 function toStrictlyIncreasing(values: number[]) {
   const out = [values[0]];
   for (let i = 1; i < values.length; i++) {
@@ -301,199 +180,225 @@ function BillboardCard({
   card,
   index,
   isMobile,
-  scrollYProgress,
+  smoothScrollProgress,
   revealStart,
   revealEnd,
-  expandedId,
-  setExpandedId,
 }: {
   card: FlightCard;
   index: number;
   isMobile: boolean;
-  scrollYProgress: MotionValue<number>;
+  smoothScrollProgress: MotionValue<number>;
   revealStart: number;
   revealEnd: number;
-  expandedId: string | null;
-  setExpandedId: React.Dispatch<React.SetStateAction<string | null>>;
 }) {
-  const isExpanded = expandedId === card.id;
-  const alignmentClass =
-    isMobile || card.align === "left"
-      ? "items-start text-left"
-      : "items-end text-right";
+
+  // The flight only ever renders on desktop or on a landscape phone, and both
+  // should read the same way: billboards staggered left and right through the
+  // corridor, not a stack of centred full-width slabs. `isMobile` now only
+  // scales things down (type, padding, offsets) — it no longer flattens the
+  // composition.
+  // The autopilot tour opens the home card's full bio partway through its
+  // intro hold, rather than leaving it collapsed while the narration reads
+  // straight through it.
+  const [autoExpandHome, setAutoExpandHome] = useState(false);
+  useEffect(() => {
+    if (card.id !== "home") return;
+    const onExpand = (event: Event) => {
+      const id = (event as CustomEvent<{ id?: string }>).detail?.id;
+      if (id === "home") setAutoExpandHome(true);
+    };
+    window.addEventListener("flight-autopilot-expand", onExpand as EventListener);
+    return () => window.removeEventListener("flight-autopilot-expand", onExpand as EventListener);
+  }, [card.id]);
+
+  const alignmentClass = card.align === "left" ? "items-start text-left" : "items-end text-right";
   const titleClass = "text-sky-50";
   const bodyClass = "text-slate-100/90";
-  const panelClass =
-    "border-white/20 shadow-[0_24px_90px_rgba(2,8,23,0.52)]";
+  const panelClass = "border-white/20 shadow-[0_24px_90px_rgba(2,8,23,0.52)]";
   const badgeClass = "border-emerald-200/20 bg-emerald-200/10 text-emerald-100";
-  const buttonClass =
-    "border-sky-200/25 bg-white/10 text-sky-50 hover:bg-white/16";
+  const buttonClass = "border-sky-200/25 bg-white/10 text-sky-50 hover:bg-white/16";
   const cardGradient = cardGradients[index % cardGradients.length];
   const targetCard = cards[index + 1] ?? cards[0];
   const actionLabel = index === cards.length - 1 ? "Restart" : "Next";
-  const baseRotate = isMobile ? 0 : card.align === "left" ? 8 : -8;
+  
+  // Refined 3D rotation parameters. The entry card is the first thing the
+  // visitor sees with no scroll context to explain the tilt, so it faces the
+  // camera square-on — the angled billboards only start once the flight does.
+  const isEntry = index === 0;
+  const baseRotateY = isEntry ? 0 : card.align === "left" ? 10 : -10;
+  const baseRotateX = isEntry ? 0 : 4;
+
   const focus = getFocusWindow(index);
   const depart = getDepartWindow(index);
-  const fadeStops = toStrictlyIncreasing([
-    0,
-    revealStart,
-    revealEnd,
-    depart.start,
-    depart.end,
-  ]);
+  const fadeStops = toStrictlyIncreasing([0, revealStart, revealEnd, depart.start, depart.end]);
+  
   const upcomingOpacity = useTransform(
-    scrollYProgress,
+    smoothScrollProgress,
     fadeStops,
-    [index === 0 ? 1 : 0.22, index === 0 ? 1 : 0.42, 1, 1, 0.05],
+    [index === 0 ? 1 : 0.0, index === 0 ? 1 : 0.42, 1, 1, 0.0]
   );
   const upcomingBlur = useTransform(
-    scrollYProgress,
+    smoothScrollProgress,
     fadeStops,
-    [index === 0 ? 0 : 2, index === 0 ? 0 : 1.2, 0, 0, 6],
+    [index === 0 ? 0 : 4, index === 0 ? 0 : 1.2, 0, 0, 3]
   );
   const upcomingScale = useTransform(
-    scrollYProgress,
+    smoothScrollProgress,
     fadeStops,
-    [index === 0 ? 1 : 0.95, index === 0 ? 1 : 0.97, 1, 1, 0.82],
+    [index === 0 ? 1 : 0.85, index === 0 ? 1 : 0.95, 1, 1, 1.1]
   );
+  
+  // Strictly increasing — the entry card's window collapses to start === peak
+  // (both 0), and a duplicated breakpoint makes the interpolation ambiguous.
   const straightening = useTransform(
-    scrollYProgress,
-    [focus.start, focus.peak, focus.end],
-    [0, 1, 0],
+    smoothScrollProgress,
+    toStrictlyIncreasing([focus.start, focus.peak, focus.end]),
+    [0, 1, 0]
   );
-  const activeRotateY = useTransform(
-    straightening,
-    (v) => baseRotate * Math.max(0, 1 - v * 1.45),
-  );
-  useMotionValueEvent(straightening, "change", (v) => {
-    if (!isExpanded) return;
-    if (v < AUTO_COLLAPSE_STRAIGHTENING_THRESHOLD) {
-      setExpandedId((prev) => (prev === card.id ? null : prev));
-    }
-  });
+
+  const activeRotateY = useTransform(straightening, (v) => baseRotateY * Math.max(0, 1 - v * 1.5));
+  const activeRotateX = useTransform(straightening, (v) => baseRotateX * Math.max(0, 1 - v * 2));
+
   const activeReadabilityBoost = useTransform(straightening, [0, 1], [0, 1]);
-  const effectiveBlur = useTransform(
-    () => upcomingBlur.get() * (1 - straightening.get()),
-  );
-  const effectiveOpacity = useTransform(() =>
-    Math.min(1, upcomingOpacity.get() + activeReadabilityBoost.get() * 0.38),
-  );
+  const effectiveBlur = useTransform(() => upcomingBlur.get() * (1 - straightening.get()));
+  const effectiveOpacity = useTransform(() => Math.min(1, upcomingOpacity.get() + activeReadabilityBoost.get() * 0.38));
   const cardFilter = useMotionTemplate`blur(${effectiveBlur}px)`;
+  // Faded-out cards are still hit-testable — and since every card is
+  // absolutely stacked in the same container, the later ones sit on top and
+  // swallow clicks meant for the card actually in view (that's what made
+  // "Next" unclickable once a card filled the screen). Drop them out of
+  // hit-testing while they're not readable.
+  const cardPointerEvents = useTransform(effectiveOpacity, (o) =>
+    o > 0.55 ? "auto" : "none",
+  );
 
   return (
     <motion.div
       style={{
         translateZ: card.z,
         rotateY: activeRotateY,
+        rotateX: activeRotateX,
         opacity: effectiveOpacity,
         filter: cardFilter,
         scale: upcomingScale,
         background: cardGradient,
+        transformStyle: "preserve-3d",
+        pointerEvents: cardPointerEvents,
       }}
       initial={false}
       animate={{
-        width: isExpanded
-          ? EXPANDED_CARD_WIDTH
-          : isMobile
-            ? "min(90vw, 420px)"
-            : card.width,
-        translateX: isExpanded ? 0 : isMobile ? 0 : card.x,
-        y: isExpanded ? 0 : [0, -6 - (index % 3) * 2, 0],
+        // Narrower than the desktop clamp so there is room either side for the
+        // lateral offsets, but wide enough that the headline still gets a real
+        // measure once the portal takes its share.
+        width: isMobile ? "min(66vw, 500px)" : card.width,
+        // Same left/right stagger as desktop, dialled back to fit the narrower
+        // viewport instead of being zeroed out.
+        translateX: isMobile ? card.x * 0.45 : card.x,
       }}
-      transition={{
-        width: EXPAND_SPRING,
-        translateX: EXPAND_SPRING,
-        y: isExpanded
-          ? { duration: 0.3 }
-          : { duration: 6 + index * 0.25, repeat: Infinity, ease: "easeInOut" },
-      }}
-      className={`absolute flex rounded-3xl border p-5 sm:rounded-4xl sm:p-8 lg:p-10 ${panelClass}`}
+      transition={PHYSICS.expansion}
+      className={`absolute flex rounded-3xl border sm:rounded-4xl ${
+        isMobile ? "p-4" : "p-5 sm:p-8 lg:p-10"
+      } ${panelClass}`}
     >
-      <div
-        className={`flex w-full items-stretch gap-5 sm:gap-8 ${
-          !isMobile && card.align === "right" ? "flex-row-reverse" : "flex-row"
+      {/* Positioned relative to this stable outer box, not the inner content
+         wrapper's gentle float animation below, so it doesn't jitter. */}
+      {card.id === "home" && <NarrationHighlights />}
+
+      <motion.div
+        animate={{ y: [0, -8, 0], scale: 0.98 }}
+        transition={{ duration: 5 + index * 0.5, repeat: Infinity, ease: "easeInOut" }}
+        className={`flex w-full items-stretch ${isMobile ? "gap-3" : "gap-5 sm:gap-8"} ${
+          card.align === "right" ? "flex-row-reverse" : "flex-row"
         }`}
+        style={{ transformStyle: "preserve-3d" }}
       >
         <motion.div
           className={`flex min-w-0 flex-1 flex-col ${alignmentClass}`}
-          style={{
-            opacity: useTransform(activeReadabilityBoost, [0, 1], [0.9, 1]),
-          }}
+          style={{ opacity: useTransform(activeReadabilityBoost, [0, 1], [0.85, 1]) }}
         >
+          {/* Tailwind breakpoints are width-based, so they can't tell a 956px
+             landscape phone from a laptop — the compact scale is driven off
+             the isMobile prop instead. */}
+          {/* No self-start here — the column's items-start/items-end from
+             alignmentClass is what sides these with the card. */}
           <span
-            className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.32em] ${badgeClass}`}
+            className={`inline-flex items-center rounded-full border font-semibold uppercase tracking-[0.24em] ${
+              isMobile ? "gap-1 px-2.5 py-1 text-[9px]" : "gap-1.5 px-4 py-2 text-xs tracking-[0.32em]"
+            } ${badgeClass}`}
           >
+            <CardIcon id={card.id} size={isMobile ? 10 : 13} />
             {card.eyebrow}
           </span>
           <h2
-            className={`mt-5 max-w-[22ch] text-2xl font-semibold leading-tight sm:mt-6 sm:text-3xl lg:text-5xl ${titleClass}`}
-            style={{ color: "#f0f9ff" }}
+            className={`max-w-[22ch] font-semibold leading-tight ${
+              isMobile
+                ? "mt-2.5 text-lg"
+                : "mt-5 text-2xl sm:mt-6 sm:text-3xl lg:text-5xl"
+            } ${titleClass}`}
           >
             {card.title}
           </h2>
-          <p
-            className={`mt-4 max-w-[38ch] text-sm leading-6 sm:mt-5 sm:text-base sm:leading-7 lg:text-xl ${bodyClass}`}
-            style={{ color: "rgba(241, 245, 249, 0.92)" }}
+          {/* Home carries the full narrated bio (all four paragraphs) — too
+             long for a billboard card to show outright, so it collapses to a
+             short preview with a "Read more" that grows the card in place. */}
+          {card.id === "home" ? (
+            <ExpandableText
+              className={`max-w-[46ch] ${isMobile ? "mt-2" : "mt-4 max-w-[38ch] sm:mt-5"}`}
+              collapsedHeight={isMobile ? "3.3em" : "4.5em"}
+              forceExpanded={autoExpandHome}
+            >
+              <p
+                className={`${
+                  isMobile
+                    ? "text-[11px] leading-[1.45]"
+                    : "text-sm leading-6 sm:text-base sm:leading-7 lg:text-xl"
+                } ${bodyClass}`}
+              >
+                <NarratedText id={card.id} text={card.description} />
+              </p>
+            </ExpandableText>
+          ) : (
+            <p
+              className={`max-w-[46ch] ${
+                isMobile
+                  ? "mt-2 line-clamp-4 text-[11px] leading-[1.45]"
+                  : "mt-4 max-w-[38ch] text-sm leading-6 sm:mt-5 sm:text-base sm:leading-7 lg:text-xl"
+              } ${bodyClass}`}
+            >
+              <NarratedText id={card.id} text={card.description} />
+            </p>
+          )}
+          {/* Opens the section's own page rather than expanding in place, so
+             each section is a real, crawlable URL. */}
+          <Link
+            href={`/${card.id}`}
+            className={`inline-block rounded-full border font-semibold transition duration-300 ${
+              isMobile
+                ? "mt-3 px-4 py-1.5 text-[11px]"
+                : "mt-6 px-6 py-3 text-sm hover:-translate-y-1 sm:mt-8"
+            } ${buttonClass}`}
           >
-            {card.description}
-          </p>
-          <button
-            type="button"
-            onClick={() => setExpandedId(isExpanded ? null : card.id)}
-            aria-expanded={isExpanded}
-            aria-controls={`${card.id}-details-panel`}
-            className={`mt-6 rounded-full border px-6 py-3 text-sm font-semibold transition duration-300 hover:-translate-y-1 sm:mt-8 ${buttonClass}`}
-          >
-            {isExpanded ? "Close" : card.cta}
-          </button>
+            {card.cta}
+          </Link>
         </motion.div>
 
-        {/* Expanded detail panel — reveals into the width the card gains on expand */}
-        <AnimatePresence>
-          {isExpanded && !isMobile && (
-            <motion.div
-              key="details-panel"
-              id={`${card.id}-details-panel`}
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: DETAILS_PANEL_WIDTH, opacity: 1 }}
-              exit={{ width: 0, opacity: 0, transition: { duration: 0.25 } }}
-              transition={{
-                width: EXPAND_SPRING,
-                opacity: { duration: 0.3, delay: 0.15 },
-              }}
-              className="min-h-65 shrink-0 overflow-hidden rounded-2xl border border-white/15 bg-white/5 p-5 lg:rounded-3xl lg:p-6"
-            >
-              <div className="w-70 max-w-full">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-sky-100">
-                  Details
-                </h3>
-                <ul className="mt-3 space-y-2 text-sm text-slate-100/85">
-                  {card.details.map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
-        {/* Portal window into the multiverse */}
         <motion.div
           initial={false}
-          animate={{ width: isExpanded ? EXPANDED_PORTAL_WIDTH : PORTAL_WIDTH }}
-          transition={{ width: EXPAND_SPRING }}
-          className="relative hidden min-h-65 shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] sm:block lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]"
+          animate={{ width: isMobile ? COMPACT_PORTAL_WIDTH : PORTAL_WIDTH }}
+          transition={PHYSICS.expansion}
+          className="relative hidden min-h-[min(16.25rem,42vh)] shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] sm:block lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]"
         >
           <CardPortal
             index={index}
-            scrollYProgress={scrollYProgress}
+            scrollYProgress={smoothScrollProgress}
             align={card.align}
             targetId={targetCard.id}
             actionLabel={actionLabel}
             ariaLabel={`Fly to ${targetCard.eyebrow.replace(/^\d+\s*\/\s*/, "")}`}
           />
         </motion.div>
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
@@ -501,20 +406,11 @@ function BillboardCard({
 function MobileCard({
   card,
   index,
-  expandedId,
-  setExpandedId,
 }: {
   card: FlightCard;
   index: number;
-  expandedId: string | null;
-  setExpandedId: React.Dispatch<React.SetStateAction<string | null>>;
 }) {
-  const isExpanded = expandedId === card.id;
-  const titleClass = "text-sky-50";
-  const bodyClass = "text-slate-100/90";
   const panelClass = "border-white/15 shadow-[0_18px_40px_rgba(2,8,23,0.35)]";
-  const badgeClass = "border-emerald-200/20 bg-emerald-200/10 text-emerald-100";
-  const buttonClass = "border-sky-200/25 bg-white/10 text-sky-50";
 
   return (
     <section
@@ -523,51 +419,22 @@ function MobileCard({
       style={{ background: cardGradients[index % cardGradients.length] }}
     >
       <div className="flex w-full flex-col items-start text-left">
-        <span
-          className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] ${badgeClass}`}
-        >
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/20 bg-emerald-200/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-100">
+          <CardIcon id={card.id} size={13} />
           {card.eyebrow}
         </span>
-        <h2
-          className={`mt-4 text-2xl font-semibold leading-tight ${titleClass}`}
-          style={{ color: "#f0f9ff" }}
-        >
+        <h2 className="mt-4 text-2xl font-semibold leading-tight text-[#f0f9ff]">
           {card.title}
         </h2>
-        <p
-          className={`mt-3 text-sm leading-6 ${bodyClass}`}
-          style={{ color: "rgba(241, 245, 249, 0.92)" }}
-        >
-          {card.description}
+        <p className="mt-3 text-sm leading-6 text-slate-100/90">
+          <NarratedText id={card.id} text={card.description} />
         </p>
-        <AnimatePresence>
-          {isExpanded && (
-            <motion.div
-              key="mobile-details"
-              id={`${card.id}-details-panel`}
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.35, ease: "easeInOut" }}
-              className="mt-3 w-full overflow-hidden"
-            >
-              <ul className="space-y-2 text-sm text-slate-100/85">
-                {card.details.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <button
-          type="button"
-          onClick={() => setExpandedId(isExpanded ? null : card.id)}
-          aria-expanded={isExpanded}
-          aria-controls={`${card.id}-details-panel`}
-          className={`mt-5 rounded-full border px-5 py-2.5 text-sm font-semibold transition duration-300 ${buttonClass}`}
+        <Link
+          href={`/${card.id}`}
+          className="mt-5 inline-block rounded-full border border-sky-200/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-sky-50 transition duration-300"
         >
-          {isExpanded ? "Close" : card.cta}
-        </button>
+          {card.cta}
+        </Link>
       </div>
     </section>
   );
@@ -575,97 +442,263 @@ function MobileCard({
 
 export default function MultiverseFlight() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isMobile, setIsMobile] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!expandedId) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setExpandedId(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [expandedId]);
+  // `compact` drives the smaller in-flight card sizing; `portrait` decides
+  // whether a small screen gets the flight at all. A phone held sideways has
+  // the aspect ratio the 3D scene needs, so it flies — held upright it falls
+  // back to the stacked reading layout with a nudge to rotate.
+  const [compact, setCompact] = useState(false);
+  const [portrait, setPortrait] = useState(false);
+  const [rotateDismissed, setRotateDismissed] = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
 
   useEffect(() => {
     const onResize = () => {
-      setIsMobile(window.innerWidth < 1024);
+      setCompact(window.innerWidth < 1024);
+      setPortrait(window.innerHeight > window.innerWidth);
     };
-
     onResize();
     window.addEventListener("resize", onResize);
-
+    // iOS Safari fires orientationchange before the resize metrics settle
+    window.addEventListener("orientationchange", onResize);
     return () => {
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
     };
   }, []);
+
+  const isMobile = compact;
+  const showStackedLayout = compact && portrait;
+  // The navigation listener is registered once, so it can't close over this
+  // directly without going stale on rotate.
+  const stackedLayoutRef = useRef(showStackedLayout);
+  stackedLayoutRef.current = showStackedLayout;
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ["start start", "end end"],
   });
 
-  const zCamera = useTransform(
+  // The secret to cinematic smoothness: applying spring physics to the global
+  // scroll progress. Touch scrolling already carries its own momentum, so the
+  // soft desktop spring stacks on top of it and reads as lag — phones get a
+  // stiffer, tighter-settling one that tracks the finger.
+  const smoothScrollProgress = useSpring(
     scrollYProgress,
-    [0, 1],
-    [0, isMobile ? 7800 : 8400],
+    compact
+      ? { stiffness: 130, damping: 26, mass: 0.5, restDelta: 0.0005 }
+      : PHYSICS.camera,
   );
-  const topColor = useTransform(
-    scrollYProgress,
-    [0, 0.28, 0.44, 0.62, 1],
-    ["#05070f", "#060a18", "#080d1e", "#030711", "#000208"],
+
+  // Coming back from a section page, the browser restores scroll position
+  // instantly but the camera spring still starts at 0 and has to travel there,
+  // sweeping every card through its reveal/depart window on the way — the
+  // whole flight replays in fast-forward. Snap the spring to wherever the
+  // page actually is on the first frames instead of animating into it.
+  useEffect(() => {
+    let frames = 0;
+    let raf = 0;
+    const settle = () => {
+      smoothScrollProgress.jump(scrollYProgress.get());
+      // Scroll restoration can land a tick or two after mount, so hold the
+      // snap for a few frames rather than trusting a single one.
+      if (++frames < 5) raf = requestAnimationFrame(settle);
+    };
+    raf = requestAnimationFrame(settle);
+    return () => cancelAnimationFrame(raf);
+  }, [scrollYProgress, smoothScrollProgress]);
+
+  const zCamera = useTransform(smoothScrollProgress, [0, 1], [0, isMobile ? 7800 : 8400]);
+
+  // Crossing the third section (skills, stop 0.22) grades the whole scene
+  // from the opening blue into a darker, blacker deep-space palette — the
+  // flight is leaving the lit part of the journey behind.
+  const bgCrossStart = sectionProgressStops[2];
+  const bgCrossEnd = bgCrossStart + 0.16;
+  const bgTopColor = useTransform(
+    smoothScrollProgress,
+    [bgCrossStart, bgCrossEnd],
+    ["#002d54", "#00203f"],
   );
-  const bottomColor = useTransform(
-    scrollYProgress,
-    [0, 0.28, 0.44, 0.62, 1],
-    ["#0a1024", "#08111f", "#050b18", "#01040c", "#000103"],
+  const bgBottomColor = useTransform(
+    smoothScrollProgress,
+    [bgCrossStart, bgCrossEnd],
+    ["#00101f", "#000000"],
   );
-  const sceneBackground = useMotionTemplate`linear-gradient(180deg, ${topColor} 0%, ${bottomColor} 100%)`;
-  const heroImageOpacity = useTransform(
-    scrollYProgress,
-    [0, 0.16, 0.26],
-    [1, 1, 0],
+  const sceneBackground = useMotionTemplate`linear-gradient(180deg, ${bgTopColor} 0%, ${bgBottomColor} 100%)`;
+  
+  const lightGlowOpacity = useTransform(smoothScrollProgress, [0, 0.28, 0.42], [1, 0.8, 0]);
+  const deepGlowOpacity = useTransform(smoothScrollProgress, [0.42, 0.58, 1], [0, 0.8, 1]);
+
+  // --- Parallax ---------------------------------------------------------
+  // The camera flies through the cards, but every layer behind them was
+  // pinned, so the space around the corridor read as a flat backdrop. Each
+  // layer now travels a different distance for the same scroll: the further
+  // back it sits, the less it moves. The near glow drifts the opposite way,
+  // which widens the apparent gap between the planes.
+  const parallaxFar = useTransform(smoothScrollProgress, [0, 1], ["0%", "-7%"]);
+  const parallaxMid = useTransform(smoothScrollProgress, [0, 1], ["0%", "-18%"]);
+  const parallaxNear = useTransform(smoothScrollProgress, [0, 1], ["0%", "12%"]);
+  // Creeping scale on the furthest plane so its edges never slide into view
+  // as it translates, and so the void feels like it is opening up.
+  const parallaxFarScale = useTransform(smoothScrollProgress, [0, 1], [1.05, 1.22]);
+  // Raw scrollYProgress, not the smoothed/overdamped camera spring — that
+  // spring approaches 1 asymptotically and can sit well below the 0.9
+  // threshold for a long time after the user has actually scrolled to the
+  // bottom, making the last stretch of scroll feel like it stopped doing
+  // anything.
+  const endEarthT = useTransform(scrollYProgress, [0.88, 1], [0, 1]);
+  const endEarthReveal = useTransform(endEarthT, [0, 0.35, 1], [0, 1, 1]);
+
+  // The credits crawl is a boolean mount, not a MotionValue-driven fade —
+  // it self-animates on a timer once it appears, so it needs a plain state
+  // flip rather than a continuous transform.
+  useEffect(() => {
+    const unsubscribe = endEarthT.on("change", (v) => setShowCredits(v > 0.55));
+    return () => unsubscribe();
+  }, [endEarthT]);
+
+  // --- Overscroll "approach" -------------------------------------------
+  // At max scroll the browser has nothing left to give, so the journey
+  // would just dead-stop on a static globe. Instead we capture the wheel /
+  // touch input the page can no longer consume and feed it into `pull`.
+  // Every increment is damped by (1 - pull)², so each step closer costs
+  // disproportionately more than the last — the globe keeps growing but the
+  // curve is asymptotic and can never arrive. Stop pushing and it drifts
+  // back out, like straining against a tether.
+  const pull = useMotionValue(0);
+  const smoothPull = useSpring(pull, { stiffness: 70, damping: 18, mass: 0.7 });
+
+  useEffect(() => {
+    if (isMobile) return;
+
+    const PULL_IN = 0.0006; // per px of forward wheel delta
+    const PULL_OUT = 0.0009; // reverse scroll pushes back out faster
+    const DECAY_PER_MS = 0.0016; // drift back once the user stops pushing
+    const IDLE_BEFORE_DECAY_MS = 320;
+    const MAX_PULL = 0.97; // never 1 — the globe is never actually reached
+
+    let lastInput = 0;
+    let lastTouchY: number | null = null;
+    let lastFrame = performance.now();
+    let raf = 0;
+
+    const atBottom = () =>
+      window.scrollY + window.innerHeight >=
+      document.documentElement.scrollHeight - 2;
+
+    const applyDelta = (deltaY: number) => {
+      const current = pull.get();
+      if (deltaY > 0) {
+        // Only "pull" once the page itself is out of scroll to give
+        if (!atBottom()) return;
+        const resistance = (1 - current) ** 2;
+        pull.set(Math.min(current + deltaY * PULL_IN * resistance, MAX_PULL));
+        lastInput = performance.now();
+      } else if (deltaY < 0 && current > 0) {
+        // Scrolling back up releases the tether before the page scrolls
+        pull.set(Math.max(current + deltaY * PULL_OUT, 0));
+        lastInput = performance.now();
+      }
+    };
+
+    const onWheel = (e: WheelEvent) => applyDelta(e.deltaY);
+    const onTouchStart = (e: TouchEvent) => {
+      lastTouchY = e.touches[0]?.clientY ?? null;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const y = e.touches[0]?.clientY;
+      if (y == null || lastTouchY == null) return;
+      applyDelta((lastTouchY - y) * 2.2);
+      lastTouchY = y;
+    };
+    const onTouchEnd = () => {
+      lastTouchY = null;
+    };
+
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      const dt = Math.min(now - lastFrame, 50);
+      lastFrame = now;
+      if (now - lastInput < IDLE_BEFORE_DECAY_MS) return;
+      const current = pull.get();
+      if (current > 0.0005) {
+        pull.set(Math.max(current - dt * DECAY_PER_MS * current, 0));
+      }
+    };
+    raf = requestAnimationFrame(tick);
+
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [isMobile, pull]);
+
+  // Exponential approach, not a linear one: growth decelerates hard as t
+  // nears 1, so the globe keeps drifting closer without ever quite arriving
+  // — scrolling further just slows the approach rather than reaching it.
+  const endEarthScale = useTransform(() => {
+    const t = Math.max(0, Math.min(1, endEarthT.get()));
+    const base = 0.45 + 0.5 * (1 - Math.exp(-3 * t));
+    return base * (1 + smoothPull.get() * 1.6);
+  });
+  // The closer you pull, the more it dissolves — it grows in the frame while
+  // fading out of it, so the approach reads as chasing something receding
+  // rather than closing a gap. Reinforces that it can never be reached.
+  const endEarthOpacity = useTransform(
+    () => endEarthReveal.get() * (1 - smoothPull.get() * 0.8),
   );
-  const heroImageX = useTransform(scrollYProgress, [0, 0.26], [0, 120]);
-  const heroImageScale = useTransform(
-    scrollYProgress,
-    [0, 0.2, 0.26],
-    [1, 1.06, 0.84],
+  // Spin tracks total scroll distance travelled, not a wall-clock timer —
+  // it's already partway through its turn by the time it comes into view,
+  // so it reads as something that's been drifting in the distance the whole
+  // flight, not an animation that just switched on. Pulling adds rotation of
+  // its own (so it never looks frozen at the bottom of the page), but on an
+  // exponential-decay curve: the closer you get, the more the spin slows,
+  // as if approaching it drags time out with it.
+  const scrollRotate = useTransform(scrollYProgress, [0, 1], [0, 300]);
+  const endEarthRotate = useTransform(
+    () => scrollRotate.get() + 34 * (1 - Math.exp(-2.5 * smoothPull.get())),
   );
-  const lightGlowOpacity = useTransform(
-    scrollYProgress,
-    [0, 0.28, 0.42],
-    [1, 0.8, 0],
+  // The moon orbits rather than spins in place — it's the same scroll-driven
+  // rotate as the earth, on its own wrapper (not the earth's own spin), and
+  // faster, so the two read as independently in motion rather than one rigid
+  // system rotating together.
+  const moonOrbit = useTransform(
+    () => scrollRotate.get() * 1.7 + 70 * (1 - Math.exp(-2.5 * smoothPull.get())),
   );
-  const deepGlowOpacity = useTransform(
-    scrollYProgress,
-    [0.42, 0.58, 1],
-    [0, 0.8, 1],
-  );
+  // Atmosphere brightens and the void closes in as you strain toward it
+  const approachGlow = useTransform(smoothPull, [0, 1], [0.25, 0.85]);
+  const approachVignette = useTransform(smoothPull, [0, 1], [0, 0.55]);
+  const hintOpacity = useTransform(() => {
+    const revealed = endEarthT.get() > 0.75 ? 1 : 0;
+    return revealed * Math.max(0, 1 - smoothPull.get() * 5);
+  });
 
   useEffect(() => {
     const handleNavigation = (event: Event) => {
       const customEvent = event as CustomEvent<{ id?: string }>;
       const targetId = customEvent.detail?.id;
-      const targetProgress = targetId
-        ? getNavTargetProgress(targetId)
-        : undefined;
+      const targetProgress = targetId ? getNavTargetProgress(targetId) : undefined;
       const container = containerRef.current;
 
-      if (window.innerWidth < 1024 && targetId) {
-        document.getElementById(`section-${targetId}`)?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
+      // Must match the layout actually rendered, not just the width. A
+      // landscape phone is under 1024px wide but shows the *flight*, where no
+      // `section-*` anchors exist — testing width alone sent every "Next" tap
+      // into a getElementById that returned null, so nothing happened.
+      if (stackedLayoutRef.current && targetId) {
+        document.getElementById(`section-${targetId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
         return;
       }
 
-      if (targetProgress === undefined || !container) {
-        return;
-      }
-
-      const containerTop =
-        window.scrollY + container.getBoundingClientRect().top;
+      if (targetProgress === undefined || !container) return;
+      const containerTop = window.scrollY + container.getBoundingClientRect().top;
       const scrollableHeight = container.offsetHeight - window.innerHeight;
 
       window.scrollTo({
@@ -674,123 +707,481 @@ export default function MultiverseFlight() {
       });
     };
 
-    window.addEventListener(
-      "navigate-flight-section",
-      handleNavigation as EventListener,
-    );
+    window.addEventListener("navigate-flight-section", handleNavigation as EventListener);
+    return () => window.removeEventListener("navigate-flight-section", handleNavigation as EventListener);
+  }, []);
+
+  // --- Autopilot --------------------------------------------------------
+  // A hands-off tour: fly to each section in turn, hold long enough to read
+  // it, then move on, and finish on the ending. The whole flight is already
+  // a pure function of scroll position, so the tour drives nothing but
+  // window.scrollY — every card, the camera and the route map follow for
+  // free. Any real input from the user (wheel, touch, key) hands control
+  // straight back.
+  useEffect(() => {
+    let raf = 0;
+    let timer = 0;
+    let detach: (() => void) | undefined;
+
+    const emit = (running: boolean, index: number) =>
+      window.dispatchEvent(
+        new CustomEvent("flight-autopilot-state", {
+          detail: { running, index, total: cards.length },
+        }),
+      );
+
+    const halt = () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+      detach?.();
+      raf = 0;
+      timer = 0;
+      detach = undefined;
+    };
+
+    const stop = () => {
+      const wasRunning = raf !== 0 || timer !== 0;
+      halt();
+      if (wasRunning) emit(false, -1);
+    };
+
+    const armHandback = () => {
+      const opts = { passive: true } as const;
+      window.addEventListener("wheel", stop, opts);
+      window.addEventListener("touchstart", stop, opts);
+      window.addEventListener("keydown", stop);
+      detach = () => {
+        window.removeEventListener("wheel", stop);
+        window.removeEventListener("touchstart", stop);
+        window.removeEventListener("keydown", stop);
+      };
+    };
+
+    // Cubic ease on every leg, so each hop off a card and onto the next one
+    // accelerates and settles instead of starting and stopping dead.
+    const ease = (t: number) =>
+      t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+
+    const runFlight = () => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const containerTop = window.scrollY + container.getBoundingClientRect().top;
+      const scrollable = container.offsetHeight - window.innerHeight;
+      if (scrollable <= 0) return;
+
+      const toScrollTop = (p: number) => containerTop + scrollable * p;
+
+      // Every section's arrival point, then the tail of the track so the tour
+      // ends on the closing shot rather than on the last card.
+      const legs = [
+        ...cards.map((card) => getNavTargetProgress(card.id) ?? 0),
+        1,
+      ];
+
+      // Per-leg timing. Every leg after the intro uses the standard 10s
+      // slot, unchanged. The first two are custom: home holds through the
+      // full 43s narration on a slow continuous drift instead of a quick
+      // travel-then-park, and about's arrival is compressed to a 1s hop so
+      // it lands exactly as the narration hands off to the second track.
+      const legPlans = legs.map((target, i) => {
+        if (i === 0) return { target, travelMs: AUTOPILOT_INTRO_HOLD * 1000, linear: true };
+        if (i === 1) return { target, travelMs: AUTOPILOT_INTRO_HANDOFF * 1000, linear: false };
+        return { target, travelMs: AUTOPILOT_TRAVEL * 1000, linear: false };
+      });
+      // Home's own "hold" already happened during its narrated travel — no
+      // extra pause after it, or the quick hop into about would miss landing
+      // right on the narration's handoff. Contact (the last real card) and
+      // the tail beyond it (the earth/moon/credits payoff) both get extra
+      // time — 1.4s was barely enough to register the ending existed before
+      // the tour disengaged itself.
+      const holdMsFor = (i: number) =>
+        i === 0
+          ? 0
+          : i === legs.length - 1
+            ? AUTOPILOT_TAIL_HOLD * 1000
+            : i === legs.length - 2
+              ? AUTOPILOT_CONTACT_HOLD * 1000
+              : AUTOPILOT_HOLD * 1000;
+
+      // Always departs from the beginning — a tour that starts halfway is not
+      // a tour. The camera spring is snapped along with the scroll so the
+      // flight doesn't replay itself in fast-forward on the way back to 0.
+      window.scrollTo({ top: toScrollTop(0), behavior: "auto" });
+      smoothScrollProgress.jump(0);
+
+      let index = 0;
+      let from = 0;
+      let legStart = 0;
+      let legMs = 0;
+      let dwellUntil = 0;
+      let introExpandFired = false;
+      // The tour's own record of where it left the camera — updated every
+      // frame below alongside the writes to window.scrollTo/smoothScroll-
+      // Progress, so it's always exactly `legs[index]` by the time a leg
+      // completes. Re-deriving `from` via progressNow() (raw window.scrollY)
+      // at each leg boundary instead left it exposed to the dwell: the tour
+      // never re-asserts scroll position while holding, so anything that
+      // nudges the page during those seconds — the browser's own scroll
+      // anchoring compensating for a layout shift is the likely culprit —
+      // went uncorrected, and the next leg then started from that drifted
+      // spot with `smoothScrollProgress.jump` snapping straight to it: a
+      // visible jitter with a pull-back right as the next section began.
+      let currentProgress = 0;
+
+      const beginLeg = (now: number) => {
+        from = currentProgress;
+        legMs = legPlans[index].travelMs;
+        legStart = now;
+        if (index === 0) introExpandFired = false;
+        if (index < cards.length) emit(true, index);
+      };
+
+      // Landing on "/" right before this runs (the cross-page engage flow)
+      // can still have the browser's own scroll restoration land a frame or
+      // two late, shoving window.scrollY off 0 after our reset above already
+      // ran. Re-assert 0 for a few frames so the visible start position
+      // matches currentProgress (0) before the first leg begins easing.
+      let holdFrames = 6;
+      const holdAtStart = (now: number) => {
+        window.scrollTo({ top: toScrollTop(0), behavior: "auto" });
+        if (--holdFrames > 0) {
+          raf = requestAnimationFrame(holdAtStart);
+          return;
+        }
+        smoothScrollProgress.jump(0);
+        beginLeg(now);
+        raf = requestAnimationFrame(tick);
+      };
+
+      const tick = (now: number) => {
+        raf = requestAnimationFrame(tick);
+
+        if (dwellUntil) {
+          if (now < dwellUntil) return;
+          dwellUntil = 0;
+          index += 1;
+          if (index >= legs.length) {
+            stop();
+            return;
+          }
+          beginLeg(now);
+        }
+
+        // The home card opens itself partway through the intro hold rather
+        // than staying collapsed while the narration reads straight through
+        // its full bio.
+        if (
+          index === 0 &&
+          !introExpandFired &&
+          now - legStart >= AUTOPILOT_INTRO_EXPAND_AT * 1000
+        ) {
+          introExpandFired = true;
+          window.dispatchEvent(
+            new CustomEvent("flight-autopilot-expand", { detail: { id: "home" } }),
+          );
+        }
+
+        const t = Math.min(1, (now - legStart) / legMs);
+        const eased = legPlans[index].linear ? t : ease(t);
+        const p = from + (legs[index] - from) * eased;
+        currentProgress = p;
+        window.scrollTo({ top: toScrollTop(p), behavior: "auto" });
+        // window.scrollTo doesn't move the camera directly — every card's
+        // transforms read smoothScrollProgress, which normally only updates
+        // when the browser fires a scroll event off that call. Those events
+        // are async and get coalesced under the browser's own throttling, so
+        // waiting on them here produced the occasional visible jump: several
+        // of our rAF frames landing between two coalesced scroll events, so
+        // the spring intermittently only heard about every other step.
+        // Jumping it directly off the same `p` we just scrolled to makes the
+        // camera authoritative on our own rAF clock instead — window.scrollTo
+        // still keeps the real document position in sync (so the scrollbar
+        // is correct and a manual-scroll handback starts from the right
+        // place), it just isn't what drives the visual anymore.
+        smoothScrollProgress.jump(p);
+
+        if (t >= 1) {
+          dwellUntil = now + holdMsFor(index);
+        }
+      };
+
+      raf = requestAnimationFrame(holdAtStart);
+    };
+
+    // Portrait phones get the stacked reading layout, which has no flight to
+    // fly — the tour walks the anchors instead.
+    const runStacked = () => {
+      let index = 0;
+      const step = () => {
+        if (index >= cards.length) {
+          stop();
+          return;
+        }
+        document
+          .getElementById(`section-${cards[index].id}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        emit(true, index);
+        index += 1;
+        timer = window.setTimeout(step, AUTOPILOT_SECTION_SECONDS * 1000);
+      };
+      // Kept non-zero so `timer` marks the tour as running immediately.
+      timer = window.setTimeout(step, 1);
+    };
+
+    const onCommand = (event: Event) => {
+      const action = (event as CustomEvent<{ action?: "start" | "stop" }>)
+        .detail?.action;
+
+      if (action === "stop") {
+        stop();
+        return;
+      }
+
+      halt();
+      armHandback();
+      // The "Let's go" toast (mounted globally, listening for this) fires
+      // right here — before the reset-to-beginning below — so the
+      // announcement and the snap-to-start read as one launch, not two
+      // separate things.
+      window.dispatchEvent(new CustomEvent("flight-autopilot-launch"));
+      if (stackedLayoutRef.current) runStacked();
+      else runFlight();
+    };
+
+    window.addEventListener("flight-autopilot", onCommand as EventListener);
+
+    // Engaging autopilot from a section detail page navigates here first
+    // (the flight only lives on "/"), leaving a flag behind for this mount to
+    // pick up and start the tour once the listener above is actually live.
+    if (sessionStorage.getItem("autopilot-pending")) {
+      sessionStorage.removeItem("autopilot-pending");
+      onCommand(new CustomEvent("flight-autopilot", { detail: { action: "start" } }));
+    }
 
     return () => {
-      window.removeEventListener(
-        "navigate-flight-section",
-        handleNavigation as EventListener,
-      );
+      window.removeEventListener("flight-autopilot", onCommand as EventListener);
+      // stop(), not halt() — unmounting mid-tour (e.g. a card's own "Next"
+      // link navigating away) must still tell CockpitTray the tour ended, or
+      // its Disengage button is left pointing at a listener that's gone.
+      stop();
     };
-  }, []);
+  }, [smoothScrollProgress]);
 
   useEffect(() => {
     const unsubscribe = scrollYProgress.on("change", (value) => {
       const progress = Math.min(1, Math.max(0, value));
-      const activeId = getActiveSectionId(progress);
-
       window.dispatchEvent(
         new CustomEvent("flight-progress-update", {
-          detail: { progress, activeId },
-        }),
+          detail: { progress, activeId: getActiveSectionId(progress) },
+        })
       );
     });
-
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [scrollYProgress]);
 
-  if (isMobile) {
+  if (showStackedLayout) {
     return (
-      <div
-        ref={containerRef}
-        className="relative min-h-screen w-full overflow-x-hidden bg-transparent pt-24"
-      >
+      <div ref={containerRef} className="relative min-h-screen w-full overflow-x-hidden bg-transparent pt-24">
         <div className="mx-auto flex w-full max-w-xl flex-col gap-5">
           {cards.map((card, index) => (
-            <MobileCard
-              key={card.id}
-              card={card}
-              index={index}
-              expandedId={expandedId}
-              setExpandedId={setExpandedId}
-            />
+            <MobileCard key={card.id} card={card} index={index} />
           ))}
         </div>
+
+        {/* The content stays readable underneath — this only invites the
+           visitor into the full 3D flight, and can be waved off. */}
+        <AnimatePresence>
+          {rotateDismissed && (
+            <motion.div
+              key="rotate-prompt"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.35 }}
+              className="fixed inset-0 z-90 flex flex-col items-center justify-center gap-6 bg-slate-950/92 px-8 text-center backdrop-blur-sm"
+            >
+              <motion.svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="72"
+                height="72"
+                viewBox="0 0 24 24"
+                className="text-(--accent)"
+                animate={{ rotate: [0, -90, -90, 0] }}
+                transition={{
+                  duration: 3,
+                  times: [0, 0.35, 0.75, 1],
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                aria-hidden="true"
+              >
+                <rect
+                  x="7"
+                  y="2"
+                  width="10"
+                  height="20"
+                  rx="2.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+                <line
+                  x1="10.5"
+                  y1="19"
+                  x2="13.5"
+                  y2="19"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </motion.svg>
+
+              <div>
+                <h2 className="text-xl font-semibold text-sky-50">Rotate your phone</h2>
+                <p className="mt-2 max-w-xs text-sm leading-6 text-slate-300">
+                  Turn your device sideways for a different view.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setRotateDismissed(true)}
+                className="rounded-full border border-white/20 bg-white/10 px-6 py-2.5 text-sm font-semibold text-sky-50 transition-colors hover:bg-white/20"
+              >
+                Keep reading instead
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
 
   return (
-    <>
-      <div
-        ref={containerRef}
-        className="relative h-[1100vh] w-full bg-transparent"
-      >
-        <div className="sticky top-0 flex h-screen w-screen items-center justify-center overflow-hidden [perspective:1100px]">
+    // Taller track = more scrolling for the same camera distance, i.e. a
+    // slower flight. Everything else is keyed off normalised progress, so
+    // stretching this is the one knob that changes pace without disturbing
+    // any of the per-card reveal/focus/depart windows.
+    <div ref={containerRef} className="relative h-[1800vh] w-full bg-transparent">
+      <div className="sticky top-0 flex h-screen w-screen items-center justify-center overflow-hidden [perspective:1100px]">
+        {/* Furthest plane — barely moves, and is over-sized so translating it
+           never drags an edge into frame. */}
+        <motion.div
+          className="absolute -inset-y-1/4 inset-x-0"
+          style={{
+            background: sceneBackground,
+            y: parallaxFar,
+            scale: parallaxFarScale,
+          }}
+        />
+        {/* Mid plane — the opening sky glow, travelling further than the void
+           behind it. */}
+        <motion.div
+          className="absolute inset-x-0 top-[-10vh] h-[60vh] bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.22),_transparent_62%)]"
+          style={{ opacity: lightGlowOpacity, y: parallaxMid }}
+        />
+        {/* Nearest plane — drifts against the others, so the depth between
+           them is legible rather than everything sliding as one sheet. */}
+        <motion.div
+          className="absolute -inset-y-1/4 inset-x-0 bg-[radial-gradient(circle_at_50%_55%,_rgba(56,189,248,0.12),_transparent_48%)]"
+          style={{ opacity: deepGlowOpacity, y: parallaxNear }}
+        />
+        
+        <SpaceParticles />
+
+        <motion.div
+          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          style={{ opacity: endEarthOpacity }}
+        >
+          {/* Void closes in the harder you strain toward it */}
           <motion.div
-            className="absolute inset-0"
-            style={{ background: sceneBackground, opacity: 0.8 }}
+            className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_transparent_25%,_#000_100%)]"
+            style={{ opacity: approachVignette }}
           />
-          <motion.div
-            className="absolute inset-x-0 top-0 h-[45vh] bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.22),_transparent_62%)]"
-            style={{ opacity: lightGlowOpacity }}
-          />
-          <motion.div
-            className="absolute inset-0 bg-[radial-gradient(circle_at_50%_55%,_rgba(56,189,248,0.12),_transparent_48%)]"
-            style={{ opacity: deepGlowOpacity }}
-          />
-          <SpaceParticles />
-{/* 
-          <motion.div
-            className="pointer-events-none absolute right-[7vw] top-1/2 hidden h-[52vh] w-[24vw] min-w-[260px] -translate-y-1/2 rounded-[2.2rem] border border-white/40 bg-white/10 p-6 backdrop-blur-md lg:flex"
-            style={{
-              opacity: heroImageOpacity,
-              x: heroImageX,
-              scale: heroImageScale,
-            }}
-            animate={{ y: [0, -14, 0], rotateZ: [0, 1.2, 0] }}
-            transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <div className="relative flex w-full items-center justify-center overflow-hidden rounded-[1.8rem]">
-              <Image
-                src="/EFR-3D.png"
-                alt="EFR 3D Logo"
-                width={520}
-                height={360}
-                className="h-full w-full object-contain"
-                priority
-              />
-            </div>
-          </motion.div> */}
 
           <motion.div
-            style={{
-              translateZ: zCamera,
-              transformStyle: "preserve-3d",
-            }}
-            className="absolute inset-0 flex items-center justify-center"
+            className="relative h-[15vh] w-[15vh] max-h-36 max-w-36"
+            style={{ scale: endEarthScale }}
           >
-            {cards.map((card, index) => (
-              <BillboardCard
-                key={card.id}
-                card={card}
-                index={index}
-                isMobile={isMobile}
-                scrollYProgress={scrollYProgress}
-                revealStart={getRevealWindow(index).start}
-                revealEnd={getRevealWindow(index).end}
-                expandedId={expandedId}
-                setExpandedId={setExpandedId}
-              />
-            ))}
+            {/* Atmosphere halo — brightens as the globe fills the view */}
+            <motion.div
+              className="absolute inset-[-22%] rounded-full blur-2xl"
+              style={{
+                opacity: approachGlow,
+                background:
+                  "radial-gradient(circle, rgba(125,211,252,0.45) 0%, rgba(125,211,252,0.14) 45%, transparent 72%)",
+              }}
+            />
+            <motion.div
+              className="relative h-full w-full"
+              style={{ rotate: endEarthRotate }}
+            >
+              <Image src="/a1.png" alt="" fill sizes="60vh" className="object-contain" />
+            </motion.div>
+
+            {/* Moon — orbits the earth on its own wrapper, so its rotate
+               sweeps position around the center rather than spinning the
+               moon image itself in place. */}
+            <motion.div
+              className="absolute inset-0"
+              style={{ rotate: moonOrbit }}
+            >
+              <div className="absolute left-1/2 top-0 h-[34%] w-[34%] -translate-x-1/2 -translate-y-[110%]">
+                <Image
+                  src="/a2.png"
+                  alt=""
+                  fill
+                  sizes="20vh"
+                  className="object-contain drop-shadow-[0_0_10px_rgba(226,232,240,0.35)]"
+                />
+              </div>
+            </motion.div>
           </motion.div>
-        </div>
+
+          {/* Invitation to keep pushing — fades the moment they do */}
+          <motion.p
+            className="absolute bottom-16 text-[10px] font-semibold uppercase tracking-[0.42em] text-sky-100/60"
+            style={{ opacity: hintOpacity }}
+          >
+            THE END,THANK YOU. PLEASE GO BACK TO THE BEGINNING TO START NEW FLIGHT.
+          </motion.p>
+        </motion.div>
+
+        {/* End-title crawl — self-playing once the globe scene is reached,
+           independent of the earth's own pull-dissolve opacity so the credits
+           stay legible even while straining toward it. */}
+        <AnimatePresence>
+          {showCredits && (
+            <motion.div
+              key="end-credits"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.2 }}
+            >
+              <EndCredits />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.div
+          style={{ translateZ: zCamera, transformStyle: "preserve-3d" }}
+          className="absolute inset-0 flex items-center justify-center"
+        >
+          {cards.map((card, index) => (
+            <BillboardCard
+              key={card.id}
+              card={card}
+              index={index}
+              isMobile={isMobile}
+              smoothScrollProgress={smoothScrollProgress}
+              revealStart={getRevealWindow(index).start}
+              revealEnd={getRevealWindow(index).end}
+            />
+          ))}
+        </motion.div>
       </div>
-    </>
+    </div>
   );
 }
