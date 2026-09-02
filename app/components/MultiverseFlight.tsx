@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  AnimatePresence,
   motion,
   useMotionTemplate,
+  useMotionValueEvent,
   useScroll,
   useTransform,
   type MotionValue,
@@ -18,6 +20,7 @@ type FlightCard = {
   eyebrowIcon?: React.ReactNode;
   title: string;
   description: string;
+  details: string[];
   cta: string;
   align: "left" | "right";
   x: number;
@@ -36,6 +39,11 @@ const cards: FlightCard[] = [
     title: "Umar Suhail — Frontend Developer Crafting Immersive Web Experiences",
     description:
       "I build fast, accessible interfaces with React, Next.js, and TypeScript — and add creative WebGL and motion touches that turn product ideas into polished, production-ready UI.",
+    details: [
+      "Frontend developer focused on React, Next.js, and TypeScript",
+      "Adds WebGL and motion craft on top of solid component architecture",
+      "This portfolio's own scroll-driven 3D flight is a working example",
+    ],
     cta: "View My Work",
     align: "left",
     x: -320,
@@ -49,6 +57,11 @@ const cards: FlightCard[] = [
     title: "A Design-Minded Engineer Who Sweats the Details",
     description:
       "Years of shipping component systems, design tokens, and animation-rich pages. I care about clean architecture, readable code, and interfaces that feel effortless to use.",
+    details: [
+      "Built and maintained design-token-driven component systems at scale",
+      "Cares about readable code as much as polished pixels",
+      "Believes the best interfaces are the ones users stop noticing",
+    ],
     cta: "More About Me",
     align: "right",
     x: 280,
@@ -62,6 +75,12 @@ const cards: FlightCard[] = [
     title: "A Toolbox Built for the Modern Web",
     description:
       "React, Next.js, TypeScript, Tailwind CSS, Framer Motion, GSAP, Three.js, Node.js, REST and GraphQL — with testing in Jest and Playwright, and CI/CD pipelines that keep releases boring.",
+    details: [
+      "Core: React, Next.js, TypeScript, Tailwind CSS",
+      "Motion & 3D: Framer Motion, GSAP, Three.js",
+      "Backend & data: Node.js, REST, GraphQL",
+      "Quality: Jest, Playwright, CI/CD pipelines",
+    ],
     cta: "See Full Stack",
     align: "left",
     x: -250,
@@ -75,6 +94,11 @@ const cards: FlightCard[] = [
     title: "Featured Work: From Admin Dashboards to 3D Storytelling",
     description:
       "Highlights include a biometric admin platform, an e-commerce storefront with 95+ Lighthouse scores, and this multiverse portfolio — scroll-driven WebGL flight and all.",
+    details: [
+      "Biometric admin platform — dense data views, real-time device state",
+      "E-commerce storefront — 95+ Lighthouse across performance and a11y",
+      "This site — scroll-driven camera flight through 3D billboard cards",
+    ],
     cta: "Browse Projects",
     align: "right",
     x: 260,
@@ -88,6 +112,12 @@ const cards: FlightCard[] = [
     title: "Teams, Products, and Production Lessons",
     description:
       "From startup sprints to enterprise release trains — building admin platforms, migrating legacy UI to React, owning performance budgets, and mentoring juniors on frontend fundamentals.",
+    details: [
+      "Startup sprints and enterprise release trains alike",
+      "Led legacy-to-React migrations without breaking the lights on",
+      "Owned performance budgets end to end",
+      "Mentored junior engineers on frontend fundamentals",
+    ],
     cta: "View Timeline",
     align: "left",
     x: -290,
@@ -101,6 +131,11 @@ const cards: FlightCard[] = [
     title: "Sharing Code, Writing, and Small Tools",
     description:
       "I contribute to UI libraries, publish small utilities, and write about animation performance, rendering internals, and pragmatic TypeScript patterns for real projects.",
+    details: [
+      "Contributes to open-source UI libraries",
+      "Publishes small, focused utility packages",
+      "Writes about animation performance and rendering internals",
+    ],
     cta: "Read & Explore",
     align: "right",
     x: 300,
@@ -114,6 +149,11 @@ const cards: FlightCard[] = [
     title: "Let's Build Something Great Together",
     description:
       "Open to frontend roles and freelance collaborations. Reach me at umarsuhail112@gmail.com, or connect on LinkedIn and GitHub to talk shop.",
+    details: [
+      "Open to full-time frontend roles and freelance collaborations",
+      "Email: umarsuhail112@gmail.com",
+      "Also reachable on LinkedIn and GitHub",
+    ],
     cta: "Get In Touch",
     align: "left",
     x: -220,
@@ -145,6 +185,42 @@ const cardGradients = [
 ];
 
 const sectionProgressStops = cards.map((card) => sectionProgressMap[card.id]);
+
+// Expanded-state sizing — EXPANDED_CARD_WIDTH deliberately mirrors the same
+// clamp(px, vw, px) shape as every card.width value above, so Framer Motion
+// can numerically tween the matching tokens in each string every frame.
+// Every expand-driven value (card width, portal width, translateX) is
+// animated through this one spring so they all move on the same rAF loop —
+// mixing a CSS transition on width with FM-driven transform on the same
+// element caused the two engines to desync and stutter under load.
+const EXPANDED_CARD_WIDTH = "clamp(760px, 92vw, 1400px)";
+const DETAILS_PANEL_WIDTH = "clamp(200px, 24vw, 320px)";
+// Replaces the old `w-[38%]`-of-row sizing — a fixed clamp() the same shape
+// as EXPANDED_PORTAL_WIDTH so the two can be tweened by Framer Motion.
+const PORTAL_WIDTH = "clamp(150px, 20vw, 320px)";
+const EXPANDED_PORTAL_WIDTH = "clamp(220px, 30vw, 360px)";
+const EXPAND_SPRING = {
+  type: "spring",
+  stiffness: 260,
+  damping: 30,
+  mass: 0.9,
+} as const;
+const AUTO_COLLAPSE_STRAIGHTENING_THRESHOLD = 0.15;
+
+// How far past a card's own scroll stop to land the camera when a nav
+// link jumps straight to it — a fraction of the headroom between that stop
+// and where the depart (shrink/fade) window kicks in, so the camera sits
+// closer to the card's z-depth (bigger, more "zoomed") without tipping into
+// the shrink-out.
+const NAV_ZOOM_FRACTION = 0.55;
+
+function getNavTargetProgress(targetId: string) {
+  const base = sectionProgressMap[targetId];
+  const index = cards.findIndex((c) => c.id === targetId);
+  if (base === undefined || index === -1) return base;
+  const depart = getDepartWindow(index);
+  return base + (depart.start - base) * NAV_ZOOM_FRACTION;
+}
 
 function getActiveSectionId(progress: number) {
   let activeId = cards[0]?.id ?? "home";
@@ -192,6 +268,35 @@ function getFocusWindow(index: number) {
   };
 }
 
+// Once the camera has flown well past a card, it needs to fade/blur/shrink
+// back out — otherwise it stays pinned at full opacity forever, and the
+// camera's translateZ eventually passes close enough to that card's own z
+// depth (a real singularity in CSS perspective projection) to blow its
+// projected size up hugely while still fully sharp and opaque.
+function getDepartWindow(index: number) {
+  const current = sectionProgressStops[index];
+  const next =
+    index < sectionProgressStops.length - 1
+      ? sectionProgressStops[index + 1]
+      : 1;
+  const span = Math.max(next - current, 0.08);
+
+  return {
+    start: Math.min(current + span * 0.3, 1),
+    end: Math.min(current + span * 0.85, 1),
+  };
+}
+
+// Guards useTransform against non-monotonic breakpoints (which can happen
+// when a card's reveal window and the next card's depart window overlap)
+function toStrictlyIncreasing(values: number[]) {
+  const out = [values[0]];
+  for (let i = 1; i < values.length; i++) {
+    out.push(Math.max(values[i], out[i - 1] + 0.0005));
+  }
+  return out;
+}
+
 function BillboardCard({
   card,
   index,
@@ -199,6 +304,8 @@ function BillboardCard({
   scrollYProgress,
   revealStart,
   revealEnd,
+  expandedId,
+  setExpandedId,
 }: {
   card: FlightCard;
   index: number;
@@ -206,7 +313,10 @@ function BillboardCard({
   scrollYProgress: MotionValue<number>;
   revealStart: number;
   revealEnd: number;
+  expandedId: string | null;
+  setExpandedId: React.Dispatch<React.SetStateAction<string | null>>;
 }) {
+  const isExpanded = expandedId === card.id;
   const alignmentClass =
     isMobile || card.align === "left"
       ? "items-start text-left"
@@ -219,22 +329,32 @@ function BillboardCard({
   const buttonClass =
     "border-sky-200/25 bg-white/10 text-sky-50 hover:bg-white/16";
   const cardGradient = cardGradients[index % cardGradients.length];
+  const targetCard = cards[index + 1] ?? cards[0];
+  const actionLabel = index === cards.length - 1 ? "Restart" : "Next";
   const baseRotate = isMobile ? 0 : card.align === "left" ? 8 : -8;
   const focus = getFocusWindow(index);
+  const depart = getDepartWindow(index);
+  const fadeStops = toStrictlyIncreasing([
+    0,
+    revealStart,
+    revealEnd,
+    depart.start,
+    depart.end,
+  ]);
   const upcomingOpacity = useTransform(
     scrollYProgress,
-    [0, revealStart, revealEnd, 1],
-    [index === 0 ? 1 : 0.22, index === 0 ? 1 : 0.42, 1, 1],
+    fadeStops,
+    [index === 0 ? 1 : 0.22, index === 0 ? 1 : 0.42, 1, 1, 0.05],
   );
   const upcomingBlur = useTransform(
     scrollYProgress,
-    [0, revealStart, revealEnd, 1],
-    [index === 0 ? 0 : 2, index === 0 ? 0 : 1.2, 0, 0],
+    fadeStops,
+    [index === 0 ? 0 : 2, index === 0 ? 0 : 1.2, 0, 0, 6],
   );
   const upcomingScale = useTransform(
     scrollYProgress,
-    [0, revealStart, revealEnd, 1],
-    [index === 0 ? 1 : 0.95, index === 0 ? 1 : 0.97, 1, 1],
+    fadeStops,
+    [index === 0 ? 1 : 0.95, index === 0 ? 1 : 0.97, 1, 1, 0.82],
   );
   const straightening = useTransform(
     scrollYProgress,
@@ -245,6 +365,12 @@ function BillboardCard({
     straightening,
     (v) => baseRotate * Math.max(0, 1 - v * 1.45),
   );
+  useMotionValueEvent(straightening, "change", (v) => {
+    if (!isExpanded) return;
+    if (v < AUTO_COLLAPSE_STRAIGHTENING_THRESHOLD) {
+      setExpandedId((prev) => (prev === card.id ? null : prev));
+    }
+  });
   const activeReadabilityBoost = useTransform(straightening, [0, 1], [0, 1]);
   const effectiveBlur = useTransform(
     () => upcomingBlur.get() * (1 - straightening.get()),
@@ -257,8 +383,6 @@ function BillboardCard({
   return (
     <motion.div
       style={{
-        width: isMobile ? "min(90vw, 420px)" : card.width,
-        translateX: isMobile ? 0 : card.x,
         translateZ: card.z,
         rotateY: activeRotateY,
         opacity: effectiveOpacity,
@@ -266,11 +390,22 @@ function BillboardCard({
         scale: upcomingScale,
         background: cardGradient,
       }}
-      animate={{ y: [0, -6 - (index % 3) * 2, 0] }}
+      initial={false}
+      animate={{
+        width: isExpanded
+          ? EXPANDED_CARD_WIDTH
+          : isMobile
+            ? "min(90vw, 420px)"
+            : card.width,
+        translateX: isExpanded ? 0 : isMobile ? 0 : card.x,
+        y: isExpanded ? 0 : [0, -6 - (index % 3) * 2, 0],
+      }}
       transition={{
-        duration: 6 + index * 0.25,
-        repeat: Infinity,
-        ease: "easeInOut",
+        width: EXPAND_SPRING,
+        translateX: EXPAND_SPRING,
+        y: isExpanded
+          ? { duration: 0.3 }
+          : { duration: 6 + index * 0.25, repeat: Infinity, ease: "easeInOut" },
       }}
       className={`absolute flex rounded-3xl border p-5 sm:rounded-4xl sm:p-8 lg:p-10 ${panelClass}`}
     >
@@ -304,26 +439,77 @@ function BillboardCard({
           </p>
           <button
             type="button"
+            onClick={() => setExpandedId(isExpanded ? null : card.id)}
+            aria-expanded={isExpanded}
+            aria-controls={`${card.id}-details-panel`}
             className={`mt-6 rounded-full border px-6 py-3 text-sm font-semibold transition duration-300 hover:-translate-y-1 sm:mt-8 ${buttonClass}`}
           >
-            {card.cta}
+            {isExpanded ? "Close" : card.cta}
           </button>
         </motion.div>
 
+        {/* Expanded detail panel — reveals into the width the card gains on expand */}
+        <AnimatePresence>
+          {isExpanded && !isMobile && (
+            <motion.div
+              key="details-panel"
+              id={`${card.id}-details-panel`}
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: DETAILS_PANEL_WIDTH, opacity: 1 }}
+              exit={{ width: 0, opacity: 0, transition: { duration: 0.25 } }}
+              transition={{
+                width: EXPAND_SPRING,
+                opacity: { duration: 0.3, delay: 0.15 },
+              }}
+              className="min-h-65 shrink-0 overflow-hidden rounded-2xl border border-white/15 bg-white/5 p-5 lg:rounded-3xl lg:p-6"
+            >
+              <div className="w-70 max-w-full">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-sky-100">
+                  Details
+                </h3>
+                <ul className="mt-3 space-y-2 text-sm text-slate-100/85">
+                  {card.details.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Portal window into the multiverse */}
-        <div className="relative hidden w-[38%] min-h-65 shrink-0 overflow-hidden rounded-2xl sm:block lg:rounded-3xl">
+        <motion.div
+          initial={false}
+          animate={{ width: isExpanded ? EXPANDED_PORTAL_WIDTH : PORTAL_WIDTH }}
+          transition={{ width: EXPAND_SPRING }}
+          className="relative hidden min-h-65 shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] sm:block lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]"
+        >
           <CardPortal
             index={index}
             scrollYProgress={scrollYProgress}
             align={card.align}
+            targetId={targetCard.id}
+            actionLabel={actionLabel}
+            ariaLabel={`Fly to ${targetCard.eyebrow.replace(/^\d+\s*\/\s*/, "")}`}
           />
-        </div>
+        </motion.div>
       </div>
     </motion.div>
   );
 }
 
-function MobileCard({ card, index }: { card: FlightCard; index: number }) {
+function MobileCard({
+  card,
+  index,
+  expandedId,
+  setExpandedId,
+}: {
+  card: FlightCard;
+  index: number;
+  expandedId: string | null;
+  setExpandedId: React.Dispatch<React.SetStateAction<string | null>>;
+}) {
+  const isExpanded = expandedId === card.id;
   const titleClass = "text-sky-50";
   const bodyClass = "text-slate-100/90";
   const panelClass = "border-white/15 shadow-[0_18px_40px_rgba(2,8,23,0.35)]";
@@ -354,11 +540,33 @@ function MobileCard({ card, index }: { card: FlightCard; index: number }) {
         >
           {card.description}
         </p>
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div
+              key="mobile-details"
+              id={`${card.id}-details-panel`}
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.35, ease: "easeInOut" }}
+              className="mt-3 w-full overflow-hidden"
+            >
+              <ul className="space-y-2 text-sm text-slate-100/85">
+                {card.details.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <button
           type="button"
+          onClick={() => setExpandedId(isExpanded ? null : card.id)}
+          aria-expanded={isExpanded}
+          aria-controls={`${card.id}-details-panel`}
           className={`mt-5 rounded-full border px-5 py-2.5 text-sm font-semibold transition duration-300 ${buttonClass}`}
         >
-          {card.cta}
+          {isExpanded ? "Close" : card.cta}
         </button>
       </div>
     </section>
@@ -368,6 +576,16 @@ function MobileCard({ card, index }: { card: FlightCard; index: number }) {
 export default function MultiverseFlight() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!expandedId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setExpandedId(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [expandedId]);
 
   useEffect(() => {
     const onResize = () => {
@@ -395,12 +613,12 @@ export default function MultiverseFlight() {
   const topColor = useTransform(
     scrollYProgress,
     [0, 0.28, 0.44, 0.62, 1],
-    ["#0b1226", "#0a1122", "#0f172a", "#040b1f", "#020617"],
+    ["#05070f", "#060a18", "#080d1e", "#030711", "#000208"],
   );
   const bottomColor = useTransform(
     scrollYProgress,
     [0, 0.28, 0.44, 0.62, 1],
-    ["#101b3a", "#0d1730", "#091225", "#020617", "#01030a"],
+    ["#0a1024", "#08111f", "#050b18", "#01040c", "#000103"],
   );
   const sceneBackground = useMotionTemplate`linear-gradient(180deg, ${topColor} 0%, ${bottomColor} 100%)`;
   const heroImageOpacity = useTransform(
@@ -430,7 +648,7 @@ export default function MultiverseFlight() {
       const customEvent = event as CustomEvent<{ id?: string }>;
       const targetId = customEvent.detail?.id;
       const targetProgress = targetId
-        ? sectionProgressMap[targetId]
+        ? getNavTargetProgress(targetId)
         : undefined;
       const container = containerRef.current;
 
@@ -494,7 +712,13 @@ export default function MultiverseFlight() {
       >
         <div className="mx-auto flex w-full max-w-xl flex-col gap-5">
           {cards.map((card, index) => (
-            <MobileCard key={card.id} card={card} index={index} />
+            <MobileCard
+              key={card.id}
+              card={card}
+              index={index}
+              expandedId={expandedId}
+              setExpandedId={setExpandedId}
+            />
           ))}
         </div>
       </div>
@@ -560,6 +784,8 @@ export default function MultiverseFlight() {
                 scrollYProgress={scrollYProgress}
                 revealStart={getRevealWindow(index).start}
                 revealEnd={getRevealWindow(index).end}
+                expandedId={expandedId}
+                setExpandedId={setExpandedId}
               />
             ))}
           </motion.div>

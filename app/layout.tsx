@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import RouteMap from "./components/RouteMap";
+import PageLoader from "./components/PageLoader";
 
 const urbanist = localFont({
   src: [
@@ -40,6 +41,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${urbanist.variable} relative min-h-screen antialiased`}>
+        <PageLoader />
         <RouteMap />
         <main className="relative z-10">{children}</main>
       </body>

@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
-const PARTICLE_COUNT = 220;
-const INITIAL_PARTICLES = 100; // Reduced initial load
+const PARTICLE_COUNT = 130;
+const INITIAL_PARTICLES = 60; // Reduced initial load
 const FIELD_DEPTH = 60;
 const FIELD_WIDTH = 44;
 const CAMERA_Z = 18;
@@ -34,8 +34,8 @@ export default function SpaceParticles() {
     if (!canvas) return;
 
     const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
-    const initialCount = isMobile ? 50 : INITIAL_PARTICLES;
-    const finalCount = isMobile ? 120 : PARTICLE_COUNT;
+    const initialCount = isMobile ? 30 : INITIAL_PARTICLES;
+    const finalCount = isMobile ? 70 : PARTICLE_COUNT;
     const fieldWidth = isMobile ? 34 : FIELD_WIDTH;
 
     const scene = new THREE.Scene();
@@ -53,7 +53,7 @@ export default function SpaceParticles() {
       antialias: false, // Disabled for better performance
       powerPreference: "high-performance",
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25)); // Reduced from 2
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1)); // Reduced from 2
     renderer.setSize(window.innerWidth, window.innerHeight);
 
     // Rounded, faded-blue starfield drifting through the z axis
@@ -74,7 +74,7 @@ export default function SpaceParticles() {
     const material = new THREE.PointsMaterial({
       map: createCircleTexture(),
       color: new THREE.Color("#93c5fd"),
-      size: 0.3,
+      size: 0.2,
       sizeAttenuation: true,
       transparent: true,
       opacity: 0.70,
