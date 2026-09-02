@@ -115,7 +115,7 @@ html {
       /* 30% opaque black at the top */
       rgba(0, 0, 0, 0.8)
       /* 80% opaque black at the bottom */
-    ), url('/public/mylogo.svg');
+    ), url('/mylogo.svg');
 
   background-size: cover;
   background-position: center;

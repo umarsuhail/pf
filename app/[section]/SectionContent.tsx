@@ -147,6 +147,14 @@ import NarratedText from "../components/NarratedText";
 const RESUME_URL = "/umar-suhail-resume-2026.pdf";
 >>>>>>> 8a13a2e (ccc)
 
+const SKILL_ICONS = [
+  { name: "React", src: "/images/react.webp" },
+  { name: "Next.js", src: "/images/next.png" },
+  { name: "TypeScript", src: "/images/typescript.svg" },
+  { name: "JavaScript", src: "/images/javascript.png" },
+  { name: "Tailwind CSS", src: "/images/tailwind.png" },
+];
+
 export function SectionContent({
   card,
   gradient,
@@ -693,6 +701,48 @@ export function SectionContent({
         {/* Subtle decorative glow overlay inside the header */}
         <div className="absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-white/5 blur-3xl pointer-events-none" />
       </motion.header>
+
+      {/* SKILL ICONS */}
+      {card.id === "skills" && (
+        <motion.div
+          variants={itemVariants}
+          className="mt-10 flex flex-wrap items-center gap-4 sm:gap-6"
+        >
+          {SKILL_ICONS.map((skill, idx) => (
+            <motion.div
+              key={skill.name}
+              initial={{ opacity: 0, y: 24, scale: 0.7 }}
+              animate={{ opacity: 1, y: [0, -10, 0], scale: 1 }}
+              transition={{
+                opacity: { duration: 0.5, delay: 0.35 + idx * 0.08 },
+                scale: {
+                  type: "spring",
+                  stiffness: 200,
+                  damping: 14,
+                  delay: 0.35 + idx * 0.08,
+                },
+                y: {
+                  duration: 2.6 + idx * 0.3,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 0.9 + idx * 0.08,
+                },
+              }}
+              whileHover={{ scale: 1.15, y: -8, transition: { duration: 0.25 } }}
+              title={skill.name}
+              className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] p-3 shadow-lg backdrop-blur-sm transition-colors hover:border-sky-300/40 hover:bg-white/[0.08] sm:h-20 sm:w-20"
+            >
+              <Image
+                src={skill.src}
+                alt={skill.name}
+                width={48}
+                height={48}
+                className="h-full w-full object-contain"
+              />
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
 
       {/* DETAILS LIST */}
       <motion.section
