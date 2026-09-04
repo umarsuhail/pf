@@ -7,6 +7,7 @@ import type { MotionValue } from "framer-motion";
 import { ArrowUpRightIcon } from "./icons/arrow-up-right";
 import type { AnimatedIconHandle } from "./icons/card-icon";
 import Space from "./Space";
+import ParticleLogo from "./HeroLogo";
 
 interface CardPortalProps {
   index: number;
@@ -430,6 +431,17 @@ export function CardPortal({
           {/* Space backdrop filling the window, carrying this section's portal color */}
           <Space tint={atmosphere.accent} />
 
+          {isEntry && (
+            <Image
+              src="/images/us.png"
+              alt=""
+              fill
+              sizes="(min-width: 1024px) 30vw, 40vh"
+              className="object-cover opacity-35 mix-blend-screen"
+              aria-hidden="true"
+            />
+          )}
+
           {/* Color overlay giving this section's universe its own tone */}
           <div
             className="absolute inset-0"
@@ -445,13 +457,13 @@ export function CardPortal({
                 willChange: "transform",
               }}
             >
-              <Image
-                src="/a1.png"
-                alt=""
-                fill
-                sizes="(min-width: 1024px) 30vw, 40vh"
+              <ParticleLogo
+                src="/images/us.png"
+                particleCount={720}
+                speed={0.8}
+                disperseStrength={110}
+                loop
                 className="object-contain object-bottom"
-                priority
               />
             </div>
           ) : (

@@ -13,6 +13,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useRef, useState } from "react";
+import { Icon } from "@iconify/react";
 import { CardPortal } from "./CardPortal";
 import { CardIcon } from "./icons/card-icon";
 import EndCredits from "./EndCredits";
@@ -21,6 +22,7 @@ import NarrationHighlights from "./NarrationHighlights";
 import NarratedText from "./NarratedText";
 import { NARRATION_DURATION } from "../data/narration";
 import SpaceParticles from "./SpaceParticles";
+import { getSkillGroups } from "../data/skillGroups";
 
 import {
   cardGradients,
@@ -28,8 +30,41 @@ import {
   sectionProgressMap,
   type FlightCard,
 } from "../data/sections";
+import ParticleLogo from "./HeroLogo";
 
 const sectionProgressStops = cards.map((card) => sectionProgressMap[card.id]);
+
+// The "Skills" billboard stays a normal flight stop, but the camera's transit
+// from it to "Projects" is used as a chance to glimpse all three skill
+// groups up close — brief, frameless pass-throughs (no border, no portal,
+// nothing to click) rather than full stops of their own. All of them appear
+// after the Skills stop, spaced through the Skills → Projects transit.
+const skillsCardIndex = cards.findIndex((c) => c.id === "skills");
+const skillsStopProgress = sectionProgressStops[skillsCardIndex] ?? 0;
+const nextCardProgress = sectionProgressStops[skillsCardIndex + 1] ?? skillsStopProgress;
+// The icon layovers must not compete with the Skills billboard while it is
+// still revealing. Keep their whole fade window after the card's completed
+// reveal, with a small pause so the card reads clearly first.
+const skillsCardReadyProgress = getRevealWindow(skillsCardIndex).end;
+const SKILL_LAYOVER_SPAN = 0.045;
+const skillLayoverStart = Math.max(
+  skillsStopProgress + (nextCardProgress - skillsStopProgress) * 0.28,
+  skillsCardReadyProgress + SKILL_LAYOVER_SPAN + 0.01,
+);
+const skillLayoverEnd =
+  skillsStopProgress + (nextCardProgress - skillsStopProgress) * 0.76;
+
+const SKILL_LAYOVERS = getSkillGroups(cards[skillsCardIndex]?.details ?? []).map(
+  (group, i, arr) => {
+    // Space the layovers through the Skills → Projects transit, beginning
+    // only after the Skills billboard is fully rendered.
+    const t = i / Math.max(arr.length - 1, 1);
+    return {
+      group,
+      peak: skillLayoverStart + (skillLayoverEnd - skillLayoverStart) * t,
+    };
+  },
+);
 
 const PORTAL_WIDTH = "clamp(150px, 20vw, 320px)";
 // Landscape phones are short, so the portal is sized off viewport *height*
@@ -45,8 +80,8 @@ const PHYSICS = {
 
 const NAV_ZOOM_FRACTION = 0.55;
 
-// Cards whose gap to the next card is tight (home, about, resume, contact —
-// all ~0.11-0.13 apart) clamp the zoom below to their own depart window's
+// Cards whose gap to the next card is tight (home, about, experience,
+// contact — all ~0.11-0.13 apart) clamp the zoom below to their own depart window's
 // exact start, with zero room to spare. That's fine for a quick scroll-past,
 // but the autopilot tour *holds* there for seconds — arriving with no
 // margin read as landing right on the lip of its own fade-out rather than
@@ -321,6 +356,7 @@ function BillboardCard({
              the isMobile prop instead. */}
           {/* No self-start here — the column's items-start/items-end from
              alignmentClass is what sides these with the card. */}
+          {/* The expanded home portal carries the particle logo. */}
           <span
             className={`inline-flex items-center rounded-full border font-semibold uppercase tracking-[0.24em] ${
               isMobile ? "gap-1 px-2.5 py-1 text-[9px]" : "gap-1.5 px-4 py-2 text-xs tracking-[0.32em]"
@@ -403,6 +439,79 @@ function BillboardCard({
   );
 }
 
+// A brief, frameless pass-through — no border, background, or portal to
+// click, just a label and a cluster of floating icons that fade in as the
+// camera nears its point in the transit and fade back out past it. Rendered
+// as a plain screen-space overlay (no translateZ/perspective), outside the
+// 3D corridor group, the same way the route-map's section pill stays crisp
+// no matter what the flying cards behind it are doing — so it never gets
+// caught in a departing card's perspective swell or tangled with the next
+// card's own reveal fade.
+function SkillLayoverCluster({
+  layover,
+  isMobile,
+  smoothScrollProgress,
+}: {
+  layover: (typeof SKILL_LAYOVERS)[number];
+  isMobile: boolean;
+  smoothScrollProgress: MotionValue<number>;
+}) {
+  const span = SKILL_LAYOVER_SPAN;
+  const stops = [layover.peak - span, layover.peak, layover.peak + span];
+  const opacity = useTransform(smoothScrollProgress, stops, [0, 1, 0]);
+  const scale = useTransform(smoothScrollProgress, stops, [0.9, 1, 0.9]);
+  const blur = useTransform(smoothScrollProgress, stops, [8, 0, 8]);
+  const filter = useMotionTemplate`blur(${blur}px)`;
+  const pointerEvents = useTransform(opacity, (o) => (o > 0.55 ? "auto" : "none"));
+
+  return (
+    <motion.div
+      style={{ opacity, scale, filter, pointerEvents }}
+      className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-4"
+    >
+      <span
+        className={`font-semibold uppercase tracking-[0.32em] text-sky-100/70 ${
+          isMobile ? "text-[9px]" : "text-xs"
+        }`}
+      >
+        {layover.group.name}
+      </span>
+      <div
+        className="flex flex-wrap items-start justify-center gap-x-6 gap-y-5"
+        style={{ maxWidth: isMobile ? 260 : 460 }}
+      >
+        {layover.group.items.map((item, i) => (
+          <div key={item.label} className="flex flex-col items-center gap-1.5">
+            <motion.div
+              animate={{ y: [0, -6, 0] }}
+              transition={{
+                duration: 2.2 + (i % 5) * 0.25,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: i * 0.1,
+              }}
+            >
+              <Icon
+                icon={item.icon}
+                className={`drop-shadow-[0_4px_14px_rgba(0,0,0,0.55)] ${
+                  isMobile ? "h-7 w-7" : "h-10 w-10 sm:h-12 sm:w-12"
+                }`}
+              />
+            </motion.div>
+            <span
+              className={`rounded bg-slate-950/40 px-1.5 py-0.5 text-slate-100/90 backdrop-blur-sm ${
+                isMobile ? "text-[9px]" : "text-[11px] sm:text-xs"
+              }`}
+            >
+              {item.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
 function MobileCard({
   card,
   index,
@@ -419,6 +528,17 @@ function MobileCard({
       style={{ background: cardGradients[index % cardGradients.length] }}
     >
       <div className="flex w-full flex-col items-start text-left">
+        {card.id === "home" && (
+          <div className="relative mb-4 h-28 w-full overflow-hidden rounded-2xl border border-white/15 bg-slate-950/30">
+            <ParticleLogo
+              src="/images/us.png"
+              particleCount={420}
+              speed={1}
+              disperseStrength={150}
+              loop
+            />
+          </div>
+        )}
         <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/20 bg-emerald-200/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-100">
           <CardIcon id={card.id} size={13} />
           {card.eyebrow}
@@ -471,7 +591,9 @@ export default function MultiverseFlight() {
   // The navigation listener is registered once, so it can't close over this
   // directly without going stale on rotate.
   const stackedLayoutRef = useRef(showStackedLayout);
-  stackedLayoutRef.current = showStackedLayout;
+  useEffect(() => {
+    stackedLayoutRef.current = showStackedLayout;
+  }, [showStackedLayout]);
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -1181,6 +1303,16 @@ export default function MultiverseFlight() {
             />
           ))}
         </motion.div>
+
+        {/* Outside the 3D corridor group on purpose — see SkillLayoverCluster. */}
+        {SKILL_LAYOVERS.map((layover) => (
+          <SkillLayoverCluster
+            key={layover.group.name}
+            layover={layover}
+            isMobile={isMobile}
+            smoothScrollProgress={smoothScrollProgress}
+          />
+        ))}
       </div>
     </div>
   );

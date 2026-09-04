@@ -7,7 +7,6 @@ import { UserIcon } from "./user";
 import { HatGlassesIcon } from "./hat-glasses";
 import { CpuIcon } from "./cpu";
 import { BriefcaseBusinessIcon } from "./briefcase-business";
-import { FileTextIcon } from "./file-text";
 import { AtSignIcon } from "./at-sign";
 
 // Every lucide-animated icon shares this exact shape (size?: number over
@@ -30,7 +29,6 @@ const REGISTRY: Record<string, AnimatedIcon> = {
   skills: HatGlassesIcon,
   projects: CpuIcon,
   experience: BriefcaseBusinessIcon,
-  resume: FileTextIcon,
   contact: AtSignIcon,
 };
 

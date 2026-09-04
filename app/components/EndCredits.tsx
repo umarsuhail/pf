@@ -37,6 +37,7 @@ function CreditsColumn() {
       {CREDIT_BLOCKS.map((block, i) => (
         <div key={i} className="text-right">
           <p className="text-[9px] font-semibold uppercase tracking-[0.42em] text-sky-300/50">
+          
             {block.heading}
           </p>
           <div className="mt-2 space-y-1">
