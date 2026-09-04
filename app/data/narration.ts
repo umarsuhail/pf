@@ -1,27 +1,17 @@
-// The intro narration is four separate ElevenLabs clips, spoken back to back
-// — one per sentence-group — rather than one long file with estimated word
-// timing. Each clip's own real playback position drives its span's
-// highlight, so sync is exact instead of proportionally guessed.
+// The intro narration used to be four separate ElevenLabs clips played back
+// to back; it's now one combined file with its background music already
+// mixed in underneath (see CockpitTray, which dropped the old separate
+// work.mp3 handover as a result). Still an array of "spans" so a future
+// split back into multiple clips is just adding entries here — with one
+// entry, CockpitTray's sequencing collapses to "play it, then hand over".
 export const NARRATION_SPANS = [
   {
-    text: "Hi, I'm Umar Suhail, a Senior Frontend Developer with over seven years of experience building modern, scalable web applications.",
-    src: "/music/1.mp3",
-    fallbackDuration: 7,
-  },
-  {
-    text: "My experience spans frontend development, application architecture, UI engineering, and building data-driven and interactive digital experiences using a wide range of modern technologies and tools.",
-    src: "/music/2.mp3",
-    fallbackDuration: 12,
-  },
-  {
-    text: "I enjoy turning complex ideas into intuitive, high-performance products, from enterprise dashboards and business applications to AI-powered and interactive experiences.",
-    src: "/music/3.mp3",
-    fallbackDuration: 10,
-  },
-  {
-    text: "Welcome to my portfolio. Explore my work and see what I've been building.",
-    src: "/music/4.mp3",
-    fallbackDuration: 4,
+    text: "Hi, I'm Umar Suhail, a Senior Frontend Developer with over seven years of experience building modern, scalable web applications. My experience spans frontend development, application architecture, UI engineering, and building data-driven and interactive digital experiences using a wide range of modern technologies and tools. I enjoy turning complex ideas into intuitive, high-performance products, from enterprise dashboards and business applications to AI-powered and interactive experiences. Welcome to my portfolio. Explore my work and see what I've been building.",
+    src: "/music/intro.mp3",
+    // Real duration comes from the loaded <audio> element the moment it's
+    // available (see CockpitTray's onNarrationProgress) — this is only the
+    // guess used before that, roughly the sum of the old four clips.
+    fallbackDuration: 33,
   },
 ] as const;
 

@@ -44,6 +44,13 @@ type ParticleLogoProps = {
      * Automatically loop the animation.
      */
     loop?: boolean;
+
+    /**
+     * Fixed pixel diameter for the formed logo — independent of the
+     * canvas's own size, so it reads the same across breakpoints and
+     * doesn't rescale when its container is resized.
+     */
+    size?: number;
 };
 
 export default function ParticleLogo({
@@ -53,6 +60,7 @@ export default function ParticleLogo({
     speed = 1,
     disperseStrength = 480,
     loop = true,
+    size = 180,
 }: ParticleLogoProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -115,20 +123,20 @@ export default function ParticleLogo({
 
         const sampleLogo = () => {
             const sampleCanvas = document.createElement("canvas");
-            const size = 500;
+            const sampleSize = 500;
 
-            sampleCanvas.width = size;
-            sampleCanvas.height = size;
+            sampleCanvas.width = sampleSize;
+            sampleCanvas.height = sampleSize;
 
             const sampleCtx = sampleCanvas.getContext("2d");
 
             if (!sampleCtx) return [];
 
-            sampleCtx.clearRect(0, 0, size, size);
+            sampleCtx.clearRect(0, 0, sampleSize, sampleSize);
 
-            sampleCtx.drawImage(logo, 0, 0, size, size);
+            sampleCtx.drawImage(logo, 0, 0, sampleSize, sampleSize);
 
-            const imageData = sampleCtx.getImageData(0, 0, size, size);
+            const imageData = sampleCtx.getImageData(0, 0, sampleSize, sampleSize);
 
             const points: {
                 x: number;
@@ -141,9 +149,9 @@ export default function ParticleLogo({
              *
              * Transparent pixels are ignored.
              */
-            for (let y = 0; y < size; y += 3) {
-                for (let x = 0; x < size; x += 3) {
-                    const index = (y * size + x) * 4;
+            for (let y = 0; y < sampleSize; y += 3) {
+                for (let x = 0; x < sampleSize; x += 3) {
+                    const index = (y * sampleSize + x) * 4;
 
                     const r = imageData.data[index];
                     const g = imageData.data[index + 1];
@@ -197,11 +205,7 @@ export default function ParticleLogo({
             const canvasWidth = rect.width;
             const canvasHeight = rect.height;
 
-            /*
-             * Logo occupies ~65% of the canvas.
-             */
-            const logoSize =
-                Math.min(canvasWidth, canvasHeight) * 0.68;
+            const logoSize = size;
 
             const scale = logoSize / 500;
 
@@ -597,6 +601,7 @@ export default function ParticleLogo({
         speed,
         disperseStrength,
         loop,
+        size,
     ]);
 
     return (

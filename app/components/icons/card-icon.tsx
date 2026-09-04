@@ -3,7 +3,6 @@
 import type { HTMLAttributes, RefAttributes } from "react";
 import { forwardRef } from "react";
 import { HomeIcon } from "./home";
-import { UserIcon } from "./user";
 import { HatGlassesIcon } from "./hat-glasses";
 import { CpuIcon } from "./cpu";
 import { BriefcaseBusinessIcon } from "./briefcase-business";
@@ -25,7 +24,6 @@ export type AnimatedIcon = React.ForwardRefExoticComponent<
 // so every place that renders a card can look its icon up the same way.
 const REGISTRY: Record<string, AnimatedIcon> = {
   home: HomeIcon,
-  about: UserIcon,
   skills: HatGlassesIcon,
   projects: CpuIcon,
   experience: BriefcaseBusinessIcon,

@@ -16,16 +16,6 @@ const navLinks = [
     ),
   },
   {
-    label: "About",
-    id: "about",
-    svgPath: (
-      <path
-        fill="currentColor"
-        d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3s1.34 3 3 3m-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5S5 6.34 5 8s1.34 3 3 3m0 2c-2.33 0-7 1.17-7 3.5V18c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-1.5c0-2.33-4.67-3.5-7-3.5m8 0c-.29 0-.62.02-.97.05c.02.01.03.03.04.04c1.14.83 1.93 1.94 1.93 3.41V18c0 .35-.07.69-.18 1H22c.55 0 1-.45 1-1v-1.5c0-2.33-4.67-3.5-7-3.5"
-      ></path>
-    ),
-  },
-  {
     label: "Skills",
     id: "skills",
     svgPath: (
@@ -87,7 +77,6 @@ function navigateToSection(id: string) {
 
 const sectionProgressMap: Record<string, number> = {
   home: 0,
-  about: 0.11,
   skills: 0.22,
   projects: 0.56,
   experience: 0.69,
@@ -104,6 +93,7 @@ export default function NeumorphicNavbar() {
   const [journeyProgress, setJourneyProgress] = useState(0);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isPillOpen, setIsPillOpen] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(true);
 
   useEffect(() => {
     if (!isPillOpen) return;
@@ -187,6 +177,25 @@ export default function NeumorphicNavbar() {
                 }
               />
             </motion.svg>
+          </motion.button>
+
+          <motion.button
+            layout
+            type="button"
+            onClick={() => setShowSidebar((prev) => !prev)}
+            aria-pressed={showSidebar}
+            aria-label={showSidebar ? "Hide side navigation" : "Show side navigation"}
+            title={showSidebar ? "Hide side navigation" : "Show side navigation"}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${
+              showSidebar
+                ? "bg-(--accent) text-slate-950"
+                : "bg-white/10 text-sky-100 hover:bg-white/20"
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+              <line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" strokeWidth="1.6" />
+            </svg>
           </motion.button>
 
           <AnimatePresence initial={false}>
@@ -318,7 +327,14 @@ export default function NeumorphicNavbar() {
         </nav> */}
       </div>
 
-      <aside className="fixed right-2 top-1/2 z-40 flex -translate-y-1/2 flex-col sm:right-4">
+      <motion.aside
+        initial={false}
+        animate={{ opacity: showSidebar ? 1 : 0, x: showSidebar ? 0 : 24 }}
+        transition={PILL_SPRING}
+        style={{ pointerEvents: showSidebar ? "auto" : "none" }}
+        aria-hidden={!showSidebar}
+        className="fixed right-2 top-1/2 z-40 flex -translate-y-1/2 flex-col sm:right-4"
+      >
         <button
           type="button"
           className="p-2 rounded-md cursor-pointer border-white/45 bg-white/70 px-3 py-4 shadow-[0_12px_32px_rgba(15,23,42,0.14)] backdrop-blur-sm  mb-2"
@@ -403,7 +419,7 @@ export default function NeumorphicNavbar() {
             />
           </svg>
         </button>
-      </aside>
+      </motion.aside>
     </>
   );
 }

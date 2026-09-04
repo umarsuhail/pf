@@ -1,11 +1,11 @@
 "use client";
 
-import { Icon } from "@iconify/react";
 import { motion, type Variants } from "framer-motion";
 import type { FlightCard } from "../data/sections";
 import { getSkillGroups } from "../data/skillGroups";
 import HandwritingText from "../components/TypoGraphyHand";
 import NarratedText from "../components/NarratedText";
+import { BrandIcon } from "../components/icons/brand-icon";
 
 const LEVEL_STYLES: Record<string, string> = {
   Expert: "text-sky-300/90",
@@ -67,7 +67,7 @@ export function SkillsShowcase({
                     }}
                     whileHover={{ scale: 1.2 }}
                   >
-                    <Icon icon={item.icon} className="h-10 w-10 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)] sm:h-12 sm:w-12" />
+                    <BrandIcon slug={item.icon} className="h-10 w-10 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)] sm:h-12 sm:w-12" />
                   </motion.div>
                   <span className="text-xs font-medium text-slate-100/85 sm:text-sm">
                     {item.label}

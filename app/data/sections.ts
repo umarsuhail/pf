@@ -18,6 +18,22 @@ export type FlightCard = {
   tone: "light" | "dark";
   // Optional hero art for the standalone /[section] detail page
   image?: string;
+  // Structured content backing the bespoke /[section] layouts below —
+  // only set on the cards that actually use them (projects, experience).
+  projects?: {
+    title: string;
+    description: string;
+    image: string;
+    category: string;
+    stack: string[];
+  }[];
+  timeline?: {
+    company: string;
+    role: string;
+    period: string;
+    location: string;
+    summary: string;
+  }[];
 };
 
 export const cards: FlightCard[] = [
@@ -41,31 +57,8 @@ export const cards: FlightCard[] = [
     tone: "light",
   },
   {
-    id: "about",
-    eyebrow: "02 / About Me",
-    title: "Software Developer from Kerala, set in Abu Dhabi",
-    description:
-      "My path spans UI Developer at Uvionics Tech, Software Engineer at Aspire Systems, Development Team Lead at Epixel Solutions, and Application Developer at EFR.",
-    details: [
-      "Full name: Umar Suhail",
-      "Role: Lead Frontend Engineer",
-      "Nationality: Indian",
-      "Languages: English, Hindi, Urdu, Malayalam, Tamil",
-      "Education: KMP College of Engineering",
-      "Current location: Abu Dhabi, United Arab Emirates",
-      "Hometown: Thrissur, Kerala",
-      "Open to remote and relocation opportunities",
-    ],
-    cta: "About Details",
-    align: "right",
-    x: 280,
-    z: -950,
-    width: "clamp(400px, 54vw, 840px)",
-    tone: "light",
-  },
-  {
     id: "skills",
-    eyebrow: "03 / Skills",
+    eyebrow: "02 / Skills",
     title: "React, Next.js, TypeScript, UI/UX, and Performance",
     description:
       "I specialise in high-performance frontend architecture with React, Next.js, TypeScript, Redux Toolkit, and Tailwind CSS, design interfaces end-to-end in Figma and Adobe Creative Suite, and round it out with Node.js and MongoDB on the backend.",
@@ -78,6 +71,7 @@ export const cards: FlightCard[] = [
       "CSS3 — Expert",
       "Tailwind CSS — Expert",
       "Redux — Expert",
+      "Zustand — Expert",
       "Material-UI — Expert",
       "Figma — Expert",
       "Adobe Photoshop — Expert",
@@ -99,10 +93,10 @@ export const cards: FlightCard[] = [
   },
   {
     id: "projects",
-    eyebrow: "04 / Projects",
-    title: "Enterprise Dashboards, Biometric Platforms, and Interactive Experiences",
+    eyebrow: "03 / Projects",
+    title: "Enterprise Products, Intelligent Platforms & Digital Experiences",
     description:
-      "Recent work includes AI-powered face-recognition systems, biometric transaction monitoring dashboards, tenant configuration workflows, and MLM software.",
+      "A selection of products I’ve designed and built across enterprise dashboards, biometric and identity platforms, AI-powered applications, workflow systems, and developer-focused tools — combining scalable frontend architecture with thoughtful, high-performance user experiences..",
     details: [
       "Dashboard v2 — Transaction & Revenue Monitoring: migrated a legacy Angular multi-tenant dashboard to Next.js + TypeScript, with role/permission access, KYC workflows, and billing analytics (Next.js, React, TypeScript, Node.js, Docker)",
       "AI Chatbots: AI-powered chatbot interfaces and a real-time monitoring dashboard for accident assessment and reporting (React.js, JavaScript, HTML, CSS, Bootstrap)",
@@ -117,10 +111,61 @@ export const cards: FlightCard[] = [
     z: -4700,
     width: "clamp(420px, 60vw, 950px)",
     tone: "dark",
+    projects: [
+      {
+        title: "Enterprise Dashboard — Transaction & Revenue Monitoring",
+        description:
+          "A multi-tenant analytics dashboard for real-time transaction monitoring, revenue tracking, and advanced reporting.",
+        // TODO: swap for the real project screenshot
+        image: "/images/pro1.png",
+        category: "Dashboards",
+        stack: ["Next.js", "React", "TypeScript", "Node.js"],
+      },
+      {
+        title: "Biometric Identity & Recognition Platform",
+        description:
+          "AI-powered face recognition system with real-time biometric monitoring, computer vision integrations, and modern UI/UX.",
+        image: "/images/pro1.png",
+        category: "AI/ML",
+        stack: ["Next.js", "React", "TypeScript", "Computer Vision"],
+      },
+      {
+        title: "AI-Powered Visual Assistant",
+        description:
+          "A real-time monitoring dashboard for automated accident assessment, pairing computer vision with visual reporting.",
+        image: "/images/pro1.png",
+        category: "AI/ML",
+        stack: ["React.js", "JavaScript", "HTML/CSS", "Bootstrap"],
+      },
+      {
+        title: "Tenant & Configuration Management Platform",
+        description:
+          "A dynamic platform for tenant onboarding, configuration workflows, and role-based access management.",
+        image: "/images/pro1.png",
+        category: "Enterprise",
+        stack: ["Next.js", "TypeScript", "Node.js"],
+      },
+      {
+        title: "AI Chatbot & Monitoring Systems",
+        description:
+          "AI-powered chatbot interfaces paired with a real-time monitoring dashboard for operational reporting.",
+        image: "/images/pro1.png",
+        category: "Productivity",
+        stack: ["React.js", "JavaScript", "Socket.io"],
+      },
+      {
+        title: "Resume & Career Tools",
+        description:
+          "ATS-friendly resume builder with live editing, styling, preview, and PDF/TeX export.",
+        image: "/images/pro1.png",
+        category: "Tools",
+        stack: ["Next.js", "TypeScript", "Tailwind CSS", "PDFKit"],
+      },
+    ],
   },
   {
     id: "experience",
-    eyebrow: "05 / Experience",
+    eyebrow: "04 / Experience",
     title: "Professional Experience Across UAE and India",
     description:
       "A track record of delivering impactful frontend solutions across biometric systems, MLM platforms, enterprise web apps, and reusable UI component libraries.",
@@ -138,13 +183,45 @@ export const cards: FlightCard[] = [
     z: -5750,
     width: "clamp(390px, 52vw, 800px)",
     tone: "dark",
+    timeline: [
+      {
+        company: "Emirates Face Recognition",
+        role: "Application Developer",
+        period: "Feb 2025 – Present",
+        location: "Abu Dhabi",
+        summary:
+          "AI-powered face recognition systems and enterprise dashboards. Scalable React and Next.js applications, real-time biometric monitoring, modern UI/UX, computer vision integrations.",
+      },
+      {
+        company: "Epixel Solutions",
+        role: "Development Team Lead",
+        period: "Nov 2022 – May 2024",
+        location: "Kochi",
+        summary:
+          "Led MLM software and enterprise frontend delivery. Improved code quality by 40%, mentored developers, set coding standards, delivered React and Next.js solutions.",
+      },
+      {
+        company: "Aspire Systems",
+        role: "Software Engineer",
+        period: "Nov 2020 – Oct 2022",
+        location: "Kochi",
+        summary: "React apps, Redux workflows, REST API integrations, client delivery.",
+      },
+      {
+        company: "Uvionics Tech India Pvt Ltd",
+        role: "UI Developer",
+        period: "Aug 2018 – Nov 2020",
+        location: "Koratty",
+        summary: "HTML, CSS, JavaScript, Bootstrap, React, reusable components.",
+      },
+    ],
   },
   {
     id: "contact",
     eyebrow: "06 / Contact",
     title: "Ready to Build Something Amazing?",
     description:
-      "I'm always excited to work on new projects and collaborate with innovative teams. Reach me in Abu Dhabi, UAE, or connect online.",
+      "Have a project in mind or just want to talk frontend? I'm based in Abu Dhabi, open to new opportunities, and always happy to connect.",
     details: [
       "Email: umarsuhail112@gmail.com",
       "Phone: +971 551 912 074 / +971 568 323 258 / +91 949 765 6243",
@@ -165,7 +242,6 @@ export const cards: FlightCard[] = [
 
 export const sectionProgressMap: Record<string, number> = {
   home: 0,
-  about: 0.11,
   skills: 0.22,
   projects: 0.56,
   experience: 0.69,

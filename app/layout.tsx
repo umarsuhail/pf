@@ -6,23 +6,27 @@ import PageLoader from "./components/PageLoader";
 import HoloChat from "./components/HoloChat";
 import CockpitTray from "./components/CockpitTray";
 import AutopilotStartToast from "./components/AutopilotStartToast";
+import ScrollSound from "./components/ScrollSound";
 
-const urbanist = localFont({
+const grenze = localFont({
   src: [
     {
-      path: "../public/urbanist-var.ttf",
+      path: "../public/Grenze-VariableFont_wght.ttf",
       style: "normal",
       weight: "100 900",
     },
-    {
-      path: "../public/urbanist-italic.ttf",
-      style: "italic",
-      weight: "100 900",
-    },
   ],
-  variable: "--font-urbanist",
+  variable: "--font-grenze",
   display: "swap",
   fallback: ["Segoe UI", "Arial", "sans-serif"],
+});
+
+// Decorative display face for the flight's time-of-day greeting.
+const twinkleStar = localFont({
+  src: "../public/TwinkleStar-Regular.ttf",
+  variable: "--font-twinkle-star",
+  display: "swap",
+  fallback: ["cursive"],
 });
 
 export const metadata: Metadata = {
@@ -109,8 +113,9 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className={`${urbanist.variable} relative min-h-screen antialiased`}>
+      <body className={`${grenze.variable} ${twinkleStar.variable} relative min-h-screen antialiased`}>
         <PageLoader />
+        <ScrollSound />
         <CockpitTray />
         <AutopilotStartToast />
         <RouteMap />

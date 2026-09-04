@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import gsap from "gsap";
-import type { MotionValue } from "framer-motion";
+import { AnimatePresence, motion, type MotionValue } from "framer-motion";
 import { ArrowUpRightIcon } from "./icons/arrow-up-right";
 import type { AnimatedIconHandle } from "./icons/card-icon";
 import Space from "./Space";
@@ -16,9 +16,13 @@ interface CardPortalProps {
   targetId: string;
   actionLabel: string;
   ariaLabel: string;
+  // Entry-card only: the home bio is reading its full, expanded text — swap
+  // the portal's particle-logo mark for the astronaut illustration so the
+  // visual matches the more contemplative, unhurried moment.
+  isExpanded?: boolean;
 }
 
-const sectionProgressStops = [0, 0.11, 0.22, 0.56, 0.69, 0.81, 0.92];
+const sectionProgressStops = [0, 0.22, 0.56, 0.69, 0.81, 0.92];
 
 // Home / Identity Space keeps its original overlay; every other section gets
 // its own atmosphere — a color grade plus an abstract motif standing in for
@@ -34,42 +38,35 @@ const atmospheres: { overlay: string; motif: MotifType; accent: string }[] = [
     accent: "#7dd3fc",
   },
   {
-    // 1 about — personal, warm
-    overlay:
-      "linear-gradient(180deg, rgba(220, 38, 38, 0.32) 0%, rgba(127, 29, 29, 0.16) 45%, rgba(15, 8, 8, 0.4) 100%)",
-    motif: "orb",
-    accent: "#f87171",
-  },
-  {
-    // 2 skills — technology constellation
+    // 1 skills — technology constellation
     overlay:
       "linear-gradient(180deg, rgba(4, 120, 87, 0.3) 0%, rgba(6, 78, 59, 0.15) 45%, rgba(2, 20, 25, 0.4) 100%)",
     motif: "nodes",
     accent: "#34d399",
   },
   {
-    // 3 projects — floating worlds
+    // 2 projects — floating worlds
     overlay:
       "linear-gradient(180deg, rgba(3, 105, 161, 0.3) 0%, rgba(12, 74, 110, 0.15) 45%, rgba(2, 15, 35, 0.4) 100%)",
     motif: "worlds",
     accent: "#60a5fa",
   },
   {
-    // 4 experience — timeline through the journey
+    // 3 experience — timeline through the journey
     overlay:
       "linear-gradient(180deg, rgba(180, 83, 9, 0.26) 0%, rgba(120, 53, 15, 0.14) 45%, rgba(20, 12, 4, 0.4) 100%)",
     motif: "timeline",
     accent: "#fbbf24",
   },
   {
-    // 5 open source — branching network
+    // 4 resume — branching network
     overlay:
       "linear-gradient(180deg, rgba(51, 65, 85, 0.34) 0%, rgba(30, 41, 59, 0.18) 45%, rgba(8, 10, 15, 0.4) 100%)",
     motif: "network",
     accent: "#94a3b8",
   },
   {
-    // 6 contact — calm arrival
+    // 5 contact — calm arrival
     overlay:
       "linear-gradient(180deg, rgba(3, 105, 161, 0.2) 0%, rgba(8, 47, 73, 0.12) 45%, rgba(2, 10, 25, 0.35) 100%)",
     motif: "calm",
@@ -81,12 +78,11 @@ const atmospheres: { overlay: string; motif: MotifType; accent: string }[] = [
 // after the entry/earth card at index 0); indices without an entry fall back
 // to the drawn PortalMotif below.
 const imageSrcByIndex: Record<number, string> = {
-  1: "/a2.svg",
-  2: "/a3.svg",
-  3: "/a4.svg",
-  4: "/a5.svg",
-  5: "/a6.svg",
-  6: "/a7.svg",
+  1: "/a3.svg",
+  2: "/a4.svg",
+  3: "/a5.svg",
+  4: "/a6.svg",
+  5: "/a7.svg",
 };
 
 function PortalMotif({ motif, accent }: { motif: MotifType; accent: string }) {
@@ -202,12 +198,14 @@ export function CardPortal({
   targetId,
   actionLabel,
   ariaLabel,
+  isExpanded = false,
 }: CardPortalProps) {
   const earthRef = useRef<HTMLDivElement>(null);
   const motifRef = useRef<HTMLDivElement>(null);
   const spinRef = useRef<HTMLDivElement>(null);
   const visualRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
+  const progressRef = useRef<SVGRectElement>(null);
   const arrowRef = useRef<AnimatedIconHandle>(null);
   const hasEnteredRef = useRef(false);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
@@ -277,6 +275,14 @@ export function CardPortal({
       };
     }
 
+    // Traces the rounded border in as the card comes into focus, then
+    // traces back out as it departs — the ring reads as this card's own
+    // zoom-in/zoom-out progress through the flight.
+    const progressDash = gsap.quickTo(progressRef.current, "strokeDashoffset", {
+      duration: 0.6,
+      ease: "power2.out",
+    });
+
     const update = (progress: number) => {
       let reveal = 0;
       if (progress >= revealStart && progress < revealPeak) {
@@ -305,6 +311,10 @@ export function CardPortal({
       lastFade = fade;
 
       applyReveal(ease(reveal), fade);
+      // Draws in while approaching, then un-draws again on the way out —
+      // mirrors the motif's own fade window so the ring tracks the same
+      // zoom-in/zoom-out lifecycle instead of staying drawn forever.
+      progressDash(100 * (1 - reveal * fade));
     };
 
     update(scrollYProgress.get());
@@ -435,9 +445,10 @@ export function CardPortal({
             <Image
               src="/images/us.png"
               alt=""
-              fill
-              sizes="(min-width: 1024px) 30vw, 40vh"
-              className="object-cover opacity-35 mix-blend-screen"
+              width={300}
+              height={300}
+              sizes=" 30vw, 40vh"
+              className="object-cover opacity-55 mix-blend-screen p-8"
               aria-hidden="true"
             />
           )}
@@ -457,14 +468,46 @@ export function CardPortal({
                 willChange: "transform",
               }}
             >
-              <ParticleLogo
-                src="/images/us.png"
-                particleCount={720}
-                speed={0.8}
-                disperseStrength={110}
-                loop
-                className="object-contain object-bottom"
-              />
+              <AnimatePresence initial={false} mode="wait">
+                {isExpanded ? (
+                  <motion.div
+                    key="astronaut"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="absolute inset-0"
+                  >
+                    <Image
+                      src="/SVG/astr.svg"
+                      alt=""
+                      fill
+                      sizes="(min-width: 1024px) 30vw, 40vh"
+                      className="object-contain object-bottom"
+                      aria-hidden="true"
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="logo"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="absolute inset-0"
+                  >
+                    <ParticleLogo
+                      src="/images/us.png"
+                      particleCount={720}
+                      speed={0.8}
+                      disperseStrength={110}
+                      size={150}
+                      loop
+                      className="object-contain object-bottom"
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           ) : (
             <div
@@ -501,6 +544,47 @@ export function CardPortal({
 
       {/* Aperture glow ring — ambient invitation, always animating */}
       <div className="portal-aperture-pulse pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-inset ring-(--accent)/40 lg:rounded-3xl" />
+
+      {/* Scroll-progress stroke — traces the rounded border in as this
+         card's own portal comes into focus (see the reveal effect above).
+         Skipped on the entry card: the earth graphic has no reveal/depart
+         window of its own, so the ring never had anywhere to animate. */}
+      {!isEntry && (
+        <svg
+          className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+          aria-hidden="true"
+        >
+          <rect
+            x="1"
+            y="1"
+            width="98%"
+            height="98%"
+            rx="20"
+            ry="20"
+            fill="none"
+            stroke="white"
+            strokeOpacity="0.12"
+            strokeWidth="2"
+          />
+          <rect
+            ref={progressRef}
+            x="1"
+            y="1"
+            width="98%"
+            height="98%"
+            rx="20"
+            ry="20"
+            fill="none"
+            stroke="#fbbf24"
+            strokeWidth="2"
+            strokeLinecap="round"
+            pathLength={100}
+            strokeDasharray={100}
+            strokeDashoffset={100}
+            style={{ filter: "drop-shadow(0 0 5px #fbbf24)" }}
+          />
+        </svg>
+      )}
 
       {/* Action label — faint baseline (touch), brightens on hover-capable pointer hover */}
       <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center opacity-70 transition-opacity duration-300 group-hover:opacity-100">

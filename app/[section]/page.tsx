@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { cardGradients, cards } from "../data/sections";
 import { SectionContent } from "./SectionContent";
 
-const detailSections = cards;
+// The resume card downloads a PDF directly instead of opening a details
+// page, so it's excluded from the standalone /[section] routes.
+const detailSections = cards.filter((card) => card.id !== "resume");
 
 export function generateStaticParams() {
   return detailSections.map((card) => ({ section: card.id }));

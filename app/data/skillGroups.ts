@@ -8,26 +8,28 @@ export type SkillGroupItem = { label: string; level: string; icon: string };
 
 export type SkillGroup = { name: SkillGroupName; blurb: string; items: SkillGroupItem[] };
 
+// `icon` keys into the self-hosted BrandIcon registry (app/components/icons/
+// brand-icon.tsx) — no icon-library runtime dependency.
 const SKILL_META: { pattern: RegExp; icon: string; group: SkillGroupName }[] = [
-  { pattern: /\breact\b/i, icon: "logos:react", group: "Frontend Development" },
-  { pattern: /\bnext(\.js)?\b/i, icon: "logos:nextjs-icon", group: "Frontend Development" },
-  { pattern: /\btypescript\b/i, icon: "logos:typescript-icon", group: "Frontend Development" },
-  { pattern: /\bjavascript\b/i, icon: "logos:javascript", group: "Frontend Development" },
-  { pattern: /\bhtml5?\b/i, icon: "logos:html-5", group: "Frontend Development" },
-  { pattern: /\bcss3?\b/i, icon: "logos:css-3", group: "Frontend Development" },
-  { pattern: /\btailwind\b/i, icon: "logos:tailwindcss-icon", group: "Frontend Development" },
-  { pattern: /\bredux\b/i, icon: "logos:redux", group: "Frontend Development" },
-  { pattern: /material-ui/i, icon: "logos:material-ui", group: "Frontend Development" },
-  { pattern: /\bfigma\b/i, icon: "logos:figma", group: "UI/UX Design" },
-  { pattern: /photoshop/i, icon: "logos:adobe-photoshop", group: "UI/UX Design" },
-  { pattern: /illustrator/i, icon: "logos:adobe-illustrator", group: "UI/UX Design" },
-  { pattern: /premiere/i, icon: "logos:adobe-premiere", group: "UI/UX Design" },
-  { pattern: /after effects/i, icon: "logos:adobe-after-effects", group: "UI/UX Design" },
-  { pattern: /\bnode(\.js)?\b/i, icon: "logos:nodejs-icon", group: "Backend & Tooling" },
-  { pattern: /mongodb/i, icon: "logos:mongodb", group: "Backend & Tooling" },
-  { pattern: /\bgit\b/i, icon: "logos:git-icon", group: "Backend & Tooling" },
-  { pattern: /\bjenkins\b/i, icon: "logos:jenkins", group: "Backend & Tooling" },
-  { pattern: /\bdocker\b/i, icon: "logos:docker-icon", group: "Backend & Tooling" },
+  { pattern: /\breact\b/i, icon: "react", group: "Frontend Development" },
+  { pattern: /\bnext(\.js)?\b/i, icon: "nextjs", group: "Frontend Development" },
+  { pattern: /\btypescript\b/i, icon: "typescript", group: "Frontend Development" },
+  { pattern: /\bjavascript\b/i, icon: "javascript", group: "Frontend Development" },
+  { pattern: /\bhtml5?\b/i, icon: "html5", group: "Frontend Development" },
+  { pattern: /\bcss3?\b/i, icon: "css3", group: "Frontend Development" },
+  { pattern: /\btailwind\b/i, icon: "tailwindcss", group: "Frontend Development" },
+  { pattern: /\bredux\b/i, icon: "redux", group: "Frontend Development" },
+  { pattern: /material-ui/i, icon: "mui", group: "Frontend Development" },
+  { pattern: /\bfigma\b/i, icon: "figma", group: "UI/UX Design" },
+  { pattern: /photoshop/i, icon: "photoshop", group: "UI/UX Design" },
+  { pattern: /illustrator/i, icon: "illustrator", group: "UI/UX Design" },
+  { pattern: /premiere/i, icon: "premiere", group: "UI/UX Design" },
+  { pattern: /after effects/i, icon: "aftereffects", group: "UI/UX Design" },
+  { pattern: /\bnode(\.js)?\b/i, icon: "nodejs", group: "Backend & Tooling" },
+  { pattern: /mongodb/i, icon: "mongodb", group: "Backend & Tooling" },
+  { pattern: /\bgit\b/i, icon: "git", group: "Backend & Tooling" },
+  { pattern: /\bjenkins\b/i, icon: "jenkins", group: "Backend & Tooling" },
+  { pattern: /\bdocker\b/i, icon: "docker", group: "Backend & Tooling" },
 ];
 
 const GROUP_ORDER: { name: SkillGroupName; blurb: string }[] = [

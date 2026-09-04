@@ -13,16 +13,17 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useRef, useState } from "react";
-import { Icon } from "@iconify/react";
 import { CardPortal } from "./CardPortal";
 import { CardIcon } from "./icons/card-icon";
-import EndCredits from "./EndCredits";
+import { DownloadIcon, type DownloadIconHandle } from "./icons/download";
+import { BrandIcon } from "./icons/brand-icon";
 import ExpandableText from "./ExpandableText";
 import NarrationHighlights from "./NarrationHighlights";
 import NarratedText from "./NarratedText";
 import { NARRATION_DURATION } from "../data/narration";
 import SpaceParticles from "./SpaceParticles";
 import { getSkillGroups } from "../data/skillGroups";
+import Greeting from "./Greeting";
 
 import {
   cardGradients,
@@ -116,6 +117,9 @@ function getActiveSectionId(progress: number) {
   return activeId;
 }
 
+const RESUME_PDF_URL = "/umar-suhail-resume-2026.pdf";
+const RESUME_TEX_URL = "/resume.tex";
+
 function getRevealWindow(index: number) {
   if (index === 0) return { start: 0, end: 0.01 };
   const previous = sectionProgressStops[index - 1];
@@ -159,19 +163,26 @@ const AUTOPILOT_TRAVEL = AUTOPILOT_SECTION_SECONDS - AUTOPILOT_HOLD;
 
 // The opening leg (home) runs on its own clock instead of the standard 10s
 // slot — it holds through the whole 43s intro narration with a slow,
-// continuously-drifting camera (never a dead-still parked hold, so it never
-// reads as "stuck"), opens the home card's full bio partway through at the
-// EXPAND mark, then makes a quick 1s hop into about right on the narration's
-// handover to the second track — landing on the second section at 0:44.
+// continuously-drifting camera that travels the *entire* way to the next
+// card's own arrival point over that whole span, landing there exactly as
+// the narration hands off. Earlier this crept to a barely-there target and
+// then hopped the rest of the way in a single quick second right at the
+// handoff — reading as a sudden jump/zoom instead of one continuous motion.
 const AUTOPILOT_INTRO_HOLD = NARRATION_DURATION;
 const AUTOPILOT_INTRO_EXPAND_AT = 10;
-const AUTOPILOT_INTRO_HANDOFF = 1;
 
 // The last real card (contact) and the tail beyond it (the earth/moon/end-
 // credits payoff) both get more time than the standard mid-tour hold —
 // they're the close of the tour, not a stop along the way.
 const AUTOPILOT_CONTACT_HOLD = 7;
 const AUTOPILOT_TAIL_HOLD = 8;
+
+// Each skill layover (frontend/UI/backend) gets a real, brief stop of its
+// own during the Skills → Projects transit, rather than just a fade the
+// camera happens to pass while travelling — a quick hop in, then a short
+// hold to actually register the cluster before moving to the next one.
+const AUTOPILOT_LAYOVER_TRAVEL = 1.4;
+const AUTOPILOT_LAYOVER_HOLD = 2.6;
 
 // Forward travel a "go to section" jump adds on top of the card's own stop,
 // in progress units — the fixed span's hang time scaled by the zoom fraction.
@@ -235,7 +246,13 @@ function BillboardCard({
   // The autopilot tour opens the home card's full bio partway through its
   // intro hold, rather than leaving it collapsed while the narration reads
   // straight through it.
+  const pdfDownloadRef = useRef<DownloadIconHandle>(null);
+  const texDownloadRef = useRef<DownloadIconHandle>(null);
   const [autoExpandHome, setAutoExpandHome] = useState(false);
+  // Tracks the bio's real expanded state (manual toggle included, not just
+  // the one-way autopilot trigger) so the portal can swap its visual to
+  // match — the astronaut only belongs on screen while the full bio reads.
+  const [isHomeExpanded, setIsHomeExpanded] = useState(false);
   useEffect(() => {
     if (card.id !== "home") return;
     const onExpand = (event: Event) => {
@@ -340,8 +357,15 @@ function BillboardCard({
       {card.id === "home" && <NarrationHighlights />}
 
       <motion.div
-        animate={{ y: [0, -8, 0], scale: 0.98 }}
-        transition={{ duration: 5 + index * 0.5, repeat: Infinity, ease: "easeInOut" }}
+       animate={{
+  y: [0, -12, 0, 12, 0],
+  opacity: [0.7, 1, 0.85, 1, 0.7],
+}}
+transition={{
+  duration: 7 + index * 0.5,
+  repeat: Infinity,
+  ease: "easeInOut",
+}}
         className={`flex w-full items-stretch ${isMobile ? "gap-3" : "gap-5 sm:gap-8"} ${
           card.align === "right" ? "flex-row-reverse" : "flex-row"
         }`}
@@ -372,7 +396,7 @@ function BillboardCard({
                 : "mt-5 text-2xl sm:mt-6 sm:text-3xl lg:text-5xl"
             } ${titleClass}`}
           >
-            {card.title}
+            {card.id === "home" ? <Greeting /> : card.title}
           </h2>
           {/* Home carries the full narrated bio (all four paragraphs) — too
              long for a billboard card to show outright, so it collapses to a
@@ -382,6 +406,7 @@ function BillboardCard({
               className={`max-w-[46ch] ${isMobile ? "mt-2" : "mt-4 max-w-[38ch] sm:mt-5"}`}
               collapsedHeight={isMobile ? "3.3em" : "4.5em"}
               forceExpanded={autoExpandHome}
+              onExpandedChange={setIsHomeExpanded}
             >
               <p
                 className={`${
@@ -393,7 +418,7 @@ function BillboardCard({
                 <NarratedText id={card.id} text={card.description} />
               </p>
             </ExpandableText>
-          ) : (
+          ) : card.id !== "resume" ? (
             <p
               className={`max-w-[46ch] ${
                 isMobile
@@ -403,19 +428,50 @@ function BillboardCard({
             >
               <NarratedText id={card.id} text={card.description} />
             </p>
+          ) : null}
+          {card.id === "resume" ? (
+            // The resume card downloads the file directly instead of opening
+            // a details page — there's no extra copy to elaborate on.
+            <div className={`flex items-center gap-3 ${isMobile ? "mt-3" : "mt-6 sm:mt-8"}`}>
+              <a
+                href={RESUME_PDF_URL}
+                download
+                onMouseEnter={() => pdfDownloadRef.current?.startAnimation()}
+                onMouseLeave={() => pdfDownloadRef.current?.stopAnimation()}
+                className={`inline-flex items-center gap-2 rounded-full border font-semibold transition duration-300 ${
+                  isMobile ? "px-4 py-1.5 text-[11px]" : "px-6 py-3 text-sm hover:-translate-y-1"
+                } ${buttonClass}`}
+              >
+                <DownloadIcon ref={pdfDownloadRef} size={isMobile ? 12 : 16} aria-hidden="true" />
+                PDF
+              </a>
+              <a
+                href={RESUME_TEX_URL}
+                download
+                onMouseEnter={() => texDownloadRef.current?.startAnimation()}
+                onMouseLeave={() => texDownloadRef.current?.stopAnimation()}
+                className={`inline-flex items-center gap-2 rounded-full border font-semibold transition duration-300 ${
+                  isMobile ? "px-4 py-1.5 text-[11px]" : "px-6 py-3 text-sm hover:-translate-y-1"
+                } ${buttonClass}`}
+              >
+                <DownloadIcon ref={texDownloadRef} size={isMobile ? 12 : 16} aria-hidden="true" />
+                TeX
+              </a>
+            </div>
+          ) : (
+            // Opens the section's own page rather than expanding in place, so
+            // each section is a real, crawlable URL.
+            <Link
+              href={`/${card.id}`}
+              className={`inline-block rounded-full border font-semibold transition duration-300 ${
+                isMobile
+                  ? "mt-3 px-4 py-1.5 text-[11px]"
+                  : "mt-6 px-6 py-3 text-sm hover:-translate-y-1 sm:mt-8"
+              } ${buttonClass}`}
+            >
+              {card.cta}
+            </Link>
           )}
-          {/* Opens the section's own page rather than expanding in place, so
-             each section is a real, crawlable URL. */}
-          <Link
-            href={`/${card.id}`}
-            className={`inline-block rounded-full border font-semibold transition duration-300 ${
-              isMobile
-                ? "mt-3 px-4 py-1.5 text-[11px]"
-                : "mt-6 px-6 py-3 text-sm hover:-translate-y-1 sm:mt-8"
-            } ${buttonClass}`}
-          >
-            {card.cta}
-          </Link>
         </motion.div>
 
 
@@ -432,6 +488,7 @@ function BillboardCard({
             targetId={targetCard.id}
             actionLabel={actionLabel}
             ariaLabel={`Fly to ${targetCard.eyebrow.replace(/^\d+\s*\/\s*/, "")}`}
+            isExpanded={card.id === "home" && isHomeExpanded}
           />
         </motion.div>
       </motion.div>
@@ -491,8 +548,8 @@ function SkillLayoverCluster({
                 delay: i * 0.1,
               }}
             >
-              <Icon
-                icon={item.icon}
+              <BrandIcon
+                slug={item.icon}
                 className={`drop-shadow-[0_4px_14px_rgba(0,0,0,0.55)] ${
                   isMobile ? "h-7 w-7" : "h-10 w-10 sm:h-12 sm:w-12"
                 }`}
@@ -535,6 +592,7 @@ function MobileCard({
               particleCount={420}
               speed={1}
               disperseStrength={150}
+              size={80}
               loop
             />
           </div>
@@ -544,17 +602,40 @@ function MobileCard({
           {card.eyebrow}
         </span>
         <h2 className="mt-4 text-2xl font-semibold leading-tight text-[#f0f9ff]">
-          {card.title}
+          {card.id === "home" ? <Greeting /> : card.title}
         </h2>
-        <p className="mt-3 text-sm leading-6 text-slate-100/90">
-          <NarratedText id={card.id} text={card.description} />
-        </p>
-        <Link
-          href={`/${card.id}`}
-          className="mt-5 inline-block rounded-full border border-sky-200/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-sky-50 transition duration-300"
-        >
-          {card.cta}
-        </Link>
+        {card.id !== "resume" && (
+          <p className="mt-3 text-sm leading-6 text-slate-100/90">
+            <NarratedText id={card.id} text={card.description} />
+          </p>
+        )}
+        {card.id === "resume" ? (
+          <div className="mt-5 flex items-center gap-3">
+            <a
+              href={RESUME_PDF_URL}
+              download
+              className="inline-flex items-center gap-2 rounded-full border border-sky-200/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-sky-50 transition duration-300"
+            >
+              <DownloadIcon size={14} aria-hidden="true" />
+              PDF
+            </a>
+            <a
+              href={RESUME_TEX_URL}
+              download
+              className="inline-flex items-center gap-2 rounded-full border border-sky-200/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-sky-50 transition duration-300"
+            >
+              <DownloadIcon size={14} aria-hidden="true" />
+              TeX
+            </a>
+          </div>
+        ) : (
+          <Link
+            href={`/${card.id}`}
+            className="mt-5 inline-block rounded-full border border-sky-200/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-sky-50 transition duration-300"
+          >
+            {card.cta}
+          </Link>
+        )}
       </div>
     </section>
   );
@@ -569,7 +650,6 @@ export default function MultiverseFlight() {
   const [compact, setCompact] = useState(false);
   const [portrait, setPortrait] = useState(false);
   const [rotateDismissed, setRotateDismissed] = useState(false);
-  const [showCredits, setShowCredits] = useState(false);
 
   useEffect(() => {
     const onResize = () => {
@@ -670,14 +750,6 @@ export default function MultiverseFlight() {
   // anything.
   const endEarthT = useTransform(scrollYProgress, [0.88, 1], [0, 1]);
   const endEarthReveal = useTransform(endEarthT, [0, 0.35, 1], [0, 1, 1]);
-
-  // The credits crawl is a boolean mount, not a MotionValue-driven fade —
-  // it self-animates on a timer once it appears, so it needs a plain state
-  // flip rather than a continuous transform.
-  useEffect(() => {
-    const unsubscribe = endEarthT.on("change", (v) => setShowCredits(v > 0.55));
-    return () => unsubscribe();
-  }, [endEarthT]);
 
   // --- Overscroll "approach" -------------------------------------------
   // At max scroll the browser has nothing left to give, so the journey
@@ -894,37 +966,75 @@ export default function MultiverseFlight() {
 
       const toScrollTop = (p: number) => containerTop + scrollable * p;
 
-      // Every section's arrival point, then the tail of the track so the tour
-      // ends on the closing shot rather than on the last card.
-      const legs = [
-        ...cards.map((card) => getNavTargetProgress(card.id) ?? 0),
-        1,
-      ];
+      // One leg per stop the tour actually parks on: the intro's continuous
+      // drift into Skills, each remaining card in turn (with the three skill
+      // layovers inserted as their own brief stops between Skills and
+      // Projects), then the tail of the track so the tour ends on the
+      // closing shot rather than on the last card. `cardIndex` is what gets
+      // reported to the UI (route highlighting, the CockpitTray leg label) —
+      // the layover legs reuse Skills' own index so they read as glances
+      // within that section rather than section changes of their own.
+      type Leg = {
+        target: number;
+        travelMs: number;
+        linear: boolean;
+        holdMs: number;
+        cardIndex: number;
+      };
 
-      // Per-leg timing. Every leg after the intro uses the standard 10s
-      // slot, unchanged. The first two are custom: home holds through the
-      // full 43s narration on a slow continuous drift instead of a quick
-      // travel-then-park, and about's arrival is compressed to a 1s hop so
-      // it lands exactly as the narration hands off to the second track.
-      const legPlans = legs.map((target, i) => {
-        if (i === 0) return { target, travelMs: AUTOPILOT_INTRO_HOLD * 1000, linear: true };
-        if (i === 1) return { target, travelMs: AUTOPILOT_INTRO_HANDOFF * 1000, linear: false };
-        return { target, travelMs: AUTOPILOT_TRAVEL * 1000, linear: false };
+      const legs: Leg[] = [];
+
+      cards.forEach((card, i) => {
+        const target = getNavTargetProgress(card.id) ?? 0;
+
+        if (i === 0) {
+          // Holds through the whole narration on one continuous, slow drift
+          // that travels all the way to the *next* card's own arrival point
+          // over that whole span, instead of creeping to a barely-there
+          // target and then hopping the rest of the way in a single quick
+          // second right as the narration ends.
+          const next = cards[1] ? getNavTargetProgress(cards[1].id) ?? target : target;
+          legs.push({
+            target: next,
+            travelMs: AUTOPILOT_INTRO_HOLD * 1000,
+            linear: true,
+            holdMs: 0,
+            cardIndex: i,
+          });
+          return;
+        }
+
+        const isLast = i === cards.length - 1;
+        legs.push({
+          target,
+          // Skills' own arrival already happened during the intro's leg
+          // above — this leg only needs to hold there, not travel again.
+          travelMs: i === 1 ? 1 : AUTOPILOT_TRAVEL * 1000,
+          linear: false,
+          holdMs: isLast ? AUTOPILOT_CONTACT_HOLD * 1000 : AUTOPILOT_HOLD * 1000,
+          cardIndex: i,
+        });
+
+        if (card.id === "skills") {
+          SKILL_LAYOVERS.forEach((layover) => {
+            legs.push({
+              target: layover.peak,
+              travelMs: AUTOPILOT_LAYOVER_TRAVEL * 1000,
+              linear: false,
+              holdMs: AUTOPILOT_LAYOVER_HOLD * 1000,
+              cardIndex: i,
+            });
+          });
+        }
       });
-      // Home's own "hold" already happened during its narrated travel — no
-      // extra pause after it, or the quick hop into about would miss landing
-      // right on the narration's handoff. Contact (the last real card) and
-      // the tail beyond it (the earth/moon/credits payoff) both get extra
-      // time — 1.4s was barely enough to register the ending existed before
-      // the tour disengaged itself.
-      const holdMsFor = (i: number) =>
-        i === 0
-          ? 0
-          : i === legs.length - 1
-            ? AUTOPILOT_TAIL_HOLD * 1000
-            : i === legs.length - 2
-              ? AUTOPILOT_CONTACT_HOLD * 1000
-              : AUTOPILOT_HOLD * 1000;
+
+      legs.push({
+        target: 1,
+        travelMs: AUTOPILOT_TRAVEL * 1000,
+        linear: false,
+        holdMs: AUTOPILOT_TAIL_HOLD * 1000,
+        cardIndex: cards.length,
+      });
 
       // Always departs from the beginning — a tour that starts halfway is not
       // a tour. The camera spring is snapped along with the scroll so the
@@ -953,10 +1063,10 @@ export default function MultiverseFlight() {
 
       const beginLeg = (now: number) => {
         from = currentProgress;
-        legMs = legPlans[index].travelMs;
+        legMs = legs[index].travelMs;
         legStart = now;
         if (index === 0) introExpandFired = false;
-        if (index < cards.length) emit(true, index);
+        if (legs[index].cardIndex < cards.length) emit(true, legs[index].cardIndex);
       };
 
       // Landing on "/" right before this runs (the cross-page engage flow)
@@ -1005,8 +1115,8 @@ export default function MultiverseFlight() {
         }
 
         const t = Math.min(1, (now - legStart) / legMs);
-        const eased = legPlans[index].linear ? t : ease(t);
-        const p = from + (legs[index] - from) * eased;
+        const eased = legs[index].linear ? t : ease(t);
+        const p = from + (legs[index].target - from) * eased;
         currentProgress = p;
         window.scrollTo({ top: toScrollTop(p), behavior: "auto" });
         // window.scrollTo doesn't move the camera directly — every card's
@@ -1024,7 +1134,7 @@ export default function MultiverseFlight() {
         smoothScrollProgress.jump(p);
 
         if (t >= 1) {
-          dwellUntil = now + holdMsFor(index);
+          dwellUntil = now + legs[index].holdMs;
         }
       };
 
@@ -1269,23 +1379,6 @@ export default function MultiverseFlight() {
             THE END,THANK YOU. PLEASE GO BACK TO THE BEGINNING TO START NEW FLIGHT.
           </motion.p>
         </motion.div>
-
-        {/* End-title crawl — self-playing once the globe scene is reached,
-           independent of the earth's own pull-dissolve opacity so the credits
-           stay legible even while straining toward it. */}
-        <AnimatePresence>
-          {showCredits && (
-            <motion.div
-              key="end-credits"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1.2 }}
-            >
-              <EndCredits />
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <motion.div
           style={{ translateZ: zCamera, transformStyle: "preserve-3d" }}

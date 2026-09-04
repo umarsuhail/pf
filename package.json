@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.59",
-    "@iconify/react": "^6.0.2",
     "@react-three/fiber": "^9.7.0",
     "@types/node": "20.19.43",
     "@types/react": "19.2.18",

@@ -24,12 +24,11 @@ export default function HoloChat() {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const chatBoxRef = useRef<HTMLDivElement>(null);
-  const iconRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const sendRef = useRef<AnimatedIconHandle>(null);
-  const toggleRef = useRef<AnimatedIconHandle>(null);
   const transmitRef = useRef<AnimatedIconHandle>(null);
+  const closeRef = useRef<AnimatedIconHandle>(null);
 
   // Initial setup for GSAP
   useEffect(() => {
@@ -39,21 +38,19 @@ export default function HoloChat() {
       y: 40,
       transformOrigin: "bottom right"
     });
-
-    // Gentle hover float animation for the button
-    gsap.to(iconRef.current, {
-      y: -8,
-      duration: 1.5,
-      repeat: -1,
-      yoyo: true,
-      ease: "sine.inOut"
-    });
   }, []);
 
   // New messages always push the transcript into view.
   useEffect(() => {
     messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight });
   }, [messages, isSending]);
+
+  // The trigger button lives in the cockpit tray (top nav) now, not here —
+  // it flips us open/closed via this event and reads our state back via
+  // "holochat-state" so its own icon/highlight can track us.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("holochat-state", { detail: { open: isOpen } }));
+  }, [isOpen]);
 
   const toggleChat = () => {
     if (!isOpen) {
@@ -79,6 +76,13 @@ export default function HoloChat() {
       setIsOpen(false);
     }
   };
+
+  useEffect(() => {
+    const onToggle = () => toggleChat();
+    window.addEventListener("toggle-holochat", onToggle);
+    return () => window.removeEventListener("toggle-holochat", onToggle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const sendMessage = async () => {
     const text = input.trim();
@@ -123,10 +127,10 @@ export default function HoloChat() {
 
   return (
     // pointer-events-none on the shell: this container is sized to fit the
-    // chat panel, so even with the panel hidden its ~350x400 footprint sat
-    // over the bottom-right of the page and swallowed clicks meant for
-    // whatever was underneath (the right-aligned cards' CTA buttons). Only
-    // the panel and the toggle opt back into hit-testing.
+    // chat panel, so even with the panel hidden (or closed via GSAP, still
+    // occupying layout) its footprint would swallow clicks meant for
+    // whatever's underneath. Only the panel itself opts back in below — the
+    // trigger now lives in the cockpit tray, not here.
     <div className="pointer-events-none fixed bottom-3 right-3 z-50 flex flex-col items-end sm:bottom-6 sm:right-6">
 
       {/* --- Chat Window ---
@@ -150,12 +154,22 @@ export default function HoloChat() {
               <p className="text-[11px] text-slate-400">Portfolio assistant</p>
             </div>
           </div>
-          <ActivityIcon
-            ref={transmitRef}
-            size={14}
-            className="rotate-90 text-sky-300/70"
-            aria-label="Transmission status"
-          />
+          <div className="flex shrink-0 items-center gap-3">
+            <ActivityIcon
+              ref={transmitRef}
+              size={14}
+              className="rotate-90 text-sky-300/70"
+              aria-label="Transmission status"
+            />
+            <button
+              type="button"
+              onClick={toggleChat}
+              aria-label="Close VEGA"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-white/10 hover:text-sky-100"
+            >
+              <XIcon ref={closeRef} size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Messages Area — user gets a filled bubble, assistant reads as
@@ -229,25 +243,6 @@ export default function HoloChat() {
           </div>
         </form>
       </div>
-
-      {/* --- Toggle Button --- */}
-      <button
-        onClick={toggleChat}
-        aria-label={isOpen ? "Close VEGA" : "Open VEGA, the portfolio assistant"}
-        aria-expanded={isOpen}
-        onMouseEnter={() => toggleRef.current?.startAnimation()}
-        onMouseLeave={() => toggleRef.current?.stopAnimation()}
-        className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-slate-950/85 text-sky-200 shadow-[0_12px_32px_rgba(2,8,23,0.55)] backdrop-blur-md transition-colors hover:border-sky-300/40 hover:text-sky-100 focus:outline-none sm:h-14 sm:w-14"
-      >
-        <div ref={iconRef}>
-          {isOpen ? (
-            <XIcon ref={toggleRef} size={22} />
-          ) : (
-            <BotMessageSquareIcon ref={toggleRef} size={22} />
-          )}
-        </div>
-      </button>
-
     </div>
   );
 }
