@@ -1,10 +1,6 @@
 "use client";
 
-<<<<<<< HEAD
 import type { Transition, Variants } from "motion/react";
-=======
-import type { Variants } from "motion/react";
->>>>>>> 8a13a2e (ccc)
 import { motion, useAnimation } from "motion/react";
 import type { HTMLAttributes } from "react";
 import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
@@ -20,7 +16,6 @@ interface DownloadIconProps extends HTMLAttributes<HTMLDivElement> {
   size?: number;
 }
 
-<<<<<<< HEAD
 const DEFAULT_TRANSITION: Transition = {
   duration: 0.4,
   ease: "easeInOut",
@@ -32,18 +27,6 @@ const ARROW_VARIANTS: Variants = {
   },
   animate: {
     translateY: ["0%", "24%", "0%"],
-=======
-const ARROW_VARIANTS: Variants = {
-  normal: { y: 0 },
-  animate: {
-    y: 2,
-    transition: {
-      type: "spring",
-      stiffness: 200,
-      damping: 10,
-      mass: 1,
-    },
->>>>>>> 8a13a2e (ccc)
   },
 };
 
@@ -102,7 +85,6 @@ const DownloadIcon = forwardRef<DownloadIconHandle, DownloadIconProps>(
           xmlns="http://www.w3.org/2000/svg"
         >
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-<<<<<<< HEAD
           <motion.path
             animate={controls}
             d="m7 10 5 5 5-5"
@@ -115,12 +97,6 @@ const DownloadIcon = forwardRef<DownloadIconHandle, DownloadIconProps>(
             transition={DEFAULT_TRANSITION}
             variants={ARROW_VARIANTS}
           />
-=======
-          <motion.g animate={controls} variants={ARROW_VARIANTS}>
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" x2="12" y1="15" y2="3" />
-          </motion.g>
->>>>>>> 8a13a2e (ccc)
         </svg>
       </div>
     );

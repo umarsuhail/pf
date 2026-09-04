@@ -19,63 +19,23 @@ const FAST_VELOCITY = 1.6; // px/ms threshold to switch to the multi-tick burst
 const TICK_POOL_SIZE = 6;
 const TICK_VOLUME = 0.4;
 const BURST_VOLUME = 0.4;
-// How much a single new velocity sample can move the running estimate (0-1).
-// Wheel/trackpad events arrive in uneven, coalesced bursts, so reacting to
-// the raw instantaneous value made the tick rate jump around independently
-// of how fast the page actually felt like it was moving.
-const VELOCITY_SMOOTHING = 0.35;
 
 export default function ScrollSound() {
   useEffect(() => {
     const tickPool = Array.from({ length: TICK_POOL_SIZE }, () => {
       const a = new Audio("/music/page.wav");
-      a.preload = "auto";
       a.volume = TICK_VOLUME;
       return a;
     });
     let tickIndex = 0;
 
     const burst = new Audio("/music/page_1.wav");
-    burst.preload = "auto";
     burst.loop = true;
     burst.volume = BURST_VOLUME;
     let burstPlaying = false;
 
-    // Browsers only allow audio-with-sound to start during a handful of
-    // "activation" gestures — click, keydown, pointerdown, touchend/start.
-    // Wheel and touchmove, the events this component actually listens to,
-    // don't qualify, so a play() fired from them is silently rejected (the
-    // .catch below swallows it) until the visitor happens to click or tap
-    // something else on the page first — which is exactly the "sometimes it
-    // just doesn't play" symptom. Priming every element (muted, so it's
-    // inaudible) on the very first qualifying gesture anywhere on the page
-    // unlocks them for every wheel/touchmove-triggered play afterwards.
-    let unlocked = false;
-    const unlock = () => {
-      if (unlocked) return;
-      unlocked = true;
-      for (const a of [...tickPool, burst]) {
-        a.muted = true;
-        void a
-          .play()
-          .then(() => a.pause())
-          .catch(() => {})
-          .finally(() => {
-            a.currentTime = 0;
-            a.muted = false;
-          });
-      }
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
-      window.removeEventListener("touchstart", unlock);
-    };
-    window.addEventListener("pointerdown", unlock);
-    window.addEventListener("keydown", unlock);
-    window.addEventListener("touchstart", unlock, { passive: true });
-
     let accumulated = 0;
     let lastTime = 0;
-    let smoothedVelocity = 0;
     let lastTouchY: number | null = null;
     let stopTimer = 0;
 
@@ -94,7 +54,6 @@ export default function ScrollSound() {
 
     const stopAll = () => {
       accumulated = 0;
-      smoothedVelocity = 0;
       stopBurst();
     };
 
@@ -107,9 +66,7 @@ export default function ScrollSound() {
 
       const distance = Math.abs(deltaY);
       if (distance === 0) return;
-      const instantVelocity = distance / Math.max(dt, 1); // px per ms
-      smoothedVelocity += (instantVelocity - smoothedVelocity) * VELOCITY_SMOOTHING;
-      const velocity = smoothedVelocity;
+      const velocity = distance / Math.max(dt, 1); // px per ms
 
       if (velocity >= FAST_VELOCITY) {
         accumulated = 0;
@@ -154,9 +111,6 @@ export default function ScrollSound() {
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
-      window.removeEventListener("touchstart", unlock);
       stopBurst();
       tickPool.forEach((a) => a.pause());
     };

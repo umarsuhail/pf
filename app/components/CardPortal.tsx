@@ -1,36 +1,13 @@
 "use client";
 
-import {
-  animate,
-  AnimatePresence,
-  motion,
-  useMotionTemplate,
-  useMotionValue,
-  type MotionValue,
-} from "motion/react";
 import Image from "next/image";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-<<<<<<< HEAD
-
-import {
-  POWER1_IN,
-  POWER2_IN,
-  POWER2_OUT,
-  POWER3_OUT,
-} from "../lib/easings";
-=======
 import gsap from "gsap";
-import type { MotionValue } from "framer-motion";
->>>>>>> 8a13a2e (ccc)
+import { AnimatePresence, motion, type MotionValue } from "framer-motion";
 import { ArrowUpRightIcon } from "./icons/arrow-up-right";
 import type { AnimatedIconHandle } from "./icons/card-icon";
 import Space from "./Space";
 import ParticleLogo from "./HeroLogo";
-
-// Pure GSAP-style Quart-out curve (gsap.parseEase("power3.out")) used to
-// shape the reveal progress itself — not an animation, just math applied to
-// the 0-1 scroll fraction before it's handed to the motion-value tweens.
-const power3Out = (t: number) => 1 - Math.pow(1 - t, 4);
 
 interface CardPortalProps {
   index: number;
@@ -101,20 +78,11 @@ const atmospheres: { overlay: string; motif: MotifType; accent: string }[] = [
 // after the entry/earth card at index 0); indices without an entry fall back
 // to the drawn PortalMotif below.
 const imageSrcByIndex: Record<number, string> = {
-<<<<<<< HEAD
   1: "/a3.svg",
   2: "/a4.svg",
   3: "/a5.svg",
   4: "/a6.svg",
   5: "/a7.svg",
-=======
-  1: "/a2.svg",
-  2: "/a3.svg",
-  3: "/a4.svg",
-  4: "/a5.svg",
-  5: "/a6.svg",
-  6: "/a7.svg",
->>>>>>> 8a13a2e (ccc)
 };
 
 function PortalMotif({ motif, accent }: { motif: MotifType; accent: string }) {
@@ -232,47 +200,23 @@ export function CardPortal({
   ariaLabel,
   isExpanded = false,
 }: CardPortalProps) {
-<<<<<<< HEAD
-=======
   const earthRef = useRef<HTMLDivElement>(null);
   const motifRef = useRef<HTMLDivElement>(null);
   const spinRef = useRef<HTMLDivElement>(null);
   const visualRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
->>>>>>> 8a13a2e (ccc)
+  const progressRef = useRef<SVGRectElement>(null);
   const arrowRef = useRef<AnimatedIconHandle>(null);
   const hasEnteredRef = useRef(false);
-  // Replaces the gsap.timeline() ref: cancels any pending activation steps
-  // (the setTimeout-scheduled ones below) and stops in-flight tweens.
-  const activationRef = useRef<{ cancelled: boolean; timeouts: number[] }>({
-    cancelled: true,
-    timeouts: [],
-  });
+  const tlRef = useRef<gsap.core.Timeline | null>(null);
   const [isActivating, setIsActivating] = useState(false);
   const isEntry = index === 0;
   const atmosphere = atmospheres[index % atmospheres.length];
 
-  // Entry card: earth rises from a bottom corner as percentages of its own
-  // size (translate(x%, y%) reproduces gsap's xPercent/yPercent exactly).
-  const earthXPercent = useMotionValue((align === "left" ? 1 : -1) * 30);
-  const earthYPercent = useMotionValue(105);
-  const earthTransform = useMotionTemplate`translate(${earthXPercent}%, ${earthYPercent}%)`;
-
-  // Other cards: their motif fades and settles in instead of rising.
-  const motifOpacity = useMotionValue(0);
-  const motifScale = useMotionValue(0.85);
-  // Per-section globe spin, on its own motion value so it never fights the
-  // opacity/scale tweens above.
-  const spinRotate = useMotionValue(index * 40);
-  // Traces the card's rounded-corner ring in/out as it comes into and
-  // leaves focus.
-  const progressDashOffset = useMotionValue(100);
-
-  // Click-to-activate "warp" flourish (visualRef's zoom, entry's flash).
-  const visualScale = useMotionValue(1);
-  const flashOpacity = useMotionValue(0);
-
   useEffect(() => {
+    const target = isEntry ? earthRef.current : motifRef.current;
+    if (!target) return;
+
     const currentStop = sectionProgressStops[index] ?? 0;
     const previousStop = index > 0 ? sectionProgressStops[index - 1] : 0;
     const approachSpan = Math.max(currentStop - previousStop, 0.08);
@@ -293,45 +237,30 @@ export function CardPortal({
     // would otherwise explode in size.
     const departFadeStart = currentStop + 0.03;
     const departFadeEnd = currentStop + 0.11;
-<<<<<<< HEAD
-    let lastReveal = -1;
-    let lastFade = -1;
-
-    // Retargeting animate() calls (rather than jumping straight to the
-    // value) keeps per-scroll updates smooth — the motion-value equivalent
-    // of GSAP's quickTo setters.
-=======
     const ease = gsap.parseEase("power3.out");
     let lastReveal = -1;
     let lastFade = -1;
 
     // Quick setters keep per-scroll updates cheap (percent-based, GPU-composited)
->>>>>>> 8a13a2e (ccc)
     let applyReveal: (eased: number, fade: number) => void;
     if (isEntry) {
       // Earth rises from the bottom corner, staying clipped inside the window
       const cornerDirection = align === "left" ? 1 : -1;
+      const earthX = gsap.quickTo(target, "xPercent", {
+        duration: 0.6,
+        ease: "power3.out",
+      });
+      const earthY = gsap.quickTo(target, "yPercent", {
+        duration: 0.6,
+        ease: "power3.out",
+      });
       applyReveal = (eased) => {
-        animate(earthXPercent, cornerDirection * 30 * (1 - eased), {
-          duration: 0.6,
-          ease: POWER3_OUT,
-        });
-        animate(earthYPercent, 105 * (1 - eased), {
-          duration: 0.6,
-          ease: POWER3_OUT,
-        });
+        earthX(cornerDirection * 30 * (1 - eased));
+        earthY(105 * (1 - eased));
       };
       // Entry card rises rather than fading — no depart dim to apply.
     } else {
       // Other universes' motifs fade and settle into view instead of rising
-<<<<<<< HEAD
-      applyReveal = (eased, fade) => {
-        animate(motifOpacity, eased * fade, { duration: 0.6, ease: POWER2_OUT });
-        animate(motifScale, 0.85 + eased * 0.15, {
-          duration: 0.6,
-          ease: POWER3_OUT,
-        });
-=======
       const motifOpacity = gsap.quickTo(target, "opacity", {
         duration: 0.6,
         ease: "power2.out",
@@ -343,18 +272,16 @@ export function CardPortal({
       applyReveal = (eased, fade) => {
         motifOpacity(eased * fade);
         motifScale(0.85 + eased * 0.15);
->>>>>>> 8a13a2e (ccc)
       };
     }
 
     // Traces the rounded border in as the card comes into focus, then
     // traces back out as it departs — the ring reads as this card's own
-    // zoom-in/zoom-out progress through the flight. Skipped on the entry
-    // card: its ring <rect> isn't rendered (see JSX below).
-    const applyProgressDash = isEntry
-      ? null
-      : (value: number) =>
-        animate(progressDashOffset, value, { duration: 0.6, ease: POWER2_OUT });
+    // zoom-in/zoom-out progress through the flight.
+    const progressDash = gsap.quickTo(progressRef.current, "strokeDashoffset", {
+      duration: 0.6,
+      ease: "power2.out",
+    });
 
     const update = (progress: number) => {
       let reveal = 0;
@@ -383,60 +310,17 @@ export function CardPortal({
       lastReveal = reveal;
       lastFade = fade;
 
-<<<<<<< HEAD
-      applyReveal(power3Out(reveal), fade);
+      applyReveal(ease(reveal), fade);
       // Draws in while approaching, then un-draws again on the way out —
       // mirrors the motif's own fade window so the ring tracks the same
       // zoom-in/zoom-out lifecycle instead of staying drawn forever.
-      applyProgressDash?.(100 * (1 - reveal * fade));
-=======
-      applyReveal(ease(reveal), fade);
->>>>>>> 8a13a2e (ccc)
+      progressDash(100 * (1 - reveal * fade));
     };
 
     update(scrollYProgress.get());
     const unsubscribe = scrollYProgress.on("change", update);
     return () => unsubscribe();
-  }, [
-    index,
-    align,
-    scrollYProgress,
-    isEntry,
-    earthXPercent,
-    earthYPercent,
-    motifOpacity,
-    motifScale,
-    progressDashOffset,
-  ]);
-
-  // Scroll-driven spin for the per-section globes, mirroring the distant
-  // a1.png earth at the end of the flight: rotation tracks how far the
-  // visitor has travelled rather than a wall-clock timer, so the globes are
-  // already mid-turn when a card comes into view and freeze when scrolling
-  // stops. Lives on its own motion value so it never fights the
-  // opacity/scale tweens already driving the motif.
-  useEffect(() => {
-    if (isEntry) return;
-
-    // Staggered start angle so the globes aren't all locked in unison
-    const offset = index * 40;
-    const update = (progress: number) =>
-      animate(spinRotate, offset + progress * 260, {
-        duration: 0.8,
-        ease: POWER2_OUT,
-      });
-
-    update(scrollYProgress.get());
-    const unsubscribe = scrollYProgress.on("change", update);
-    return () => unsubscribe();
-  }, [index, isEntry, scrollYProgress, spinRotate]);
-
-  const cancelActivation = () => {
-    const token = activationRef.current;
-    token.cancelled = true;
-    token.timeouts.forEach((id) => window.clearTimeout(id));
-    token.timeouts = [];
-  };
+  }, [index, align, scrollYProgress, isEntry]);
 
   // Scroll-driven spin for the per-section globes, mirroring the distant
   // a1.png earth at the end of the flight: rotation tracks how far the
@@ -466,15 +350,13 @@ export function CardPortal({
     if (!isEntry) return;
     const unsubscribe = scrollYProgress.on("change", (value) => {
       if (value <= 0.02 && !hasEnteredRef.current) {
-        cancelActivation();
-        visualScale.set(1);
-        flashOpacity.set(0);
+        tlRef.current?.kill();
+        gsap.set(visualRef.current, { scale: 1 });
+        gsap.set(flashRef.current, { opacity: 0 });
       }
     });
     return () => unsubscribe();
-  }, [isEntry, scrollYProgress, visualScale, flashOpacity]);
-
-  useEffect(() => cancelActivation, []);
+  }, [isEntry, scrollYProgress]);
 
   const navigateToTarget = () => {
     window.dispatchEvent(
@@ -500,50 +382,38 @@ export function CardPortal({
       return;
     }
 
-    cancelActivation();
-    const token = { cancelled: false, timeouts: [] as number[] };
-    activationRef.current = token;
-
-    const finish = () => {
-      if (token.cancelled) return;
-      hasEnteredRef.current = false;
-      setIsActivating(false);
-    };
-
-    animate(visualScale, isEntry ? 1.18 : 1.06, {
-      duration: isEntry ? 0.45 : 0.22,
-      ease: POWER2_IN,
+    tlRef.current?.kill();
+    const tl = gsap.timeline({
+      onComplete: () => {
+        hasEnteredRef.current = false;
+        setIsActivating(false);
+      },
     });
+    tlRef.current = tl;
+
+    tl.to(
+      visualRef.current,
+      {
+        scale: isEntry ? 1.18 : 1.06,
+        duration: isEntry ? 0.45 : 0.22,
+        ease: "power2.in",
+      },
+      0,
+    );
 
     if (isEntry) {
-      token.timeouts.push(
-        window.setTimeout(() => {
-          if (token.cancelled) return;
-          animate(flashOpacity, 1, { duration: 0.3, ease: POWER1_IN });
-        }, 200),
-      );
-      token.timeouts.push(
-        window.setTimeout(() => {
-          if (!token.cancelled) navigateToTarget();
-        }, 450),
-      );
-      token.timeouts.push(
-        window.setTimeout(() => {
-          if (token.cancelled) return;
-          animate(flashOpacity, 0, { duration: 0.4, ease: POWER2_OUT });
-          animate(visualScale, 1, { duration: 0.4, ease: POWER2_OUT }).then(finish);
-        }, 500),
-      );
+      tl.to(flashRef.current, { opacity: 1, duration: 0.3, ease: "power1.in" }, 0.2)
+        .call(navigateToTarget, undefined, 0.45)
+        .to(flashRef.current, { opacity: 0, duration: 0.4, ease: "power2.out" }, 0.5)
+        .to(visualRef.current, { scale: 1, duration: 0.4, ease: "power2.out" }, 0.5);
       return;
     }
 
-    token.timeouts.push(
-      window.setTimeout(() => {
-        if (token.cancelled) return;
-        navigateToTarget();
-        animate(visualScale, 1, { duration: 0.28, ease: POWER2_OUT }).then(finish);
-      }, 140),
-    );
+    tl.call(navigateToTarget, undefined, 0.14).to(visualRef.current, {
+      scale: 1,
+      duration: 0.28,
+      ease: "power2.out",
+    });
   };
 
   return (
@@ -564,18 +434,14 @@ export function CardPortal({
       }}
     >
       {/* 1. Static Mask Wrapper - enforces perfect clipping boundaries that never scale */}
-<<<<<<< HEAD
-      <div className="absolute inset-0 overflow-hidden rounded-2xl ">
-
-        {/* 2. Scaling container */}
-        <motion.div
-          style={{ scale: visualScale }}
-          className="relative h-full w-full transform-flat"
-        >
+      <div className="absolute inset-0 overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]">
+        
+        {/* 2. Scaling container (with visualRef) */}
+        <div ref={visualRef} className="relative h-full w-full transform-flat">
           {/* Space backdrop filling the window, carrying this section's portal color */}
           <Space tint={atmosphere.accent} />
 
-          {/* {isEntry && (
+          {isEntry && (
             <Image
               src="/images/us.png"
               alt=""
@@ -585,16 +451,7 @@ export function CardPortal({
               className="object-cover opacity-55 mix-blend-screen p-8"
               aria-hidden="true"
             />
-          )} */}
-
-          {/* Color overlay giving this section's universe its own tone */}
-=======
-      <div className="absolute inset-0 overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]">
-        
-        {/* 2. Scaling container (with visualRef) */}
-        <div ref={visualRef} className="relative h-full w-full transform-flat">
-          {/* Space backdrop filling the window, carrying this section's portal color */}
-          <Space tint={atmosphere.accent} />
+          )}
 
           {/* Color overlay giving this section's universe its own tone */}
           <div
@@ -611,14 +468,46 @@ export function CardPortal({
                 willChange: "transform",
               }}
             >
-              <Image
-                src="/a1.png"
-                alt=""
-                fill
-                sizes="(min-width: 1024px) 30vw, 40vh"
-                className="object-contain object-bottom"
-                priority
-              />
+              <AnimatePresence initial={false} mode="wait">
+                {isExpanded ? (
+                  <motion.div
+                    key="astronaut"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="absolute inset-0"
+                  >
+                    <Image
+                      src="/SVG/astr.svg"
+                      alt=""
+                      fill
+                      sizes="(min-width: 1024px) 30vw, 40vh"
+                      className="object-contain object-bottom"
+                      aria-hidden="true"
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="logo"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="absolute inset-0"
+                  >
+                    <ParticleLogo
+                      src="/images/us.png"
+                      particleCount={720}
+                      speed={0.8}
+                      disperseStrength={110}
+                      size={150}
+                      loop
+                      className="object-contain object-bottom"
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           ) : (
             <div
@@ -645,98 +534,10 @@ export function CardPortal({
 
         {/* 3. Punch-through flash layer - inside mask but outside visualRef so it doesn't scale strangely */}
         {isEntry && (
->>>>>>> 8a13a2e (ccc)
           <div
-            className="absolute inset-0"
-            style={{ background: atmosphere.overlay }}
-          />
-
-          {isEntry ? (
-            <motion.div
-              className="absolute inset-x-0 bottom-0 h-[65%]"
-              style={{
-                transform: earthTransform,
-                willChange: "transform",
-              }}
-            >
-              <AnimatePresence initial={false} mode="wait">
-                {isExpanded ? (
-                  <motion.div
-                    key="astronaut"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                    className="absolute inset-0"
-                  >
-                    <Image
-                      src="/images/us.png"
-                      alt=""
-                      fill
-                      sizes="(min-width: 1024px) 30vw, 40vh"
-                      className="object-contain object-bottom"
-                      aria-hidden="true"
-                    />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="logo"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                    className="absolute inset-0"
-                  >
-                    <ParticleLogo
-                      src="/us.png"
-                      // 1100 (bumped from the original 720 to read bigger in
-                      // this enlarged portal) turned out to be the direct
-                      // cause of a slow initial reveal and ongoing scroll
-                      // jank — ~10% of these are "spark" particles drawn
-                      // with an expensive canvas shadow blur every frame,
-                      // for as long as this stays mounted (the whole flight,
-                      // not just while it's on screen). 850 keeps the denser,
-                      // bigger-reading mark without the compute spike; the
-                      // larger `size` below carries most of the "bigger" ask
-                      // on its own.
-                      particleCount={850}
-                      speed={0.8}
-                      disperseStrength={170}
-                      size={280}
-                      loop
-                      className="object-contain object-bottom"
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          ) : (
-            <motion.div
-              className="absolute inset-0"
-              style={{ opacity: motifOpacity, scale: motifScale, willChange: "opacity, transform" }}
-            >
-              {imageSrcByIndex[index] ? (
-                <motion.div className="absolute inset-0" style={{ rotate: spinRotate }}>
-                  <Image
-                    src={imageSrcByIndex[index]}
-                    alt=""
-                    fill
-                    sizes="(min-width: 1024px) 30vw, 30vh"
-                    className="object-contain"
-                  />
-                </motion.div>
-              ) : (
-                <PortalMotif motif={atmosphere.motif} accent={atmosphere.accent} />
-              )}
-            </motion.div>
-          )}
-        </motion.div>
-
-        {/* 3. Punch-through flash layer - inside mask but outside the scaling container so it doesn't scale strangely */}
-        {isEntry && (
-          <motion.div
-            style={{ opacity: flashOpacity }}
+            ref={flashRef}
             className="pointer-events-none absolute inset-0 bg-sky-50"
+            style={{ opacity: 0 }}
           />
         )}
       </div>
@@ -765,7 +566,8 @@ export function CardPortal({
             strokeOpacity="0.12"
             strokeWidth="2"
           />
-          <motion.rect
+          <rect
+            ref={progressRef}
             x="1"
             y="1"
             width="98%"
@@ -778,10 +580,8 @@ export function CardPortal({
             strokeLinecap="round"
             pathLength={100}
             strokeDasharray={100}
-            style={{
-              strokeDashoffset: progressDashOffset,
-              filter: "drop-shadow(0 0 5px #fbbf24)",
-            }}
+            strokeDashoffset={100}
+            style={{ filter: "drop-shadow(0 0 5px #fbbf24)" }}
           />
         </svg>
       )}

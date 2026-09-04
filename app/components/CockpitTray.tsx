@@ -1,20 +1,13 @@
 "use client";
 
-<<<<<<< HEAD
-import { AnimatePresence, motion } from "motion/react";
-=======
 import { AnimatePresence, motion } from "framer-motion";
->>>>>>> 8a13a2e (ccc)
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cards } from "../data/sections";
 import { NARRATION_SPANS } from "../data/narration";
 import { CardIcon } from "./icons/card-icon";
-<<<<<<< HEAD
 import { BotMessageSquareIcon } from "./icons/bot-message-square";
 import { XIcon } from "./icons/x";
-=======
->>>>>>> 8a13a2e (ccc)
 import type { AnimatedIconHandle } from "./icons/card-icon";
 
 // Overhead console: a small latch sits on the top edge, and pulling it drops
@@ -33,7 +26,6 @@ const TRAY_SPRING = {
   mass: 0.8,
 } as const;
 
-<<<<<<< HEAD
 // The soundtrack is a two-act programme, not a loop. intro.mp3 is the
 // narration with its own background music already mixed in (see
 // data/narration.ts — still played through the "span" machinery below in
@@ -42,21 +34,6 @@ const TRAY_SPRING = {
 // stays. It starts the instant the narration ends and ramps up under it
 // (see runRamp), so there's no dead air between the two.
 const MAIN_SRC = "/music/tomoon.mp3";
-=======
-// The soundtrack is a three-act programme, not a loop. The intro is four
-// separate narration clips played back to back (real per-clip playback, not
-// one long file with estimated timing — see data/narration.ts), then
-// work.mp3 carries the middle of the tour (~111s, second priority right
-// after the narration), then tomoon.mp3 takes over on a loop for however
-// long the visitor stays. The narration clips cut straight into each other
-// (spoken sentences, not music — a crossfade between voice clips sounds
-// garbled); the handover into the music tracks still crossfades early so
-// there's never a gap there.
-const WORK_SRC = "/music/work.mp3";
-const MAIN_SRC = "/music/tomoon.mp3";
-const WORK_LENGTH = 111;
-const CROSSFADE = 2.5;
->>>>>>> 8a13a2e (ccc)
 const TARGET_VOLUME = 0.42;
 
 // Brushed steel: a raking light gradient for the body, a hard specular line
@@ -123,13 +100,12 @@ function Rivets({ className = "" }: { className?: string }) {
   );
 }
 
-<<<<<<< HEAD
-// The top-hung tray keeps one shared silhouette at every state.
+// The closed latch floats alone at the very top of the page, so its flat
 // top edge can get a pair of concave "ear" flares — the classic iPhone
 // notch trick: a small square masked with a radial gradient so it reads as
 // solid near the notch's corner and fades to nothing away from it, faking
 // a corner that curves the *opposite* way from a normal border-radius.
-const NOTCH_EAR = 16;
+const NOTCH_EAR = 14;
 const NOTCH_COLOR = "#1c2734";
 function notchEarStyle(corner: "top right" | "top left") {
   const mask = `radial-gradient(circle at ${corner}, black ${NOTCH_EAR}px, transparent ${NOTCH_EAR}px)`;
@@ -142,25 +118,6 @@ function notchEarStyle(corner: "top right" | "top left") {
   } as const;
 }
 
-function CockpitNotchShoulders() {
-  return (
-    <>
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute top-0 right-full"
-        style={notchEarStyle("top right")}
-      />
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute top-0 left-full"
-        style={notchEarStyle("top left")}
-      />
-    </>
-  );
-}
-
-=======
->>>>>>> 8a13a2e (ccc)
 // Collapsed state: squeezed to a sliver at the corner nearest the console
 // (set by transformOrigin below) and nudged the rest of the way across the
 // gap, so the bay reads as folding into the tray.
@@ -234,15 +191,10 @@ export default function CockpitTray() {
   const [isLatchHot, setIsLatchHot] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [leg, setLeg] = useState(-1);
-<<<<<<< HEAD
   const [track, setTrack] = useState<"intro" | "main" | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isSidenavVisible, setIsSidenavVisible] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
-=======
-  const [track, setTrack] = useState<"intro" | "work" | "main" | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
->>>>>>> 8a13a2e (ccc)
   // The <audio> elements themselves are expensive to justify keeping around
   // for a visitor who never touches the console — they're only mounted once
   // the tray is actually expanded (or the latch's own play button is
@@ -251,7 +203,6 @@ export default function CockpitTray() {
   const pendingPlayRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const stopIconRefs = useRef<Record<string, AnimatedIconHandle | null>>({});
-<<<<<<< HEAD
   // NARRATION_SPANS is down to a single combined clip now (see
   // data/narration.ts), but this still walks it as a sequence in case it's
   // ever split back into multiple — spanIndexRef tracks which is loaded.
@@ -260,17 +211,6 @@ export default function CockpitTray() {
   const mainRef = useRef<HTMLAudioElement>(null);
   // Where each deck's volume is heading; one rAF loop walks both there.
   const levelsRef = useRef({ intro: 0, main: 0 });
-=======
-  // Narration is 4 clips played back to back on one reusable element (no
-  // overlap between them, so there's no need for 4 separate decks) —
-  // spanIndexRef tracks which of NARRATION_SPANS is currently loaded.
-  const narrationRef = useRef<HTMLAudioElement>(null);
-  const spanIndexRef = useRef(0);
-  const workRef = useRef<HTMLAudioElement>(null);
-  const mainRef = useRef<HTMLAudioElement>(null);
-  // Where each deck's volume is heading; one rAF loop walks all three there.
-  const levelsRef = useRef({ intro: 0, work: 0, main: 0 });
->>>>>>> 8a13a2e (ccc)
   const rampRef = useRef(0);
 
   useEffect(() => {
@@ -320,14 +260,8 @@ export default function CockpitTray() {
     const step = () => {
       let settled = true;
 
-<<<<<<< HEAD
       for (const key of ["intro", "main"] as const) {
         const el = key === "intro" ? narrationRef.current : mainRef.current;
-=======
-      for (const key of ["intro", "work", "main"] as const) {
-        const el =
-          key === "intro" ? narrationRef.current : key === "work" ? workRef.current : mainRef.current;
->>>>>>> 8a13a2e (ccc)
         if (!el) continue;
         const target = levelsRef.current[key];
         const delta = target - el.volume;
@@ -357,15 +291,9 @@ export default function CockpitTray() {
     );
   };
 
-<<<<<<< HEAD
   // Bring tomoon.mp3 (looping) up under intro.mp3 and fade the intro out.
   // Declared first since playNextSpan's own fallback (no more spans left,
   // or the browser refused the asset) skips straight here.
-=======
-  // Bring tomoon.mp3 (looping) up under work.mp3 and fade work out. Declared
-  // first since handOverToWork's own fallback (no work asset, or the browser
-  // refused it) skips straight here.
->>>>>>> 8a13a2e (ccc)
   const handOverToMain = useCallback(() => {
     const main = mainRef.current;
     if (!main || !main.paused) return;
@@ -375,59 +303,22 @@ export default function CockpitTray() {
       .play()
       .then(() => {
         setTrack("main");
-<<<<<<< HEAD
         levelsRef.current = { intro: 0, main: TARGET_VOLUME };
         runRamp();
         emitNarration(NARRATION_SPANS.length, 0, 0, false);
-=======
-        levelsRef.current = { intro: 0, work: 0, main: TARGET_VOLUME };
-        runRamp();
->>>>>>> 8a13a2e (ccc)
       })
       .catch(() => setTrack(null));
   }, [runRamp]);
 
-<<<<<<< HEAD
   // Plays NARRATION_SPANS[spanIndexRef.current] on the shared narration
   // element, advancing sequentially — each clip cuts straight into the
   // next (spoken sentences, not music, so no crossfade between them).
-  // The recursive call in .catch() goes through a ref rather than closing
-  // over playNextSpan directly, since the const isn't assigned until after
-  // this initializer returns.
-  const playNextSpanRef = useRef<() => void>(() => {});
-=======
-  // Bring work.mp3 up under the narration and fade it out from underneath —
-  // second priority right after the narration, per the brief.
-  const handOverToWork = useCallback(() => {
-    const work = workRef.current;
-    if (!work || !work.paused) return;
-
-    work.volume = 0;
-    void work
-      .play()
-      .then(() => {
-        setTrack("work");
-        levelsRef.current = { intro: 0, work: TARGET_VOLUME, main: 0 };
-        runRamp();
-        emitNarration(NARRATION_SPANS.length, 0, 0, false);
-      })
-      .catch(() => handOverToMain());
-  }, [handOverToMain, runRamp]);
-
-  // Plays NARRATION_SPANS[spanIndexRef.current] on the shared narration
-  // element, advancing sequentially — each clip cuts straight into the
-  // next (spoken sentences, not music, so no crossfade between them).
->>>>>>> 8a13a2e (ccc)
   const playNextSpan = useCallback(() => {
     const narration = narrationRef.current;
     if (!narration) return;
     const span = NARRATION_SPANS[spanIndexRef.current];
     if (!span) {
-<<<<<<< HEAD
       handOverToMain();
-=======
-      handOverToWork();
->>>>>>> 8a13a2e (ccc)
       return;
     }
 
@@ -443,37 +334,18 @@ export default function CockpitTray() {
       // sentence rather than going silent on just one span.
       .catch(() => {
         spanIndexRef.current += 1;
-<<<<<<< HEAD
-        playNextSpanRef.current();
-      });
-  }, [handOverToMain]);
-  // Keeps the ref current after every render — writing to a ref during
-  // render itself (rather than in an effect) isn't allowed.
-  useEffect(() => {
-    playNextSpanRef.current = playNextSpan;
-  });
-=======
         playNextSpan();
       });
-  }, [handOverToWork]);
->>>>>>> 8a13a2e (ccc)
+  }, [handOverToMain]);
 
   const onNarrationEnded = useCallback(() => {
     spanIndexRef.current += 1;
     if (spanIndexRef.current >= NARRATION_SPANS.length) {
-<<<<<<< HEAD
       handOverToMain();
       return;
     }
     playNextSpan();
   }, [handOverToMain, playNextSpan]);
-=======
-      handOverToWork();
-      return;
-    }
-    playNextSpan();
-  }, [handOverToWork, playNextSpan]);
->>>>>>> 8a13a2e (ccc)
 
   const onNarrationProgress = () => {
     const narration = narrationRef.current;
@@ -485,35 +357,14 @@ export default function CockpitTray() {
 
   const startAudio = useCallback(() => {
     const narration = narrationRef.current;
-<<<<<<< HEAD
     const main = mainRef.current;
     if (!narration || !main) return;
 
-    // The <audio> tag itself carries no `src` (see JSX below) — assigning it
-    // only here, at the moment playback is actually requested, means tomoon
-    // never triggers so much as a metadata fetch until the visitor engages
-    // with the app, regardless of how strictly a given browser honors
-    // preload="none" once a `src` is already set on mount.
-    if (!main.src) main.src = MAIN_SRC;
-
-=======
-    const work = workRef.current;
-    const main = mainRef.current;
-    if (!narration || !work || !main) return;
-
-    work.pause();
-    work.currentTime = 0;
-    work.volume = 0;
->>>>>>> 8a13a2e (ccc)
     main.pause();
     main.currentTime = 0;
     main.volume = 0;
     narration.volume = 0;
-<<<<<<< HEAD
     levelsRef.current = { intro: TARGET_VOLUME, main: 0 };
-=======
-    levelsRef.current = { intro: TARGET_VOLUME, work: 0, main: 0 };
->>>>>>> 8a13a2e (ccc)
 
     spanIndexRef.current = 0;
     playNextSpan();
@@ -542,37 +393,16 @@ export default function CockpitTray() {
   }, [audioReady, startAudio]);
 
   const stopAudio = useCallback(() => {
-<<<<<<< HEAD
     levelsRef.current = { intro: 0, main: 0 };
-=======
-    levelsRef.current = { intro: 0, work: 0, main: 0 };
->>>>>>> 8a13a2e (ccc)
     runRamp();
     setTrack(null);
     emitNarration(NARRATION_SPANS.length, 0, 0, false);
   }, [runRamp]);
 
-<<<<<<< HEAD
-=======
-  const onWorkProgress = () => {
-    const work = workRef.current;
-    if (!work) return;
-    const handoverAt = Math.min(
-      WORK_LENGTH,
-      Number.isFinite(work.duration) ? work.duration : WORK_LENGTH,
-    );
-    if (work.currentTime >= handoverAt - CROSSFADE) handOverToMain();
-  };
-
->>>>>>> 8a13a2e (ccc)
   const toggleMute = () => {
     setIsMuted((prev) => {
       const next = !prev;
       if (narrationRef.current) narrationRef.current.muted = next;
-<<<<<<< HEAD
-=======
-      if (workRef.current) workRef.current.muted = next;
->>>>>>> 8a13a2e (ccc)
       if (mainRef.current) mainRef.current.muted = next;
       return next;
     });
@@ -632,7 +462,6 @@ export default function CockpitTray() {
     );
   };
 
-<<<<<<< HEAD
   // RouteMap (the right-edge journey rail) owns its own visibility, driven
   // by this toggle rather than a prop — the two are separately-mounted
   // siblings in layout.tsx. The dispatch has to happen outside the state
@@ -665,8 +494,6 @@ export default function CockpitTray() {
     window.dispatchEvent(new CustomEvent("toggle-holochat"));
   };
 
-=======
->>>>>>> 8a13a2e (ccc)
   return (
     <div
       ref={containerRef}
@@ -683,21 +510,7 @@ export default function CockpitTray() {
             onTimeUpdate={onNarrationProgress}
             onEnded={onNarrationEnded}
           />
-<<<<<<< HEAD
-          {/* No static src — startAudio() assigns MAIN_SRC imperatively the
-             instant playback is actually requested, so nothing is fetched
-             before then. */}
-          <audio ref={mainRef} loop preload="none" />
-=======
-          <audio
-            ref={workRef}
-            src={WORK_SRC}
-            preload="none"
-            onTimeUpdate={onWorkProgress}
-            onEnded={handOverToMain}
-          />
           <audio ref={mainRef} src={MAIN_SRC} loop preload="none" />
->>>>>>> 8a13a2e (ccc)
         </>
       )}
 
@@ -749,11 +562,7 @@ export default function CockpitTray() {
                 }}
                 transition={TRAY_SPRING}
                 style={{ transformOrigin: "top center", perspective: 900 }}
-<<<<<<< HEAD
-                className={`pointer-events-auto w-[min(94vw,880px)] rounded-b-[22px] border-t-0 px-3 pb-4 pt-4 sm:px-5 ${METAL_SURFACE}`}
-=======
                 className={`pointer-events-auto w-[min(94vw,880px)] rounded-b-3xl border-t-0 px-3 pb-4 pt-4 sm:px-5 ${METAL_SURFACE}`}
->>>>>>> 8a13a2e (ccc)
               >
                 <BrushedGrain />
                 <Sheen delay={0.45} />
@@ -893,16 +702,11 @@ export default function CockpitTray() {
                     </svg>
                   </button>
 
-<<<<<<< HEAD
                   {/* Level meter — reads the deck that is actually playing.
                      Hidden below sm: the autopilot row is already tight
                      against the status text on a phone-width console, and
                      this is the most dispensable part of it. */}
                   <div className="hidden h-6 items-end gap-[3px] sm:flex">
-=======
-                  {/* Level meter — reads the deck that is actually playing */}
-                  <div className="flex h-6 items-end gap-[3px]">
->>>>>>> 8a13a2e (ccc)
                     {[0.5, 0.9, 0.65, 1, 0.75].map((peak, i) => {
                       const live = track !== null && !isMuted;
                       return (
@@ -912,13 +716,7 @@ export default function CockpitTray() {
                           className={`h-6 w-[3px] rounded-sm ${
                             track === "intro"
                               ? "bg-gradient-to-t from-amber-400/50 to-amber-200"
-<<<<<<< HEAD
                               : "bg-gradient-to-t from-emerald-400/50 to-sky-300"
-=======
-                              : track === "work"
-                                ? "bg-gradient-to-t from-violet-400/50 to-sky-300"
-                                : "bg-gradient-to-t from-emerald-400/50 to-sky-300"
->>>>>>> 8a13a2e (ccc)
                           }`}
                           animate={
                             live
@@ -945,24 +743,30 @@ export default function CockpitTray() {
             )}
           </AnimatePresence>
 
-<<<<<<< HEAD
           {/* The latch — always visible, hangs just under the console. Closed,
-             it keeps the shared iPhone-notch frame in both states. */}
+             it's floating free against the page, so it gets the notch ears;
+             open, it's flush against the console above it and a flare there
+             would just read as a seam, so they're skipped. */}
           <div className="relative inline-block">
-            <CockpitNotchShoulders />
+            {!isOpen && (
+              <>
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-0 right-full"
+                  style={notchEarStyle("top right")}
+                />
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-0 left-full"
+                  style={notchEarStyle("top left")}
+                />
+              </>
+            )}
             <div
               onPointerEnter={() => setIsLatchHot(true)}
               onPointerLeave={() => setIsLatchHot(false)}
-              className={`pointer-events-auto flex items-center gap-1 rounded-b-[18px] border-t-0 px-1.5 py-1 ${METAL_SURFACE}`}
+              className={`pointer-events-auto flex items-center gap-1 rounded-b-xl border-t-0 px-1.5 py-1 ${METAL_SURFACE}`}
             >
-=======
-          {/* The latch — always visible, hangs just under the console */}
-          <div
-            onPointerEnter={() => setIsLatchHot(true)}
-            onPointerLeave={() => setIsLatchHot(false)}
-            className={`pointer-events-auto flex items-center gap-1 rounded-b-xl border-t-0 px-1.5 py-1 ${METAL_SURFACE}`}
-          >
->>>>>>> 8a13a2e (ccc)
             <Sheen delay={0.2} duration={2.4} active={isOpen || isLatchHot} />
 
             {/* Autopilot is reachable with the tray shut — it is the control
@@ -989,7 +793,6 @@ export default function CockpitTray() {
 
             <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
 
-<<<<<<< HEAD
             {/* Journey rail (RouteMap) show/hide — a separate mounted
                sibling, toggled purely over the event bus (see toggleSidenav
                above). */}
@@ -1026,8 +829,6 @@ export default function CockpitTray() {
 
             <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
 
-=======
->>>>>>> 8a13a2e (ccc)
             <button
               type="button"
               onClick={() =>
@@ -1058,10 +859,7 @@ export default function CockpitTray() {
                 />
               </motion.svg>
             </button>
-<<<<<<< HEAD
             </div>
-=======
->>>>>>> 8a13a2e (ccc)
           </div>
         </div>
 

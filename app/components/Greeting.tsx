@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
 type TimeOfDay = "morning" | "afternoon" | "evening" | "night";
@@ -81,10 +81,6 @@ export default function Greeting({ className = "" }: { className?: string }) {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    // The local hour is an external, client-only input (unknowable during
-    // SSR) — this is the one-time read-and-store effect React's own docs
-    // carve out an exception for, not state derivable from props/state.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setWords(GREETINGS[getTimeOfDay(new Date().getHours())]);
   }, []);
 

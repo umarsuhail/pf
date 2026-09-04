@@ -1,11 +1,7 @@
 "use client";
 
 import Image from "next/image";
-<<<<<<< HEAD
-import { AnimatePresence, motion } from "motion/react";
-=======
 import { AnimatePresence, motion } from "framer-motion";
->>>>>>> 8a13a2e (ccc)
 import { useEffect, useState } from "react";
 
 const navLinks = [
@@ -20,19 +16,6 @@ const navLinks = [
     ),
   },
   {
-<<<<<<< HEAD
-=======
-    label: "About",
-    id: "about",
-    svgPath: (
-      <path
-        fill="currentColor"
-        d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3s1.34 3 3 3m-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5S5 6.34 5 8s1.34 3 3 3m0 2c-2.33 0-7 1.17-7 3.5V18c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-1.5c0-2.33-4.67-3.5-7-3.5m8 0c-.29 0-.62.02-.97.05c.02.01.03.03.04.04c1.14.83 1.93 1.94 1.93 3.41V18c0 .35-.07.69-.18 1H22c.55 0 1-.45 1-1v-1.5c0-2.33-4.67-3.5-7-3.5"
-      ></path>
-    ),
-  },
-  {
->>>>>>> 8a13a2e (ccc)
     label: "Skills",
     id: "skills",
     svgPath: (
@@ -75,22 +58,6 @@ const navLinks = [
     ),
   },
   {
-<<<<<<< HEAD
-=======
-    label: "Resume",
-    id: "resume",
-    svgPath: (
-      <g fill="none" stroke="currentColor" strokeWidth={1.5}>
-        <path
-          strokeLinecap="round"
-          d="M11.007 21H9.605c-3.585 0-5.377 0-6.491-1.135S2 16.903 2 13.25s0-5.48 1.114-6.615S6.02 5.5 9.605 5.5h3.803c3.585 0 5.378 0 6.492 1.135c.857.873 1.054 2.156 1.1 4.365"
-        ></path>
-        <path d="M17.111 13.255c.185-.17.277-.255.389-.255s.204.085.389.255l.713.657c.086.079.129.119.182.138c.054.02.112.018.23.013l.962-.038c.248-.01.372-.014.457.057s.102.194.135.44l.132.986c.016.114.023.17.051.22c.028.048.073.083.163.154l.776.61c.192.152.288.227.307.335s-.046.212-.174.42l-.526.847c-.06.097-.09.146-.1.2s.002.111.026.223l.209.978c.05.24.076.36.021.456s-.172.134-.405.21l-.926.301c-.11.036-.166.054-.209.09c-.043.037-.07.089-.123.192l-.452.871c-.115.223-.173.334-.278.372s-.22-.01-.452-.106l-.888-.368c-.109-.045-.163-.068-.22-.068s-.111.023-.22.068l-.888.368c-.232.096-.347.144-.452.106s-.163-.15-.278-.372l-.452-.871c-.054-.103-.08-.155-.123-.191s-.099-.055-.209-.09l-.926-.302c-.233-.076-.35-.114-.405-.21s-.03-.215.021-.456l.21-.978c.023-.112.035-.168.025-.222a.6.6 0 0 0-.1-.2l-.525-.848c-.13-.208-.194-.312-.175-.42s.115-.183.307-.334l.776-.61c.09-.072.135-.107.163-.156s.035-.105.05-.22l.133-.985c.033-.245.05-.369.135-.44s.209-.067.457-.057l.963.038c.117.005.175.007.229-.013c.053-.02.096-.059.182-.138zM16 5.5l-.1-.31c-.495-1.54-.742-2.31-1.331-2.75C13.979 2 13.197 2 11.63 2h-.263c-1.565 0-2.348 0-2.937.44c-.59.44-.837 1.21-1.332 2.75L7 5.5"></path>
-      </g>
-    ),
-  },
-  {
->>>>>>> 8a13a2e (ccc)
     label: "Contact",
     id: "contact",
     svgPath: (
@@ -110,17 +77,9 @@ function navigateToSection(id: string) {
 
 const sectionProgressMap: Record<string, number> = {
   home: 0,
-<<<<<<< HEAD
   skills: 0.22,
   projects: 0.56,
   experience: 0.69,
-=======
-  about: 0.11,
-  skills: 0.22,
-  projects: 0.56,
-  experience: 0.69,
-  resume: 0.81,
->>>>>>> 8a13a2e (ccc)
   contact: 0.92,
 };
 
@@ -134,10 +93,7 @@ export default function NeumorphicNavbar() {
   const [journeyProgress, setJourneyProgress] = useState(0);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isPillOpen, setIsPillOpen] = useState(false);
-<<<<<<< HEAD
   const [showSidebar, setShowSidebar] = useState(true);
-=======
->>>>>>> 8a13a2e (ccc)
 
   useEffect(() => {
     if (!isPillOpen) return;
@@ -223,7 +179,6 @@ export default function NeumorphicNavbar() {
             </motion.svg>
           </motion.button>
 
-<<<<<<< HEAD
           <motion.button
             layout
             type="button"
@@ -243,8 +198,6 @@ export default function NeumorphicNavbar() {
             </svg>
           </motion.button>
 
-=======
->>>>>>> 8a13a2e (ccc)
           <AnimatePresence initial={false}>
             {isPillOpen &&
               navLinks.map((link, i) => {
@@ -374,7 +327,6 @@ export default function NeumorphicNavbar() {
         </nav> */}
       </div>
 
-<<<<<<< HEAD
       <motion.aside
         initial={false}
         animate={{ opacity: showSidebar ? 1 : 0, x: showSidebar ? 0 : 24 }}
@@ -383,20 +335,13 @@ export default function NeumorphicNavbar() {
         aria-hidden={!showSidebar}
         className="fixed right-2 top-1/2 z-40 flex -translate-y-1/2 flex-col sm:right-4"
       >
-=======
-      <aside className="fixed right-2 top-1/2 z-40 flex -translate-y-1/2 flex-col sm:right-4">
->>>>>>> 8a13a2e (ccc)
         <button
           type="button"
           className="p-2 rounded-md cursor-pointer border-white/45 bg-white/70 px-3 py-4 shadow-[0_12px_32px_rgba(15,23,42,0.14)] backdrop-blur-sm  mb-2"
           onClick={() => handleNavigate("home")}
         >
           <Image
-<<<<<<< HEAD
             src="/images/us.png"
-=======
-            src="/us.png"
->>>>>>> 8a13a2e (ccc)
             alt="Umar Suhail"
             width={150}
             height={128}

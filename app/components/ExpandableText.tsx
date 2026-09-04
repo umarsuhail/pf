@@ -14,10 +14,7 @@ export default function ExpandableText({
   toggleClassName = "",
   className = "",
   forceExpanded = false,
-<<<<<<< HEAD
   onExpandedChange,
-=======
->>>>>>> 8a13a2e (ccc)
 }: {
   children: ReactNode;
   collapsedHeight?: string;
@@ -28,22 +25,15 @@ export default function ExpandableText({
   // visitor mid-flight) — after it fires, expansion reverts to ordinary
   // click-driven state, so the visitor can still collapse it again.
   forceExpanded?: boolean;
-<<<<<<< HEAD
   // Lets a parent react to the real expanded state (manual toggle or
   // forceExpanded alike) instead of just the one-way forceExpanded trigger.
   onExpandedChange?: (expanded: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  // Reacts to forceExpanded's rising edge during render (React's documented
-  // pattern for adjusting state from a prop) rather than in an effect, so
-  // there's no extra commit between the prop changing and expanded catching
-  // up to it.
-  const [prevForceExpanded, setPrevForceExpanded] = useState(forceExpanded);
-  if (forceExpanded !== prevForceExpanded) {
-    setPrevForceExpanded(forceExpanded);
+  useEffect(() => {
     if (forceExpanded) setExpanded(true);
-  }
+  }, [forceExpanded]);
 
   useEffect(() => {
     onExpandedChange?.(expanded);
@@ -51,14 +41,6 @@ export default function ExpandableText({
     // re-fire this on every parent render instead of only on real changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expanded]);
-=======
-}) {
-  const [expanded, setExpanded] = useState(false);
-
-  useEffect(() => {
-    if (forceExpanded) setExpanded(true);
-  }, [forceExpanded]);
->>>>>>> 8a13a2e (ccc)
 
   return (
     <div className={className}>
