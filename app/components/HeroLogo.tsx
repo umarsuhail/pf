@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import gsap from "gsap";
+import { animate } from "motion/react";
+import { POWER2_IN, POWER2_OUT, POWER3_OUT } from "../lib/easings";
+
+type NumberControls = { stop: () => void };
 
 type Particle = {
     x: number;
@@ -20,6 +23,13 @@ type Particle = {
 
     rotation: number;
     rotationSpeed: number;
+
+    // In-flight animate() controls for each tweened field, so a new tween
+    // can stop the previous one first — the motion equivalent of GSAP's
+    // `overwrite: true`.
+    xCtrl?: NumberControls;
+    yCtrl?: NumberControls;
+    alphaCtrl?: NumberControls;
 };
 
 type ParticleLogoProps = {
@@ -81,6 +91,7 @@ export default function ParticleLogo({
 
         let animationFrame = 0;
         let destroyed = false;
+        const timeouts: number[] = [];
 
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
@@ -90,6 +101,27 @@ export default function ParticleLogo({
 
         const random = (min: number, max: number) =>
             Math.random() * (max - min) + min;
+
+        // Retargets (or starts) a single tweened field on a particle,
+        // stopping whatever was already animating that field first — the
+        // motion equivalent of GSAP's `overwrite: true`.
+        const tweenField = (
+            particle: Particle,
+            valueKey: "x" | "y" | "alpha",
+            controlKey: "xCtrl" | "yCtrl" | "alphaCtrl",
+            target: number,
+            opts: { duration: number; delay?: number; ease: readonly number[] },
+        ) => {
+            particle[controlKey]?.stop();
+            particle[controlKey] = animate(particle[valueKey], target, {
+                duration: opts.duration,
+                delay: opts.delay,
+                ease: opts.ease as unknown as [number, number, number, number],
+                onUpdate: (latest: number) => {
+                    particle[valueKey] = latest;
+                },
+            });
+        };
 
         const resize = () => {
             const rect = canvas.getBoundingClientRect();
@@ -366,20 +398,18 @@ export default function ParticleLogo({
          */
         const formLogo = () => {
             particles.forEach((particle) => {
-                gsap.to(particle, {
-                    x: particle.homeX,
-                    y: particle.homeY,
+                const duration = 1.9 / speed;
+                const delay = (particle.delay * 0.4) / speed;
 
-                    duration: 1.9 / speed,
-
-                    delay:
-                        particle.delay *
-                        0.4 /
-                        speed,
-
-                    ease: "power3.out",
-
-                    overwrite: true,
+                tweenField(particle, "x", "xCtrl", particle.homeX, {
+                    duration,
+                    delay,
+                    ease: POWER3_OUT,
+                });
+                tweenField(particle, "y", "yCtrl", particle.homeY, {
+                    duration,
+                    delay,
+                    ease: POWER3_OUT,
                 });
             });
         };
@@ -419,34 +449,27 @@ export default function ParticleLogo({
                     disperseStrength *
                     random(0.7, 1.2);
 
-                gsap.to(particle, {
-                    x:
-                        particle.homeX +
-                        Math.cos(angle) * distance,
+                const duration = 0.9 / speed;
+                const delay = random(0, 0.5) / speed;
 
-                    y:
-                        particle.homeY +
-                        Math.sin(angle) * distance,
-
-                    duration:
-                        0.9 / speed,
-
-                    delay:
-                        random(0, 0.5) /
-                        speed,
-
-                    ease: "power2.in",
-
-                    overwrite: true,
-
-                    onStart: () => {
-                        gsap.to(particle, {
-                            alpha: 0,
-                            duration:
-                                0.9 / speed,
-                            ease: "power2.in",
-                        });
-                    },
+                // Same delay/duration/ease on x, y and alpha reproduces the
+                // original's x/y tween whose onStart fired a matching alpha
+                // fade — they were always in lockstep, so there's no need
+                // to chain them.
+                tweenField(particle, "x", "xCtrl", particle.homeX + Math.cos(angle) * distance, {
+                    duration,
+                    delay,
+                    ease: POWER2_IN,
+                });
+                tweenField(particle, "y", "yCtrl", particle.homeY + Math.sin(angle) * distance, {
+                    duration,
+                    delay,
+                    ease: POWER2_IN,
+                });
+                tweenField(particle, "alpha", "alphaCtrl", 0, {
+                    duration,
+                    delay,
+                    ease: POWER2_IN,
                 });
             });
         };
@@ -463,63 +486,56 @@ export default function ParticleLogo({
              * Fade particles in and form logo.
              */
             particles.forEach((particle) => {
-                gsap.to(particle, {
-                    alpha: 1,
-
-                    duration:
-                        0.5 / speed,
-
-                    delay:
-                        particle.delay /
-                        speed,
-
-                    ease: "power2.out",
+                tweenField(particle, "alpha", "alphaCtrl", 1, {
+                    duration: 0.5 / speed,
+                    delay: particle.delay / speed,
+                    ease: POWER2_OUT,
                 });
             });
 
             formLogo();
 
             if (loop) {
-                gsap.delayedCall(
-                    3.1 / speed,
-                    () => {
-                        disperseLogo();
+                const disperseTimeout = window.setTimeout(() => {
+                    if (destroyed) return;
 
-                        gsap.delayedCall(
-                            1.5 / speed,
-                            () => {
-                                /*
-                                 * Reset particles.
-                                 */
-                                particles.forEach(
-                                    (particle) => {
-                                        const angle =
-                                            Math.random() *
-                                            Math.PI *
-                                            2;
+                    disperseLogo();
 
-                                        const distance =
-                                            disperseStrength;
+                    const resetTimeout = window.setTimeout(() => {
+                        if (destroyed) return;
 
-                                        particle.x =
-                                            particle.homeX +
-                                            Math.cos(angle) *
-                                            distance;
+                        /*
+                         * Reset particles.
+                         */
+                        particles.forEach(
+                            (particle) => {
+                                const angle =
+                                    Math.random() *
+                                    Math.PI *
+                                    2;
 
-                                        particle.y =
-                                            particle.homeY +
-                                            Math.sin(angle) *
-                                            distance;
+                                const distance =
+                                    disperseStrength;
 
-                                        particle.alpha = 0;
-                                    }
-                                );
+                                particle.x =
+                                    particle.homeX +
+                                    Math.cos(angle) *
+                                    distance;
 
-                                runAnimation();
+                                particle.y =
+                                    particle.homeY +
+                                    Math.sin(angle) *
+                                    distance;
+
+                                particle.alpha = 0;
                             }
                         );
-                    }
-                );
+
+                        runAnimation();
+                    }, (1.5 / speed) * 1000);
+                    timeouts.push(resetTimeout);
+                }, (3.1 / speed) * 1000);
+                timeouts.push(disperseTimeout);
             }
         };
 
@@ -578,7 +594,13 @@ export default function ParticleLogo({
                 animationFrame
             );
 
-            gsap.killTweensOf(particles);
+            timeouts.forEach((id) => window.clearTimeout(id));
+
+            particles.forEach((particle) => {
+                particle.xCtrl?.stop();
+                particle.yCtrl?.stop();
+                particle.alphaCtrl?.stop();
+            });
 
             window.removeEventListener(
                 "resize",

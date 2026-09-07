@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, stagger, type Variants } from "framer-motion";
+import { motion, stagger, type Variants } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";

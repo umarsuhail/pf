@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cards } from "../data/sections";
@@ -100,12 +100,12 @@ function Rivets({ className = "" }: { className?: string }) {
   );
 }
 
-// The closed latch floats alone at the very top of the page, so its flat
+// The top-hung tray keeps one shared silhouette at every state.
 // top edge can get a pair of concave "ear" flares — the classic iPhone
 // notch trick: a small square masked with a radial gradient so it reads as
 // solid near the notch's corner and fades to nothing away from it, faking
 // a corner that curves the *opposite* way from a normal border-radius.
-const NOTCH_EAR = 14;
+const NOTCH_EAR = 16;
 const NOTCH_COLOR = "#1c2734";
 function notchEarStyle(corner: "top right" | "top left") {
   const mask = `radial-gradient(circle at ${corner}, black ${NOTCH_EAR}px, transparent ${NOTCH_EAR}px)`;
@@ -116,6 +116,23 @@ function notchEarStyle(corner: "top right" | "top left") {
     WebkitMaskImage: mask,
     maskImage: mask,
   } as const;
+}
+
+function CockpitNotchShoulders() {
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute top-0 right-full"
+        style={notchEarStyle("top right")}
+      />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute top-0 left-full"
+        style={notchEarStyle("top left")}
+      />
+    </>
+  );
 }
 
 // Collapsed state: squeezed to a sliver at the corner nearest the console
@@ -562,7 +579,7 @@ export default function CockpitTray() {
                 }}
                 transition={TRAY_SPRING}
                 style={{ transformOrigin: "top center", perspective: 900 }}
-                className={`pointer-events-auto w-[min(94vw,880px)] rounded-b-3xl border-t-0 px-3 pb-4 pt-4 sm:px-5 ${METAL_SURFACE}`}
+                className={`pointer-events-auto w-[min(94vw,880px)] rounded-b-[22px] border-t-0 px-3 pb-4 pt-4 sm:px-5 ${METAL_SURFACE}`}
               >
                 <BrushedGrain />
                 <Sheen delay={0.45} />
@@ -744,28 +761,13 @@ export default function CockpitTray() {
           </AnimatePresence>
 
           {/* The latch — always visible, hangs just under the console. Closed,
-             it's floating free against the page, so it gets the notch ears;
-             open, it's flush against the console above it and a flare there
-             would just read as a seam, so they're skipped. */}
+             it keeps the shared iPhone-notch frame in both states. */}
           <div className="relative inline-block">
-            {!isOpen && (
-              <>
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-0 right-full"
-                  style={notchEarStyle("top right")}
-                />
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-0 left-full"
-                  style={notchEarStyle("top left")}
-                />
-              </>
-            )}
+            <CockpitNotchShoulders />
             <div
               onPointerEnter={() => setIsLatchHot(true)}
               onPointerLeave={() => setIsLatchHot(false)}
-              className={`pointer-events-auto flex items-center gap-1 rounded-b-xl border-t-0 px-1.5 py-1 ${METAL_SURFACE}`}
+              className={`pointer-events-auto flex items-center gap-1 rounded-b-[18px] border-t-0 px-1.5 py-1 ${METAL_SURFACE}`}
             >
             <Sheen delay={0.2} duration={2.4} active={isOpen || isLatchHot} />
 

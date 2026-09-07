@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, type Variants } from "framer-motion";
+import { motion, type Variants } from "motion/react";
 import type { FlightCard } from "../data/sections";
 import { getSkillGroups } from "../data/skillGroups";
 import HandwritingText from "../components/TypoGraphyHand";

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import RouteMap from "./components/RouteMap";
+import ScrollDial from "./components/ScrollDial";
 import PageLoader from "./components/PageLoader";
 import HoloChat from "./components/HoloChat";
 import CockpitTray from "./components/CockpitTray";
@@ -119,6 +120,7 @@ export default function RootLayout({
         <CockpitTray />
         <AutopilotStartToast />
         <RouteMap />
+        <ScrollDial />
         <main className="relative z-10">{children}</main>
         <HoloChat />
       </body>

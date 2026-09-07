@@ -138,9 +138,9 @@ export const cards: FlightCard[] = [
         stack: ["React.js", "JavaScript", "HTML/CSS", "Bootstrap"],
       },
       {
-        title: "Tenant & Configuration Management Platform",
+        title: "Multi-Tenant Transaction Monitoring Dashboard",
         description:
-          "A dynamic platform for tenant onboarding, configuration workflows, and role-based access management.",
+          "A dynamic platform for tenant listing, seperated with configurations workflows, and role-based access management.",
         image: "/images/pro1.png",
         category: "Enterprise",
         stack: ["Next.js", "TypeScript", "Node.js"],

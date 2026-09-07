@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef } from "react";
-import gsap from "gsap";
+import { animate } from "motion/react";
 
 type HandwritingProps = {
     children: React.ReactNode;
@@ -20,21 +20,21 @@ export default function Handwriting({
         const paths =
             containerRef.current.querySelectorAll<SVGPathElement>("path");
 
-        paths.forEach((path) => {
+        const controls = Array.from(paths).map((path) => {
             const length = path.getTotalLength();
 
-            gsap.set(path, {
-                strokeDasharray: length,
-                strokeDashoffset: length,
-                fill: "none",
-            });
+            path.style.strokeDasharray = `${length}`;
+            path.style.strokeDashoffset = `${length}`;
+            path.style.fill = "none";
 
-            gsap.to(path, {
-                strokeDashoffset: 0,
-                duration: 2,
-                ease: "none",
-            });
+            return animate(
+                path,
+                { strokeDashoffset: 0 },
+                { duration: 2, ease: "linear" },
+            );
         });
+
+        return () => controls.forEach((c) => c.stop());
     }, []);
 
     return (
