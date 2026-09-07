@@ -309,7 +309,7 @@ export function CardPortal({
     const applyProgressDash = isEntry
       ? null
       : (value: number) =>
-          animate(progressDashOffset, value, { duration: 0.6, ease: POWER2_OUT });
+        animate(progressDashOffset, value, { duration: 0.6, ease: POWER2_OUT });
 
     const update = (progress: number) => {
       let reveal = 0;
@@ -493,7 +493,7 @@ export function CardPortal({
     >
       {/* 1. Static Mask Wrapper - enforces perfect clipping boundaries that never scale */}
       <div className="absolute inset-0 overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]">
-        
+
         {/* 2. Scaling container */}
         <motion.div
           style={{ scale: visualScale }}
@@ -502,7 +502,7 @@ export function CardPortal({
           {/* Space backdrop filling the window, carrying this section's portal color */}
           <Space tint={atmosphere.accent} />
 
-          {isEntry && (
+          {/* {isEntry && (
             <Image
               src="/images/us.png"
               alt=""
@@ -512,7 +512,7 @@ export function CardPortal({
               className="object-cover opacity-55 mix-blend-screen p-8"
               aria-hidden="true"
             />
-          )}
+          )} */}
 
           {/* Color overlay giving this section's universe its own tone */}
           <div
@@ -539,7 +539,7 @@ export function CardPortal({
                     className="absolute inset-0"
                   >
                     <Image
-                      src="/SVG/astr.svg"
+                      src="/images/us.png"
                       alt=""
                       fill
                       sizes="(min-width: 1024px) 30vw, 40vh"

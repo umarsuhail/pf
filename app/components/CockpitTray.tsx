@@ -377,6 +377,13 @@ export default function CockpitTray() {
     const main = mainRef.current;
     if (!narration || !main) return;
 
+    // The <audio> tag itself carries no `src` (see JSX below) — assigning it
+    // only here, at the moment playback is actually requested, means tomoon
+    // never triggers so much as a metadata fetch until the visitor engages
+    // with the app, regardless of how strictly a given browser honors
+    // preload="none" once a `src` is already set on mount.
+    if (!main.src) main.src = MAIN_SRC;
+
     main.pause();
     main.currentTime = 0;
     main.volume = 0;
@@ -527,7 +534,10 @@ export default function CockpitTray() {
             onTimeUpdate={onNarrationProgress}
             onEnded={onNarrationEnded}
           />
-          <audio ref={mainRef} src={MAIN_SRC} loop preload="none" />
+          {/* No static src — startAudio() assigns MAIN_SRC imperatively the
+             instant playback is actually requested, so nothing is fetched
+             before then. */}
+          <audio ref={mainRef} loop preload="none" />
         </>
       )}
 

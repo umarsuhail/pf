@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 
 // Assets the very first screen depends on — gate the loader on these
 // actually finishing, not a fake timer. (earth.png no longer exists; the
-// entry portal and the end-of-flight globe both use a1.png now.)
-const CRITICAL_ASSETS = ["/bg.jpg", "/a1.png"];
+// entry portal and the end-of-flight scene use a1.png and a2.png now.)
+const CRITICAL_ASSETS = ["/bg.jpg", "/a1.png", "/a2.png"];
 const MIN_VISIBLE_MS = 900;
 const EXIT_DURATION_MS = 700;
 const RADIUS = 26;

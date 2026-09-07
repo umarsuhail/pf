@@ -18,6 +18,9 @@ type Particle = {
 
     size: number;
     alpha: number;
+    tone: number;
+    twinkle: number;
+    isSpark: boolean;
 
     delay: number;
 
@@ -281,9 +284,14 @@ export default function ParticleLogo({
                     vx: 0,
                     vy: 0,
 
-                    size: random(0.7, 2.2),
+                    // Fine points and occasional four-point sparks feel more
+                    // like a holographic instrument readout than confetti.
+                    size: random(0.5, 1.45),
 
                     alpha: point.alpha,
+                    tone: random(0, 1),
+                    twinkle: random(0, Math.PI * 2),
+                    isSpark: Math.random() > 0.9,
 
                     delay: random(0, 0.8),
 
@@ -305,10 +313,29 @@ export default function ParticleLogo({
                 rect.height
             );
 
+            // The formed portrait gets a restrained ice-blue bloom. This is
+            // drawn once per frame, rather than putting a costly blur on every
+            // particle, so the mark stays crisp on lower-power devices.
+            const halo = ctx.createRadialGradient(
+                rect.width / 2,
+                rect.height / 2,
+                0,
+                rect.width / 2,
+                rect.height / 2,
+                Math.min(rect.width, rect.height) * 0.46
+            );
+            halo.addColorStop(0, "rgba(56, 189, 248, 0.11)");
+            halo.addColorStop(0.52, "rgba(14, 165, 233, 0.035)");
+            halo.addColorStop(1, "rgba(14, 165, 233, 0)");
+            ctx.fillStyle = halo;
+            ctx.fillRect(0, 0, rect.width, rect.height);
+            ctx.globalCompositeOperation = "lighter";
+
             /*
              * Mouse influence.
              */
             const mouse = mouseRef.current;
+            const frameTime = performance.now();
 
             particles.forEach((particle) => {
                 if (mouse.active) {
@@ -365,29 +392,37 @@ export default function ParticleLogo({
                     particle.rotation
                 );
 
-                ctx.globalAlpha =
-                    particle.alpha;
+                const shimmer =
+                    0.78 + Math.sin(frameTime * 0.002 + particle.twinkle) * 0.22;
+                ctx.globalAlpha = particle.alpha * shimmer;
 
                 /*
                  * Particle appearance.
                  */
-                ctx.fillStyle =
-                    "rgba(255,255,255,1)";
+                const isBright = particle.tone > 0.72;
+                ctx.fillStyle = isBright
+                    ? "rgba(224, 242, 254, 1)"
+                    : particle.tone > 0.35
+                        ? "rgba(125, 211, 252, 0.92)"
+                        : "rgba(56, 189, 248, 0.82)";
 
-                ctx.beginPath();
-
-                ctx.arc(
-                    0,
-                    0,
-                    particle.size,
-                    0,
-                    Math.PI * 2
-                );
-
-                ctx.fill();
+                if (particle.isSpark) {
+                    const arm = particle.size * 2.1;
+                    ctx.shadowBlur = 7;
+                    ctx.shadowColor = "rgba(56, 189, 248, 0.8)";
+                    ctx.fillRect(-particle.size * 0.38, -arm, particle.size * 0.76, arm * 2);
+                    ctx.fillRect(-arm, -particle.size * 0.38, arm * 2, particle.size * 0.76);
+                } else {
+                    // A rotated square is less playful than a soft circle and
+                    // gives the assembled image a contemporary, faceted grain.
+                    const edge = particle.size * 1.35;
+                    ctx.fillRect(-edge / 2, -edge / 2, edge, edge);
+                }
 
                 ctx.restore();
             });
+
+            ctx.globalCompositeOperation = "source-over";
 
             animationFrame =
                 requestAnimationFrame(draw);
