@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 
 // Assets the very first screen depends on — gate the loader on these
-<<<<<<< HEAD
 // actually finishing, not a fake timer. a1.png/a2.png (the end-of-flight
 // earth/moon) used to be listed here too, but they're only ever seen after
 // scrolling to ~90% of the flight — holding the opening loader on ~1.7MB of
@@ -11,11 +10,6 @@ import { useEffect, useState } from "react";
 // longer for no visible benefit. next/image's own lazy loading fetches them
 // once the visitor is actually approaching that point in the scroll.
 const CRITICAL_ASSETS = ["/bg.jpg"];
-=======
-// actually finishing, not a fake timer. (earth.png no longer exists; the
-// entry portal and the end-of-flight globe both use a1.png now.)
-const CRITICAL_ASSETS = ["/bg.jpg", "/a1.png"];
->>>>>>> 8a13a2e (ccc)
 const MIN_VISIBLE_MS = 900;
 const EXIT_DURATION_MS = 700;
 const RADIUS = 26;

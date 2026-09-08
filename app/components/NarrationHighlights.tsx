@@ -1,10 +1,6 @@
 "use client";
 
-<<<<<<< HEAD
-import { AnimatePresence, motion } from "motion/react";
-=======
 import { AnimatePresence, motion } from "framer-motion";
->>>>>>> 8a13a2e (ccc)
 import { useEffect, useRef, useState } from "react";
 import type { AnimatedIcon, AnimatedIconHandle } from "./icons/card-icon";
 import { HistoryIcon } from "./icons/history";
