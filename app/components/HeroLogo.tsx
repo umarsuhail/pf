@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { animate } from "motion/react";
+import { animate } from "framer-motion";
 import { POWER2_IN, POWER2_OUT, POWER3_OUT } from "../lib/easings";
 
 type NumberControls = { stop: () => void };

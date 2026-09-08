@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef } from "react";
-import { animate } from "motion/react";
+import { animate } from "framer-motion";
 
 type HandwritingProps = {
     children: React.ReactNode;

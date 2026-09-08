@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import gsap from "gsap";
+import { motion } from "framer-motion";
+import { ELASTIC_OUT_SPRING, POWER3_IN } from "../lib/easings";
 import { SendIcon } from "./icons/send";
 import { BotMessageSquareIcon } from "./icons/bot-message-square";
 import { XIcon } from "./icons/x";
@@ -23,22 +24,11 @@ export default function HoloChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const chatBoxRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const sendRef = useRef<AnimatedIconHandle>(null);
   const transmitRef = useRef<AnimatedIconHandle>(null);
   const closeRef = useRef<AnimatedIconHandle>(null);
-
-  // Initial setup for GSAP
-  useEffect(() => {
-    gsap.set(chatBoxRef.current, {
-      autoAlpha: 0,
-      scale: 0.8,
-      y: 40,
-      transformOrigin: "bottom right"
-    });
-  }, []);
 
   // New messages always push the transcript into view.
   useEffect(() => {
@@ -54,25 +44,9 @@ export default function HoloChat() {
 
   const toggleChat = () => {
     if (!isOpen) {
-      // Open Animation
-      gsap.to(chatBoxRef.current, {
-        autoAlpha: 1,
-        scale: 1,
-        y: 0,
-        duration: 0.6,
-        ease: "elastic.out(1, 0.8)"
-      });
       setIsOpen(true);
       requestAnimationFrame(() => inputRef.current?.focus());
     } else {
-      // Close Animation
-      gsap.to(chatBoxRef.current, {
-        autoAlpha: 0,
-        scale: 0.8,
-        y: 40,
-        duration: 0.4,
-        ease: "power3.in"
-      });
       setIsOpen(false);
     }
   };
@@ -139,9 +113,19 @@ export default function HoloChat() {
          Same glass-panel language as the rest of the site (SectionContent,
          CallbackForm, the cockpit tray): dark slate, soft white borders,
          backdrop blur — no separate neon theme of its own. */}
-      <div
-        ref={chatBoxRef}
-        className="pointer-events-auto relative mb-3 flex h-[min(500px,68vh)] w-[min(360px,88vw)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-950/90 shadow-[0_24px_60px_rgba(2,8,23,0.6)] backdrop-blur-xl sm:mb-5"
+      <motion.div
+        initial={false}
+        animate={{
+          opacity: isOpen ? 1 : 0,
+          scale: isOpen ? 1 : 0.8,
+          y: isOpen ? 0 : 40,
+        }}
+        transition={isOpen ? ELASTIC_OUT_SPRING : { duration: 0.4, ease: POWER3_IN }}
+        style={{
+          transformOrigin: "bottom right",
+          pointerEvents: isOpen ? "auto" : "none",
+        }}
+        className="relative mb-3 flex h-[min(500px,68vh)] w-[min(360px,88vw)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-950/90 shadow-[0_24px_60px_rgba(2,8,23,0.6)] backdrop-blur-xl sm:mb-5"
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3.5">
@@ -242,7 +226,7 @@ export default function HoloChat() {
             </button>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }
