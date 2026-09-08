@@ -457,10 +457,6 @@ export function SectionContent({
                           </span>
                         ))}
                       </div>
-                      <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-sky-300">
-                        View Case Study
-                        <ArrowRightIcon size={12} aria-hidden="true" />
-                      </span>
                     </div>
                   </motion.div>
                 );

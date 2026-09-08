@@ -54,17 +54,24 @@ type ParticleLogoProps = {
     disperseStrength?: number;
 
     /**
-     * Automatically loop the animation.
-     */
-    loop?: boolean;
-
-    /**
      * Fixed pixel diameter for the formed logo — independent of the
      * canvas's own size, so it reads the same across breakpoints and
      * doesn't rescale when its container is resized.
      */
     size?: number;
+
+    /**
+     * Controls the form-in/disperse-out lifecycle explicitly — pass the
+     * parent's own "is this actually in view" signal when it has one (e.g.
+     * a sticky scroll-driven card, where geometric viewport intersection
+     * alone can't tell visible from opacity-faded-out). Left undefined,
+     * the component watches its own viewport intersection instead, which
+     * is the right default for a plain, normally-scrolled element.
+     */
+    active?: boolean;
 };
+
+type FormControls = { formIn: () => void; formOut: () => void };
 
 export default function ParticleLogo({
     src = "/images/us.png",
@@ -72,16 +79,41 @@ export default function ParticleLogo({
     particleCount = 624,
     speed = 1,
     disperseStrength = 480,
-    loop = true,
     size = 180,
+    active,
 }: ParticleLogoProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    // Populated synchronously by the setup effect below, read by the
+    // separate `active`-prop-watching effect (and the click handler) so
+    // triggering a reveal/shatter doesn't have to tear down and rebuild
+    // the whole canvas/particle setup.
+    const controlsRef = useRef<FormControls | null>(null);
+    // The last `active` value actually acted on — either by initialize()
+    // below (mount) or by the watcher effect itself (subsequent changes).
+    // Compared against rather than just "skip the first run", because a
+    // controlled caller's very first render often already carries a real
+    // value (e.g. starting at `false` before its own scroll effect flips
+    // it true) — treating that as a no-op transition would silently
+    // swallow the first genuine reveal.
+    const lastAppliedActiveRef = useRef<boolean | undefined>(undefined);
 
     const mouseRef = useRef({
         x: 0,
         y: 0,
         active: false,
     });
+
+    useEffect(() => {
+        if (active === undefined) return;
+        // formIn()/formOut() are both idempotent (guarded by the closure's
+        // own `visible` flag), so a redundant call here — e.g. racing
+        // initialize()'s own async mount-time decision — is harmless; this
+        // guard is purely to skip genuinely-unchanged values.
+        if (lastAppliedActiveRef.current === active) return;
+        lastAppliedActiveRef.current = active;
+        if (active) controlsRef.current?.formIn();
+        else controlsRef.current?.formOut();
+    }, [active]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -94,22 +126,22 @@ export default function ParticleLogo({
 
         let animationFrame = 0;
         let destroyed = false;
-        const timeouts: number[] = [];
 
         // The entry card (and its logo) stay mounted for the whole flight —
         // scrolling past it used to leave this canvas drawing every particle,
         // sparks' shadowBlur included, on every frame indefinitely. Only
         // actually drawing while some part of the canvas is on screen is
         // what stops that from taxing the main thread for the rest of the
-        // session.
+        // session. Separate from (and unrelated to) the reveal/`active`
+        // lifecycle below — this is purely a draw-loop perf gate.
         let isVisible = true;
-        const visibilityObserver = new IntersectionObserver(
+        const paintVisibilityObserver = new IntersectionObserver(
             ([entry]) => {
                 isVisible = entry?.isIntersecting ?? true;
             },
             { threshold: 0 },
         );
-        visibilityObserver.observe(canvas);
+        paintVisibilityObserver.observe(canvas);
 
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
@@ -199,8 +231,8 @@ export default function ParticleLogo({
              *
              * Transparent pixels are ignored.
              */
-            for (let y = 0; y < sampleSize; y += 3) {
-                for (let x = 0; x < sampleSize; x += 3) {
+            for (let y = 0; y < sampleSize; y += 2) {
+                for (let x = 0; x < sampleSize; x += 2) {
                     const index = (y * sampleSize + x) * 4;
 
                     const r = imageData.data[index];
@@ -303,7 +335,10 @@ export default function ParticleLogo({
                     // like a holographic instrument readout than confetti.
                     size: random(0.5, 1.45),
 
-                    alpha: point.alpha,
+                    // Starts invisible — formIn() fades it up. (point.alpha,
+                    // the source pixel's own opacity, isn't used as a
+                    // target: every particle fades to fully opaque.)
+                    alpha: 0,
                     tone: random(0, 1),
                     twinkle: random(0, Math.PI * 2),
                     isSpark: Math.random() > 0.9,
@@ -453,14 +488,29 @@ export default function ParticleLogo({
                 requestAnimationFrame(draw);
         };
 
+        // Whether the logo is currently formed (or forming) — guards
+        // against redundant re-triggers, e.g. two intersection callbacks
+        // firing in a row, or a redundant call from the `active`-prop
+        // effect landing before/after this one.
+        let visible = false;
+
         /*
-         * FORM LOGO
+         * FORM IN — fades particles up from nothing and draws them
+         * together into the logo. One-shot: no auto-disperse/reform loop.
          */
-        const formLogo = () => {
+        const formIn = () => {
+            if (visible || destroyed || particles.length === 0) return;
+            visible = true;
+
             particles.forEach((particle) => {
                 const duration = 1.9 / speed;
                 const delay = (particle.delay * 0.4) / speed;
 
+                tweenField(particle, "alpha", "alphaCtrl", 1, {
+                    duration: 0.5 / speed,
+                    delay: particle.delay / speed,
+                    ease: POWER2_OUT,
+                });
                 tweenField(particle, "x", "xCtrl", particle.homeX, {
                     duration,
                     delay,
@@ -475,9 +525,14 @@ export default function ParticleLogo({
         };
 
         /*
-         * DISPERSE LOGO
+         * FORM OUT — scatters particles back outward and fades them, the
+         * mirror image of formIn. Also one-shot. Shared by the scroll/
+         * `active` lifecycle and the click-to-shatter handler below.
          */
-        const disperseLogo = () => {
+        const formOut = () => {
+            if (!visible || destroyed || particles.length === 0) return;
+            visible = false;
+
             particles.forEach((particle) => {
                 const dx =
                     particle.x - particle.homeX;
@@ -512,10 +567,8 @@ export default function ParticleLogo({
                 const duration = 0.9 / speed;
                 const delay = random(0, 0.5) / speed;
 
-                // Same delay/duration/ease on x, y and alpha reproduces the
-                // original's x/y tween whose onStart fired a matching alpha
-                // fade — they were always in lockstep, so there's no need
-                // to chain them.
+                // Same delay/duration/ease on x, y and alpha — they were
+                // always in lockstep, so there's no need to chain them.
                 tweenField(particle, "x", "xCtrl", particle.homeX + Math.cos(angle) * distance, {
                     duration,
                     delay,
@@ -534,69 +587,57 @@ export default function ParticleLogo({
             });
         };
 
-        const runAnimation = () => {
-            /*
-             * Start invisible.
-             */
-            particles.forEach((particle) => {
-                particle.alpha = 0;
-            });
+        controlsRef.current = { formIn, formOut };
 
-            /*
-             * Fade particles in and form logo.
-             */
+        /*
+         * SHATTER — an explosive click response: every particle blasts
+         * outward from the pointer itself (not just its own home position),
+         * hard and fast, then the logo reassembles on its own once the
+         * burst settles. One-shot per click; ignored while already mid-
+         * shatter or not currently formed.
+         */
+        let shatterTimeout = 0;
+        const shatter = (originX: number, originY: number) => {
+            if (!visible || destroyed || particles.length === 0) return;
+            visible = false;
+
             particles.forEach((particle) => {
-                tweenField(particle, "alpha", "alphaCtrl", 1, {
-                    duration: 0.5 / speed,
-                    delay: particle.delay / speed,
+                const dx = particle.homeX - originX;
+                const dy = particle.homeY - originY;
+                const originDistance = Math.sqrt(dx * dx + dy * dy) || 1;
+                // Particles nearer the click point get blown further —
+                // reads as an impact radiating outward, not a uniform pop.
+                const kick = disperseStrength * random(1.1, 1.9);
+                const falloff = Math.max(0.4, 1 - originDistance / 260);
+                const distance = kick * falloff + random(0, 40);
+                const angle =
+                    Math.atan2(dy, dx) + random(-0.35, 0.35);
+
+                const duration = random(0.35, 0.55) / speed;
+                const delay = random(0, 0.12) / speed;
+
+                tweenField(particle, "x", "xCtrl", particle.homeX + Math.cos(angle) * distance, {
+                    duration,
+                    delay,
+                    ease: POWER2_OUT,
+                });
+                tweenField(particle, "y", "yCtrl", particle.homeY + Math.sin(angle) * distance, {
+                    duration,
+                    delay,
+                    ease: POWER2_OUT,
+                });
+                tweenField(particle, "alpha", "alphaCtrl", 0.15, {
+                    duration: duration * 0.8,
+                    delay,
                     ease: POWER2_OUT,
                 });
             });
 
-            formLogo();
-
-            if (loop) {
-                const disperseTimeout = window.setTimeout(() => {
-                    if (destroyed) return;
-
-                    disperseLogo();
-
-                    const resetTimeout = window.setTimeout(() => {
-                        if (destroyed) return;
-
-                        /*
-                         * Reset particles.
-                         */
-                        particles.forEach(
-                            (particle) => {
-                                const angle =
-                                    Math.random() *
-                                    Math.PI *
-                                    2;
-
-                                const distance =
-                                    disperseStrength;
-
-                                particle.x =
-                                    particle.homeX +
-                                    Math.cos(angle) *
-                                    distance;
-
-                                particle.y =
-                                    particle.homeY +
-                                    Math.sin(angle) *
-                                    distance;
-
-                                particle.alpha = 0;
-                            }
-                        );
-
-                        runAnimation();
-                    }, (1.5 / speed) * 1000);
-                    timeouts.push(resetTimeout);
-                }, (3.1 / speed) * 1000);
-                timeouts.push(disperseTimeout);
-            }
+            window.clearTimeout(shatterTimeout);
+            shatterTimeout = window.setTimeout(() => {
+                if (destroyed) return;
+                formIn();
+            }, 650 / speed);
         };
 
         const handleMouseMove = (
@@ -618,6 +659,20 @@ export default function ParticleLogo({
             mouseRef.current.active = false;
         };
 
+        const handleClick = (event: MouseEvent) => {
+            // The logo is its own click target — this stops the click from
+            // bubbling to whatever the canvas is nested inside (e.g. the
+            // portal card's own "click anywhere to navigate" handler),
+            // which would otherwise cut the shatter off mid-animation.
+            event.stopPropagation();
+            const rect = canvas.getBoundingClientRect();
+            shatter(event.clientX - rect.left, event.clientY - rect.top);
+        };
+
+        // Uncontrolled mode (no `active` prop): the component watches its
+        // own scroll-into/out-of-viewport transitions directly.
+        let revealObserver: IntersectionObserver | undefined;
+
         const initialize = async () => {
             resize();
 
@@ -627,7 +682,23 @@ export default function ParticleLogo({
 
             draw();
 
-            runAnimation();
+            if (active === undefined) {
+                revealObserver = new IntersectionObserver(
+                    ([entry]) => {
+                        if (entry.isIntersecting) formIn();
+                        else formOut();
+                    },
+                    { threshold: 0.2 },
+                );
+                revealObserver.observe(canvas);
+            } else {
+                // Keeps the watcher effect's own comparison in sync with
+                // whatever this mount-time decision actually was, so it
+                // correctly recognizes the *next* real change rather than
+                // mistaking it for a no-op (see lastAppliedActiveRef above).
+                lastAppliedActiveRef.current = active;
+                if (active) formIn();
+            }
         };
 
         window.addEventListener(
@@ -645,6 +716,11 @@ export default function ParticleLogo({
             handleMouseLeave
         );
 
+        canvas.addEventListener(
+            "click",
+            handleClick
+        );
+
         initialize();
 
         return () => {
@@ -654,9 +730,11 @@ export default function ParticleLogo({
                 animationFrame
             );
 
-            visibilityObserver.disconnect();
+            window.clearTimeout(shatterTimeout);
 
-            timeouts.forEach((id) => window.clearTimeout(id));
+            paintVisibilityObserver.disconnect();
+            revealObserver?.disconnect();
+            controlsRef.current = null;
 
             particles.forEach((particle) => {
                 particle.xCtrl?.stop();
@@ -678,20 +756,30 @@ export default function ParticleLogo({
                 "mouseleave",
                 handleMouseLeave
             );
+
+            canvas.removeEventListener(
+                "click",
+                handleClick
+            );
         };
+        // `active`'s initial value (read once, above) decides whether this
+        // setup drives itself via IntersectionObserver or waits to be
+        // told — deliberately excluded here so toggling it afterward
+        // (handled by the separate effect above, via controlsRef) doesn't
+        // tear down and rebuild the whole canvas/particle setup.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         src,
         particleCount,
         speed,
         disperseStrength,
-        loop,
         size,
     ]);
 
     return (
         <canvas
             ref={canvasRef}
-            className={`block h-full w-full ${className}`}
+            className={`block h-full w-full cursor-pointer ${className}`}
             style={{
                 width: "100%",
                 height: "100%",

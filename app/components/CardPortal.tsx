@@ -226,6 +226,12 @@ export function CardPortal({
     timeouts: [],
   });
   const [isActivating, setIsActivating] = useState(false);
+  // Drives the entry portal's ParticleLogo instances' form-in/disperse-out
+  // — derived from the same scroll-reveal math below rather than a plain
+  // viewport IntersectionObserver, since this card's visibility is CSS
+  // opacity/scale, not geometry (it stays inside the sticky flight
+  // container at all times).
+  const [particlesActive, setParticlesActive] = useState(false);
   const isEntry = index === 0;
   const atmosphere = atmospheres[index % atmospheres.length];
 
@@ -337,6 +343,8 @@ export function CardPortal({
       if (reveal === lastReveal && fade === lastFade) return;
       lastReveal = reveal;
       lastFade = fade;
+
+      if (isEntry) setParticlesActive(reveal > 0.6);
 
       applyReveal(power3Out(reveal), fade);
       // Draws in while approaching, then un-draws again on the way out —
@@ -557,12 +565,12 @@ export function CardPortal({
                     className="absolute inset-0"
                   >
                     <ParticleLogo
-                      src="/images/us.png"
-                      particleCount={720}
+                      src="/images/us.svg"
+                      particleCount={1800}
                       speed={0.8}
                       disperseStrength={110}
                       size={150}
-                      loop
+                      active={particlesActive}
                       className="object-contain object-bottom"
                     />
                   </motion.div>

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AnimatePresence,
   motion,
   useMotionTemplate,
   useMotionValue,
@@ -31,7 +30,6 @@ import {
   sectionProgressMap,
   type FlightCard,
 } from "../data/sections";
-import ParticleLogo from "./HeroLogo";
 
 const sectionProgressStops = cards.map((card) => sectionProgressMap[card.id]);
 
@@ -226,6 +224,7 @@ function BillboardCard({
   card,
   index,
   isMobile,
+  mobileOffsetScale,
   smoothScrollProgress,
   revealStart,
   revealEnd,
@@ -233,16 +232,18 @@ function BillboardCard({
   card: FlightCard;
   index: number;
   isMobile: boolean;
+  mobileOffsetScale: number;
   smoothScrollProgress: MotionValue<number>;
   revealStart: number;
   revealEnd: number;
 }) {
 
-  // The flight only ever renders on desktop or on a landscape phone, and both
-  // should read the same way: billboards staggered left and right through the
-  // corridor, not a stack of centred full-width slabs. `isMobile` now only
-  // scales things down (type, padding, offsets) — it no longer flattens the
-  // composition.
+  // The flight renders at every viewport now, portrait phones included, and
+  // all of them read the same way: billboards staggered left and right
+  // through the corridor, not a stack of centred full-width slabs. `isMobile`
+  // scales things down (type, padding), and `mobileOffsetScale` — derived
+  // from the actual viewport width rather than a flat constant — keeps the
+  // left/right stagger from pushing a card off a narrow phone's edges.
   // The autopilot tour opens the home card's full bio partway through its
   // intro hold, rather than leaving it collapsed while the narration reads
   // straight through it.
@@ -343,9 +344,13 @@ function BillboardCard({
         // lateral offsets, but wide enough that the headline still gets a real
         // measure once the portal takes its share.
         width: isMobile ? "min(66vw, 500px)" : card.width,
-        // Same left/right stagger as desktop, dialled back to fit the narrower
-        // viewport instead of being zeroed out.
-        translateX: isMobile ? card.x * 0.45 : card.x,
+        // Same left/right stagger as desktop, scaled down to fit the
+        // narrower viewport instead of being zeroed out — mobileOffsetScale
+        // is proportional to actual viewport width, so a landscape phone
+        // (wide) keeps close to the original stagger while a narrow
+        // portrait phone gets a much smaller one, keeping the card on
+        // screen instead of clipping off its edges.
+        translateX: isMobile ? card.x * mobileOffsetScale : card.x,
       }}
       transition={PHYSICS.expansion}
       className={`absolute flex rounded-3xl border sm:rounded-4xl ${
@@ -569,92 +574,19 @@ function SkillLayoverCluster({
   );
 }
 
-function MobileCard({
-  card,
-  index,
-}: {
-  card: FlightCard;
-  index: number;
-}) {
-  const panelClass = "border-white/15 shadow-[0_18px_40px_rgba(2,8,23,0.35)]";
-
-  return (
-    <section
-      id={`section-${card.id}`}
-      className={`w-full rounded-3xl border p-5 sm:p-6 ${panelClass}`}
-      style={{ background: cardGradients[index % cardGradients.length] }}
-    >
-      <div className="flex w-full flex-col items-start text-left">
-        {card.id === "home" && (
-          <div className="relative mb-4 h-28 w-full overflow-hidden rounded-2xl border border-white/15 bg-slate-950/30">
-            <ParticleLogo
-              src="/images/us.png"
-              particleCount={420}
-              speed={1}
-              disperseStrength={150}
-              size={80}
-              loop
-            />
-          </div>
-        )}
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/20 bg-emerald-200/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-100">
-          <CardIcon id={card.id} size={13} />
-          {card.eyebrow}
-        </span>
-        <h2 className="mt-4 text-2xl font-semibold leading-tight text-[#f0f9ff]">
-          {card.id === "home" ? <Greeting /> : card.title}
-        </h2>
-        {card.id !== "resume" && (
-          <p className="mt-3 text-sm leading-6 text-slate-100/90">
-            <NarratedText id={card.id} text={card.description} />
-          </p>
-        )}
-        {card.id === "resume" ? (
-          <div className="mt-5 flex items-center gap-3">
-            <a
-              href={RESUME_PDF_URL}
-              download
-              className="inline-flex items-center gap-2 rounded-full border border-sky-200/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-sky-50 transition duration-300"
-            >
-              <DownloadIcon size={14} aria-hidden="true" />
-              PDF
-            </a>
-            <a
-              href={RESUME_TEX_URL}
-              download
-              className="inline-flex items-center gap-2 rounded-full border border-sky-200/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-sky-50 transition duration-300"
-            >
-              <DownloadIcon size={14} aria-hidden="true" />
-              TeX
-            </a>
-          </div>
-        ) : (
-          <Link
-            href={`/${card.id}`}
-            className="mt-5 inline-block rounded-full border border-sky-200/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-sky-50 transition duration-300"
-          >
-            {card.cta}
-          </Link>
-        )}
-      </div>
-    </section>
-  );
-}
-
 export default function MultiverseFlight() {
   const containerRef = useRef<HTMLDivElement>(null);
-  // `compact` drives the smaller in-flight card sizing; `portrait` decides
-  // whether a small screen gets the flight at all. A phone held sideways has
-  // the aspect ratio the 3D scene needs, so it flies — held upright it falls
-  // back to the stacked reading layout with a nudge to rotate.
+  // `compact` drives the smaller in-flight card sizing. The flight now runs
+  // at every viewport — portrait phones included — with `mobileOffsetScale`
+  // (derived from the actual viewport width below) keeping the left/right
+  // card stagger from overflowing a narrow screen.
   const [compact, setCompact] = useState(false);
-  const [portrait, setPortrait] = useState(false);
-  const [rotateDismissed, setRotateDismissed] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(0);
 
   useEffect(() => {
     const onResize = () => {
       setCompact(window.innerWidth < 1024);
-      setPortrait(window.innerHeight > window.innerWidth);
+      setViewportWidth(window.innerWidth);
     };
     onResize();
     window.addEventListener("resize", onResize);
@@ -667,13 +599,19 @@ export default function MultiverseFlight() {
   }, []);
 
   const isMobile = compact;
-  const showStackedLayout = compact && portrait;
-  // The navigation listener is registered once, so it can't close over this
-  // directly without going stale on rotate.
-  const stackedLayoutRef = useRef(showStackedLayout);
-  useEffect(() => {
-    stackedLayoutRef.current = showStackedLayout;
-  }, [showStackedLayout]);
+  // The left/right card stagger (card.x) was tuned against a landscape
+  // phone's wide viewport (~700-930px), where a flat 0.45 multiplier keeps
+  // every card on screen. A portrait phone is much narrower (~375-430px),
+  // where that same multiplier pushes a card's edge past the viewport —
+  // scaling proportionally to actual width keeps the stagger present but
+  // safely on screen at every size, landscape included (viewportWidth=900
+  // recovers ~0.45, the original tuning). Clamped so it never vanishes
+  // entirely (some stagger reads better than a dead-centered stack) or
+  // exceeds the original desktop-mobile feel.
+  const mobileOffsetScale =
+    viewportWidth > 0
+      ? Math.min(0.45, Math.max(0.16, (viewportWidth / 900) * 0.45))
+      : 0.45;
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -881,15 +819,6 @@ export default function MultiverseFlight() {
       const targetId = customEvent.detail?.id;
       const targetProgress = targetId ? getNavTargetProgress(targetId) : undefined;
       const container = containerRef.current;
-
-      // Must match the layout actually rendered, not just the width. A
-      // landscape phone is under 1024px wide but shows the *flight*, where no
-      // `section-*` anchors exist — testing width alone sent every "Next" tap
-      // into a getElementById that returned null, so nothing happened.
-      if (stackedLayoutRef.current && targetId) {
-        document.getElementById(`section-${targetId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-        return;
-      }
 
       if (targetProgress === undefined || !container) return;
       const containerTop = window.scrollY + container.getBoundingClientRect().top;
@@ -1141,26 +1070,6 @@ export default function MultiverseFlight() {
       raf = requestAnimationFrame(holdAtStart);
     };
 
-    // Portrait phones get the stacked reading layout, which has no flight to
-    // fly — the tour walks the anchors instead.
-    const runStacked = () => {
-      let index = 0;
-      const step = () => {
-        if (index >= cards.length) {
-          stop();
-          return;
-        }
-        document
-          .getElementById(`section-${cards[index].id}`)
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-        emit(true, index);
-        index += 1;
-        timer = window.setTimeout(step, AUTOPILOT_SECTION_SECONDS * 1000);
-      };
-      // Kept non-zero so `timer` marks the tour as running immediately.
-      timer = window.setTimeout(step, 1);
-    };
-
     const onCommand = (event: Event) => {
       const action = (event as CustomEvent<{ action?: "start" | "stop" }>)
         .detail?.action;
@@ -1177,8 +1086,7 @@ export default function MultiverseFlight() {
       // announcement and the snap-to-start read as one launch, not two
       // separate things.
       window.dispatchEvent(new CustomEvent("flight-autopilot-launch"));
-      if (stackedLayoutRef.current) runStacked();
-      else runFlight();
+      runFlight();
     };
 
     window.addEventListener("flight-autopilot", onCommand as EventListener);
@@ -1211,84 +1119,6 @@ export default function MultiverseFlight() {
     });
     return () => unsubscribe();
   }, [scrollYProgress]);
-
-  if (showStackedLayout) {
-    return (
-      <div ref={containerRef} className="relative min-h-screen w-full overflow-x-hidden bg-transparent pt-24">
-        <div className="mx-auto flex w-full max-w-xl flex-col gap-5">
-          {cards.map((card, index) => (
-            <MobileCard key={card.id} card={card} index={index} />
-          ))}
-        </div>
-
-        {/* The content stays readable underneath — this only invites the
-           visitor into the full 3D flight, and can be waved off. */}
-        <AnimatePresence>
-          {rotateDismissed && (
-            <motion.div
-              key="rotate-prompt"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.35 }}
-              className="fixed inset-0 z-90 flex flex-col items-center justify-center gap-6 bg-slate-950/92 px-8 text-center backdrop-blur-sm"
-            >
-              <motion.svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="72"
-                height="72"
-                viewBox="0 0 24 24"
-                className="text-(--accent)"
-                animate={{ rotate: [0, -90, -90, 0] }}
-                transition={{
-                  duration: 3,
-                  times: [0, 0.35, 0.75, 1],
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-                aria-hidden="true"
-              >
-                <rect
-                  x="7"
-                  y="2"
-                  width="10"
-                  height="20"
-                  rx="2.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-                <line
-                  x1="10.5"
-                  y1="19"
-                  x2="13.5"
-                  y2="19"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </motion.svg>
-
-              <div>
-                <h2 className="text-xl font-semibold text-sky-50">Rotate your phone</h2>
-                <p className="mt-2 max-w-xs text-sm leading-6 text-slate-300">
-                  Turn your device sideways for a different view.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setRotateDismissed(true)}
-                className="rounded-full border border-white/20 bg-white/10 px-6 py-2.5 text-sm font-semibold text-sky-50 transition-colors hover:bg-white/20"
-              >
-                Keep reading instead
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    );
-  }
 
   return (
     // Taller track = more scrolling for the same camera distance, i.e. a
@@ -1390,6 +1220,7 @@ export default function MultiverseFlight() {
               card={card}
               index={index}
               isMobile={isMobile}
+              mobileOffsetScale={mobileOffsetScale}
               smoothScrollProgress={smoothScrollProgress}
               revealStart={getRevealWindow(index).start}
               revealEnd={getRevealWindow(index).end}

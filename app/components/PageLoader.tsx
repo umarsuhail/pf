@@ -21,23 +21,6 @@ export default function PageLoader() {
   const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);
   const [hidden, setHidden] = useState(false);
-  // Nudge the visitor to turn the phone while the assets are still loading,
-  // so the flight is already in its proper orientation by the time it starts.
-  const [needsRotate, setNeedsRotate] = useState(false);
-
-  useEffect(() => {
-    const check = () =>
-      setNeedsRotate(
-        window.innerWidth < 1024 && window.innerHeight > window.innerWidth,
-      );
-    check();
-    window.addEventListener("resize", check);
-    window.addEventListener("orientationchange", check);
-    return () => {
-      window.removeEventListener("resize", check);
-      window.removeEventListener("orientationchange", check);
-    };
-  }, []);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -108,9 +91,8 @@ export default function PageLoader() {
           : "scale-100 opacity-100 blur-none duration-500"
       }`}
     >
-      {/* Stays a landscape card on phones — a 70vh × 70vw box in portrait is
-         a tall crop that fights the image and previews the wrong shape for
-         the flight the visitor is about to rotate into. */}
+      {/* Stays a landscape-shaped preview card on phones — a 70vh × 70vw box
+         in portrait is an awkward tall crop of a wide background image. */}
       <div
         className="aspect-16/10 w-[86vw] rounded-2xl bg-cover bg-center shadow-2xl shadow-black/60 lg:aspect-auto lg:h-[70vh] lg:w-[70vw] lg:rounded-3xl"
         style={{ backgroundImage: "url(/bg.jpg)" }}
@@ -149,42 +131,6 @@ export default function PageLoader() {
         <p className="px-6 text-center text-xs font-semibold uppercase tracking-[0.32em] text-sky-100/80">
           Loading his world. thanks for visiting.
         </p>
-
-        {needsRotate && (
-          <div className="flex items-center gap-2.5 rounded-full border border-white/15 bg-white/5 px-4 py-2 backdrop-blur-sm">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              className="loader-rotate-hint shrink-0 text-(--accent)"
-              aria-hidden="true"
-            >
-              <rect
-                x="7"
-                y="2"
-                width="10"
-                height="20"
-                rx="2.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              />
-              <line
-                x1="10.5"
-                y1="19"
-                x2="13.5"
-                y2="19"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-            <span className="text-[11px] font-medium text-sky-100/90">
-              Rotate your phone for the full experience
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );
