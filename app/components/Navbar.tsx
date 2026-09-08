@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
 const navLinks = [
@@ -15,18 +16,8 @@ const navLinks = [
     ),
   },
   {
-    label: "About Us",
-    id: "about",
-    svgPath: (
-      <path
-        fill="currentColor"
-        d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3s1.34 3 3 3m-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5S5 6.34 5 8s1.34 3 3 3m0 2c-2.33 0-7 1.17-7 3.5V18c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-1.5c0-2.33-4.67-3.5-7-3.5m8 0c-.29 0-.62.02-.97.05c.02.01.03.03.04.04c1.14.83 1.93 1.94 1.93 3.41V18c0 .35-.07.69-.18 1H22c.55 0 1-.45 1-1v-1.5c0-2.33-4.67-3.5-7-3.5"
-      ></path>
-    ),
-  },
-  {
-    label: "Services",
-    id: "services",
+    label: "Skills",
+    id: "skills",
     svgPath: (
       <path
         fill="none"
@@ -39,8 +30,8 @@ const navLinks = [
     ),
   },
   {
-    label: "Innovation",
-    id: "innovation",
+    label: "Projects",
+    id: "projects",
     svgPath: (
       <g fill="none" stroke="currentColor" strokeWidth={1.5}>
         <path
@@ -57,8 +48,8 @@ const navLinks = [
     ),
   },
   {
-    label: "Press",
-    id: "press",
+    label: "Experience",
+    id: "experience",
     svgPath: (
       <path
         fill="currentColor"
@@ -67,20 +58,7 @@ const navLinks = [
     ),
   },
   {
-    label: "Career",
-    id: "career",
-    svgPath: (
-      <g fill="none" stroke="currentColor" strokeWidth={1.5}>
-        <path
-          strokeLinecap="round"
-          d="M11.007 21H9.605c-3.585 0-5.377 0-6.491-1.135S2 16.903 2 13.25s0-5.48 1.114-6.615S6.02 5.5 9.605 5.5h3.803c3.585 0 5.378 0 6.492 1.135c.857.873 1.054 2.156 1.1 4.365"
-        ></path>
-        <path d="M17.111 13.255c.185-.17.277-.255.389-.255s.204.085.389.255l.713.657c.086.079.129.119.182.138c.054.02.112.018.23.013l.962-.038c.248-.01.372-.014.457.057s.102.194.135.44l.132.986c.016.114.023.17.051.22c.028.048.073.083.163.154l.776.61c.192.152.288.227.307.335s-.046.212-.174.42l-.526.847c-.06.097-.09.146-.1.2s.002.111.026.223l.209.978c.05.24.076.36.021.456s-.172.134-.405.21l-.926.301c-.11.036-.166.054-.209.09c-.043.037-.07.089-.123.192l-.452.871c-.115.223-.173.334-.278.372s-.22-.01-.452-.106l-.888-.368c-.109-.045-.163-.068-.22-.068s-.111.023-.22.068l-.888.368c-.232.096-.347.144-.452.106s-.163-.15-.278-.372l-.452-.871c-.054-.103-.08-.155-.123-.191s-.099-.055-.209-.09l-.926-.302c-.233-.076-.35-.114-.405-.21s-.03-.215.021-.456l.21-.978c.023-.112.035-.168.025-.222a.6.6 0 0 0-.1-.2l-.525-.848c-.13-.208-.194-.312-.175-.42s.115-.183.307-.334l.776-.61c.09-.072.135-.107.163-.156s.035-.105.05-.22l.133-.985c.033-.245.05-.369.135-.44s.209-.067.457-.057l.963.038c.117.005.175.007.229-.013c.053-.02.096-.059.182-.138zM16 5.5l-.1-.31c-.495-1.54-.742-2.31-1.331-2.75C13.979 2 13.197 2 11.63 2h-.263c-1.565 0-2.348 0-2.937.44c-.59.44-.837 1.21-1.332 2.75L7 5.5"></path>
-      </g>
-    ),
-  },
-  {
-    label: "Contact Us",
+    label: "Contact",
     id: "contact",
     svgPath: (
       <path
@@ -99,18 +77,32 @@ function navigateToSection(id: string) {
 
 const sectionProgressMap: Record<string, number> = {
   home: 0,
-  about: 0.11,
-  services: 0.22,
-  innovation: 0.56,
-  press: 0.69,
-  career: 0.81,
+  skills: 0.22,
+  projects: 0.56,
+  experience: 0.69,
   contact: 0.92,
 };
+
+// Framer's `layout` measures with getBoundingClientRect, so it only behaves
+// on elements outside a 3D perspective context — this pill is fixed to the
+// viewport, well clear of the flight scene's transforms.
+const PILL_SPRING = { type: "spring", stiffness: 320, damping: 32, mass: 0.7 } as const;
 
 export default function NeumorphicNavbar() {
   const [activeId, setActiveId] = useState("home");
   const [journeyProgress, setJourneyProgress] = useState(0);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isPillOpen, setIsPillOpen] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(true);
+
+  useEffect(() => {
+    if (!isPillOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsPillOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isPillOpen]);
 
   useEffect(() => {
     const handleProgressUpdate = (event: Event) => {
@@ -151,7 +143,101 @@ export default function NeumorphicNavbar() {
 
   return (
     <>
-      <div className="fixed left-1/2 top-3 z-50 w-[95%] max-w-7xl -translate-x-1/2 sm:top-6">
+      {/* Collapsed: a single round button. Tap it and the pill grows sideways
+         into a horizontal card of section links. */}
+      <div className="fixed left-1/2 top-3 z-50 -translate-x-1/2 sm:top-6">
+        <motion.nav
+          layout
+          transition={PILL_SPRING}
+          aria-label="Sections"
+          className="flex items-center gap-1 overflow-hidden rounded-full border border-white/15 bg-slate-950/70 p-1.5 shadow-[0_8px_32px_rgba(2,8,23,0.55)] backdrop-blur-md"
+        >
+          <motion.button
+            layout
+            type="button"
+            onClick={() => setIsPillOpen((prev) => !prev)}
+            aria-expanded={isPillOpen}
+            aria-label={isPillOpen ? "Close section menu" : "Open section menu"}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-sky-100 transition-colors hover:bg-white/20"
+          >
+            <motion.svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              animate={{ rotate: isPillOpen ? 90 : 0 }}
+              transition={PILL_SPRING}
+            >
+              <path
+                fill="currentColor"
+                d={
+                  isPillOpen
+                    ? "M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                    : "M3 18h18v-2H3zm0-5h18v-2H3zm0-7v2h18V6z"
+                }
+              />
+            </motion.svg>
+          </motion.button>
+
+          <motion.button
+            layout
+            type="button"
+            onClick={() => setShowSidebar((prev) => !prev)}
+            aria-pressed={showSidebar}
+            aria-label={showSidebar ? "Hide side navigation" : "Show side navigation"}
+            title={showSidebar ? "Hide side navigation" : "Show side navigation"}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${
+              showSidebar
+                ? "bg-(--accent) text-slate-950"
+                : "bg-white/10 text-sky-100 hover:bg-white/20"
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+              <line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" strokeWidth="1.6" />
+            </svg>
+          </motion.button>
+
+          <AnimatePresence initial={false}>
+            {isPillOpen &&
+              navLinks.map((link, i) => {
+                const isActive = activeId === link.id;
+                return (
+                  <motion.button
+                    key={link.id}
+                    layout
+                    type="button"
+                    initial={{ opacity: 0, scale: 0.7 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.7 }}
+                    transition={{ ...PILL_SPRING, delay: i * 0.035 }}
+                    onClick={() => {
+                      handleNavigate(link.id);
+                      setIsPillOpen(false);
+                    }}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors ${
+                      isActive
+                        ? "bg-(--accent) text-slate-950"
+                        : "text-sky-100/70 hover:bg-white/10 hover:text-sky-50"
+                    }`}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      {link.svgPath}
+                    </svg>
+                    {link.label}
+                  </motion.button>
+                );
+              })}
+          </AnimatePresence>
+        </motion.nav>
+
         {/* <nav className="relative flex items-center justify-between rounded-2xl border border-white/70 bg-gray-100/95 px-3 py-2 shadow-md backdrop-blur-sm sm:h-20 sm:rounded-full sm:px-4 sm:py-0 sm:shadow-[8px_8px_16px_#d1d5db,-8px_-8px_16px_#ffffff]">
           <div className="hidden items-center gap-3 lg:flex">
             {navLinks.map((link) => {
@@ -241,23 +327,30 @@ export default function NeumorphicNavbar() {
         </nav> */}
       </div>
 
-      <aside className="fixed right-4 top-1/2 z-40  -translate-y-1/2 flex flex-col">
+      <motion.aside
+        initial={false}
+        animate={{ opacity: showSidebar ? 1 : 0, x: showSidebar ? 0 : 24 }}
+        transition={PILL_SPRING}
+        style={{ pointerEvents: showSidebar ? "auto" : "none" }}
+        aria-hidden={!showSidebar}
+        className="fixed right-2 top-1/2 z-40 flex -translate-y-1/2 flex-col sm:right-4"
+      >
         <button
           type="button"
           className="p-2 rounded-md cursor-pointer border-white/45 bg-white/70 px-3 py-4 shadow-[0_12px_32px_rgba(15,23,42,0.14)] backdrop-blur-sm  mb-2"
           onClick={() => handleNavigate("home")}
         >
           <Image
-            src="/ef-r-logo.png"
-            alt="EFR"
+            src="/images/us.png"
+            alt="Umar Suhail"
             width={150}
-            height={52}
+            height={128}
             priority
-            className="h-8 w-auto object-contain sm:h-10"
+            className="h-10 w-auto object-contain sm:h-12"
           />
         </button>
         <div className={`flex absolute top-[80px] right-0 items-center gap-3 rounded-2xl border border-white/45 bg-white/70 pl-2 pr-3 py-4 shadow-[0_12px_32px_rgba(15,23,42,0.14)] backdrop-blur-sm transition-all duration-300`}>
-          <div className="flex h-88 flex-col items-center justify-between">
+          <div className="flex h-88 flex-col items-center justify-between [@media(max-height:560px)]:h-56">
             {navLinks.map((link) => {
               const isActive = activeId === link.id;
               return (
@@ -298,7 +391,7 @@ export default function NeumorphicNavbar() {
           </div>
 
           {!isCollapsed && (
-            <div className="relative h-88 w-2.5 rounded-full bg-slate-200">
+            <div className="relative h-88 w-2.5 rounded-full bg-slate-200 [@media(max-height:560px)]:h-56">
               <div
                 className="absolute bottom-0 left-0 w-full rounded-full bg-[linear-gradient(180deg,#2f78bc_0%,#124677_100%)] transition-[height] duration-500"
                 style={{ height: `${Math.max(6, journeyProgress * 100)}%` }}
@@ -326,7 +419,7 @@ export default function NeumorphicNavbar() {
             />
           </svg>
         </button>
-      </aside>
+      </motion.aside>
     </>
   );
 }

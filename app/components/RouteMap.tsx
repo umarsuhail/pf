@@ -10,11 +10,10 @@ type RouteStop = {
 
 const stops: RouteStop[] = [
   { id: "home", label: "Hello", progress: 0 },
-  { id: "about", label: "About Me", progress: 0.11 },
   { id: "skills", label: "Skills", progress: 0.22 },
   { id: "projects", label: "Projects", progress: 0.56 },
   { id: "experience", label: "Experience", progress: 0.69 },
-  { id: "opensource", label: "Open Source", progress: 0.81 },
+  { id: "resume", label: "Resume Builder", progress: 0.81 },
   { id: "contact", label: "Contact", progress: 0.92 },
 ];
 
@@ -23,6 +22,20 @@ const LAST_STOP = stops[stops.length - 1].progress;
 export default function RouteMap() {
   const [activeId, setActiveId] = useState("home");
   const [journeyProgress, setJourneyProgress] = useState(0);
+  const [isVisible, setIsVisible] = useState(true);
+
+  // Shown/hidden from the cockpit tray's own toggle, not owned locally —
+  // kept mounted (opacity/pointer-events only) so scroll position isn't
+  // lost while it's tucked away.
+  useEffect(() => {
+    const onToggle = (event: Event) => {
+      const detail = (event as CustomEvent<{ visible?: boolean }>).detail;
+      setIsVisible((prev) => detail?.visible ?? !prev);
+    };
+    window.addEventListener("toggle-route-map", onToggle as EventListener);
+    return () =>
+      window.removeEventListener("toggle-route-map", onToggle as EventListener);
+  }, []);
 
   useEffect(() => {
     const handleProgressUpdate = (event: Event) => {
@@ -65,7 +78,10 @@ export default function RouteMap() {
   return (
     <nav
       aria-label="Journey route map"
-      className="fixed right-4 top-1/2 z-50 hidden -translate-y-1/2 sm:block lg:right-8"
+      aria-hidden={!isVisible}
+      className={`fixed right-4 top-1/2 z-50 hidden -translate-y-1/2 transition-all duration-300 sm:block lg:right-8 ${
+        isVisible ? "opacity-100" : "pointer-events-none translate-x-6 opacity-0"
+      }`}
     >
       <div className="relative h-[62vh] w-10">
         {/* Route track */}

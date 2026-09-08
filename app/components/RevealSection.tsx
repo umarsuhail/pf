@@ -32,7 +32,12 @@ export default function RevealSection({
     return () => observer.disconnect();
   }, []);
 
-  const Comp = Tag as React.ElementType;
+  // `keyof JSX.IntrinsicElements` widened to a bare ElementType resolves its
+  // props to the intersection of every intrinsic element, which collapses
+  // `children`/`ref`/`style` to `never`. Pin the props we actually pass.
+  const Comp = Tag as unknown as React.FC<
+    React.HTMLAttributes<HTMLElement> & { ref?: React.Ref<HTMLDivElement> }
+  >;
 
   return (
     <Comp

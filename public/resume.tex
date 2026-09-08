@@ -1,0 +1,220 @@
+%!TEX program = xelatex
+\documentclass[a4paper,9.8pt]{article}
+
+% ─── Packages ────────────────────────────────────────────────────────────────
+\usepackage[
+  a4paper,
+  top=12mm, bottom=12mm,
+  left=16mm, right=16mm
+]{geometry}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{multicol}
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{fontspec}
+\usepackage{array}
+\usepackage{parskip}
+\usepackage{calc}
+\usepackage{graphicx}
+
+% ─── Fonts ───────────────────────────────────────────────────────────────────
+\setmainfont{TeX Gyre Termes}   % Times-compatible, widely available
+
+% ─── Colours ─────────────────────────────────────────────────────────────────
+\definecolor{maroon}{HTML}{800000}
+\definecolor{darkgray}{HTML}{444444}
+\definecolor{lightgray}{HTML}{AAAAAA}
+\definecolor{rulegray}{HTML}{DDDDDD}
+\definecolor{photobg}{HTML}{F0E8E8}
+
+% ─── Hyperref ────────────────────────────────────────────────────────────────
+\hypersetup{
+  colorlinks=true,
+  urlcolor=maroon,
+  linkcolor=maroon,
+  pdfborder={0 0 0}
+}
+
+% ─── No paragraph indent, tight spacing ──────────────────────────────────────
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+\setlength{\tabcolsep}{0pt}
+\pagestyle{empty}
+
+% ─── Section headings ────────────────────────────────────────────────────────
+\titleformat{\section}
+  {\normalsize\bfseries\color{maroon}}
+  {}{0em}{}
+  [\vspace{1pt}\color{maroon}\titlerule\vspace{4pt}]
+\titlespacing{\section}{0pt}{8pt}{4pt}
+
+% ─── Bullet list style ────────────────────────────────────────────────────────
+\newlist{cvitems}{itemize}{1}
+\setlist[cvitems]{
+  leftmargin=10pt,
+  itemsep=1pt,
+  parsep=0pt,
+  topsep=2pt,
+  label={\small\textcolor{maroon}{$\bullet$}}
+}
+
+% ─── Helpers ─────────────────────────────────────────────────────────────────
+% Job entry: \jobentry{Company}{Role}{Date}
+\newcommand{\jobentry}[3]{%
+  \begin{tabularx}{\linewidth}{@{}X r@{}}
+    {\bfseries\color{maroon}#1} & {\small\color{darkgray}#3}\\
+    {\small\bfseries #2} & \\
+  \end{tabularx}%
+  \vspace{2pt}%
+}
+
+% Skill row: \skillrow{Category}{Details}
+\newcommand{\skillrow}[2]{%
+  \begin{tabularx}{\linewidth}{@{}>{\bfseries}p{36mm}X@{}}
+    #1 & #2
+  \end{tabularx}\vspace{2pt}%
+}
+
+% Project entry: \projectentry{Title}{Role · Type · Year}{Description}{Stack}
+\newcommand{\projectentry}[4]{%
+  {\bfseries #1} \textcolor{maroon}{·} {\small\color{maroon}#2}\\[2pt]
+  {\small #3}\\[2pt]
+  {\small\itshape\color{darkgray}Stack: #4}%
+  \vspace{5pt}%
+}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\begin{document}
+% ═════════════════════════════════════════════════════════════════════════════
+
+% ─── HEADER ──────────────────────────────────────────────────────────────────
+\begin{minipage}[t]{0.75\linewidth}
+  \vspace{0pt}
+  {\LARGE\bfseries Umar Suhail}\\[3pt]
+  {\normalsize\color{maroon}\bfseries Lead Frontend Engineer \& Application Developer}\\[2pt]
+  {\small\color{darkgray}React.js · Next.js · TypeScript · UI/UX Design · Frontend Architecture}\\[5pt]
+  {\small
+    \textcolor{maroon}{\textbf{Phone:}} +971 551912074 / +91 9497656243\quad \textcolor{maroon}{\textbf{Landline:}} +971 568 323 258\\[2pt]
+    \textcolor{maroon}{\textbf{WA:}} +971 568 323 258 / +91 9497656243\\[2pt]
+    \textcolor{maroon}{\textbf{Email:}} \href{mailto:umarsuhail112@gmail.com}{umarsuhail112@gmail.com}
+    \quad \textcolor{maroon}{\textbf{Web:}} \href{https://umar.website}{umar.website}\\[2pt]
+    \textcolor{maroon}{\textbf{LinkedIn:}} \href{https://linkedin.com/in/umar-suhail}{linkedin.com/in/umar-suhail}
+    \quad \textcolor{maroon}{\textbf{Location:}} Abu Dhabi, UAE
+  }
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.20\linewidth}
+  \vspace{0pt}
+  \begin{tikzpicture}
+    \draw[maroon, line width=0.8pt]
+      (0,0) rectangle (2.8cm, 3.2cm);
+    \node[inner sep=0pt] at (1.4cm, 1.6cm)
+      {\includegraphics[width=2.8cm, height=3.2cm, keepaspectratio=false]{images/me-s.jpeg}};
+  \end{tikzpicture}
+\end{minipage}
+
+\vspace{5pt}
+{\color{maroon}\rule{\linewidth}{1.2pt}}
+\vspace{4pt}
+
+% ─── SUMMARY ─────────────────────────────────────────────────────────────────
+\section{Summary}
+{\small Senior frontend engineer with 7+ years of hands-on experience building high-performance, scalable web applications.
+Deep expertise across the full React ecosystem — from architecture and design systems to API integration and CI/CD pipelines.
+Equally fluent in UI/UX design, having shipped polished interfaces across web and mobile.
+Side toolkit spans Adobe Photoshop, Premiere Pro, and Illustrator for end-to-end creative production.}
+
+% ─── TECHNICAL SKILLS ────────────────────────────────────────────────────────
+\section{Technical Skills}
+{\small
+\skillrow{Frontend}{React.js, Next.js, TypeScript, JavaScript (ES2022+), HTML5, CSS3, Redux Toolkit, React Router, Zustand}
+\skillrow{UI \& Design}{Tailwind CSS, Material-UI (MUI), Shadcn/UI, Figma, Adobe Photoshop, Illustrator, Premiere Pro}
+\skillrow{Accessibility}{WCAG 2.1 AA/AAA, ARIA, Screen Reader Testing, Keyboard Navigation, Colour Contrast, Focus Management}
+\skillrow{Testing}{Jest, React Testing Library, Cypress, Accessibility Testing (axe, Lighthouse)}
+\skillrow{DevOps \& Tools}{Jenkins, Git, GitHub Actions, Docker (basics), Vite, Webpack, npm/pnpm, IIS}
+\skillrow{Performance}{Core Web Vitals, Code Splitting, Lazy Loading, Memoisation, Bundle Optimisation, PWA}
+\skillrow{Backend / API}{REST API Integration, GraphQL (consumption), Node.js (basics)}
+\skillrow{Other}{Design Systems, Agile/Scrum, SEO, i18n/l10n, CI/CD, Framer Motion}
+}
+
+% ─── PROFESSIONAL EXPERIENCE ─────────────────────────────────────────────────
+\section{Professional Experience}
+
+\jobentry{Emirates Face Recognition (EFR)}{Application Developer}{Sep 2024 – Present \quad Abu Dhabi, UAE}
+\begin{cvitems}
+  \item Developing and maintaining web-based application interfaces for a biometric face recognition platform used across UAE government and enterprise clients.
+  \item Architecting reusable React component libraries and design tokens to enforce visual consistency across multiple product surfaces.
+  \item Integrating real-time data streams and REST APIs with robust error handling and optimistic UI patterns.
+  \item Collaborating cross-functionally with backend engineers and hardware teams to align frontend behaviour with biometric pipeline requirements.
+  \item Driving performance optimisation — code splitting, lazy loading, memoisation — reducing initial bundle size by over 30\%.
+\end{cvitems}
+\vspace{4pt}
+
+\jobentry{Epixel Solutions}{Development Team Lead / Senior Frontend Developer}{Nov 2022 – May 2024}
+\begin{cvitems}
+  \item Led a frontend team of 5+ engineers delivering Epixel MLM Software — a large-scale SaaS platform serving thousands of concurrent users.
+  \item Owned frontend architecture decisions: state management (Redux Toolkit), routing conventions, and shared component design system.
+  \item Conducted code reviews, established coding standards, and mentored junior developers on TypeScript best practices and testing patterns.
+  \item Introduced Jenkins-based CI pipelines for automated linting, unit tests, and build verification, cutting regression cycles by \textasciitilde40\%.
+  \item Rebuilt critical dashboard modules in Next.js (SSR + SSG), improving SEO scores and time-to-interactive significantly.
+\end{cvitems}
+\vspace{4pt}
+
+\jobentry{Aspire Systems}{Software Engineer}{Nov 2020 – Oct 2022}
+\begin{cvitems}
+  \item Led frontend rebuild of Guardian Insurance USA's legacy application — migrating a monolithic system to a modern React/Next.js architecture with improved performance, accessibility (WCAG 2.1 AA), and maintainability.
+  \item Built and maintained feature-rich React applications for enterprise clients, working within an Agile delivery model with two-week sprints.
+  \item Developed reusable UI components aligned with Material-UI design guidelines, accelerating feature delivery across projects.
+  \item Collaborated with UX designers to translate Figma wireframes into pixel-perfect, accessible (WCAG AA) interfaces.
+  \item Wrote unit and integration tests using Jest and React Testing Library, maintaining coverage above 80\% on core modules.
+\end{cvitems}
+\vspace{4pt}
+
+\jobentry{Uvionics Tech India Pvt. Ltd.}{UI Developer}{Aug 2018 – Nov 2020}
+\begin{cvitems}
+  \item Developed responsive web UIs for industrial IoT dashboards using React, JavaScript, HTML5, and CSS3.
+  \item Consumed RESTful APIs to render real-time sensor data, charts, and alert systems in the browser.
+  \item Collaborated in cross-functional teams with embedded engineers to ensure UI accurately reflected device state.
+  \item Created UI/UX mockups in Adobe Photoshop and Illustrator, bridging design and engineering workflows.
+\end{cvitems}
+
+% ─── FEATURED PROJECTS ───────────────────────────────────────────────────────
+\section{Featured Projects}
+
+\projectentry
+  {Emirates Face Recognition Dashboards}
+  {Application Developer · AI/ML · 2025}
+  {Multi-tenant biometric dashboard platform serving 50+ tenants from a single application — each tenant monitors its own deployment with isolated data, while a secure authorisation layer independently segregates every tenant's users. Features real-time biometric transaction monitoring and configurable alert thresholds for 24/7 availability.}
+  {Next.js 14, TypeScript, Redux, TailwindCSS, Framer Motion}
+
+\projectentry
+  {Telecom Onboarding Dashboard}
+  {Frontend Developer · Web App · 2025}
+  {Configurable analytics dashboard for telecom customer onboarding — interactive charts, sortable tables, and multi-dimension filters with a side-by-side comparison view and KPI tracking. Config-driven setup, shipped as a static export and deployed on-premise via IIS for air-gapped enterprise environments.}
+  {Next.js, TypeScript, Redux, TailwindCSS, IIS}
+
+% ─── CREATIVE & DESIGN ───────────────────────────────────────────────────────
+\section{Creative \& Design Skills}
+{\small
+\textbf{UI/UX Design:} End-to-end product design for web and mobile — user flows, wireframing, prototyping, and high-fidelity mockups.\\[2pt]
+\textbf{Graphic Design:} Adobe Photoshop, Illustrator — branding, visual assets, marketing collateral. Certified graphic designer.\\[2pt]
+\textbf{Video Editing:} Adobe Premiere Pro — content creation and post-production editing.
+}
+
+% ─── CERTIFICATIONS ──────────────────────────────────────────────────────────
+\section{Certifications}
+{\small GraphQL — Udemy \quad · \quad JavaScript for Web Development \quad · \quad UI/UX Designing}
+
+% ─── EDUCATION ───────────────────────────────────────────────────────────────
+\section{Education}
+{\small
+\textbf{Bachelor of Technology (B.Tech) — Computer Science \& Engineering}\\
+KMP College of Engineering \quad · \quad 2014 – incomplete\\[2pt]
+\textbf{Graphic Designer Certification}
+}
+
+\end{document}

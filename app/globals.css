@@ -9,21 +9,26 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-urbanist);
+  --font-sans: var(--font-grenze);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(180deg, #002d54 0%, #00101f 100%);
+  background-attachment: fixed;
   color: var(--foreground);
-  font-family: var(--font-urbanist), "Segoe UI", Arial, sans-serif;
-  font-size: clamp(1rem, 0.95rem + 0.2vw, 1.1rem);
+  font-family: var(--font-grenze), "Segoe UI", Arial, sans-serif;
+  /* Grenze's x-height reads noticeably smaller than Urbanist's at the same
+     declared size — sized up ~20% across body and headings below to land
+     back at the same apparent size, not just a bigger number. */
+  font-size: clamp(1.2rem, 1.1rem + 0.3vw, 1.35rem);
   line-height: 1.65;
   letter-spacing: 0.005em;
   font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
   text-rendering: optimizeLegibility;
   position: relative;
   overflow-x: hidden;
+  overscroll-behavior-y: none;
   transition: color 220ms ease;
 }
 
@@ -32,48 +37,55 @@ li {
   text-wrap: pretty;
 }
 
-a,
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  color: var(--accent);
-}
+/* Layered so Tailwind utility classes (text-*, hover:text-*, etc.) can
+   still override these defaults on individual elements — unlayered CSS
+   otherwise beats @layer utilities in Tailwind v4 regardless of source
+   order, which was silently forcing every <a>/heading to --accent even
+   when a component set its own text color (e.g. black text on a button). */
+@layer base {
+  a,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--accent);
+  }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  font-family: var(--font-urbanist), "Segoe UI", Arial, sans-serif;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-grenze), "Segoe UI", Arial, sans-serif;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
 
-h1 {
-  font-size: clamp(2rem, 1.5rem + 2.3vw, 4rem);
-  font-weight: 760;
-}
+  h1 {
+    font-size: clamp(2.5rem, 1.9rem + 2.9vw, 5rem);
+    font-weight: 760;
+  }
 
-h2 {
-  font-size: clamp(1.6rem, 1.2rem + 1.5vw, 2.8rem);
-  font-weight: 720;
-}
+  h2 {
+    font-size: clamp(2rem, 1.5rem + 1.9vw, 3.5rem);
+    font-weight: 720;
+  }
 
-h3 {
-  font-size: clamp(1.3rem, 1.08rem + 1vw, 2.1rem);
-  font-weight: 680;
-}
+  h3 {
+    font-size: clamp(1.6rem, 1.35rem + 1.25vw, 2.6rem);
+    font-weight: 680;
+  }
 
-h4,
-h5,
-h6 {
-  font-size: clamp(1.08rem, 1rem + 0.45vw, 1.45rem);
-  font-weight: 640;
+  h4,
+  h5,
+  h6 {
+    font-size: clamp(1.35rem, 1.25rem + 0.55vw, 1.8rem);
+    font-weight: 640;
+  }
 }
 
 a {
@@ -94,6 +106,21 @@ html {
     -8px -8px 18px rgba(255, 255, 255, 0.85);
 }
 
+.hero-overlay {
+  width: 100%;
+  height: 400px;
+  /* The gradient MUST come before the image URL */
+  background-image: linear-gradient(to bottom,
+      rgba(0, 0, 0, 0.3),
+      /* 30% opaque black at the top */
+      rgba(0, 0, 0, 0.8)
+      /* 80% opaque black at the bottom */
+    ), url('/mylogo.svg');
+
+  background-size: cover;
+  background-position: center;
+}
+
 .neumorphic-inset {
   background: #eef0f5;
   box-shadow:
@@ -102,10 +129,12 @@ html {
 }
 
 @keyframes logoPulse {
+
   0%,
   100% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.03);
   }
@@ -113,4 +142,102 @@ html {
 
 .logo-pulse {
   animation: logoPulse 6s ease-in-out infinite;
+}
+
+@keyframes portalAperturePulse {
+
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.85;
+    transform: scale(1.04);
+  }
+}
+
+.portal-aperture-pulse {
+  animation: portalAperturePulse 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-aperture-pulse {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+/* Per-section portal motifs (About/Skills/Projects/Experience/Open Source/Contact) */
+@keyframes motifBreathe {
+
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+.motif-breathe {
+  animation: motifBreathe 4.5s ease-in-out infinite;
+}
+
+@keyframes motifDrift {
+
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  50% {
+    transform: rotate(1.5deg);
+  }
+}
+
+.motif-drift {
+  animation: motifDrift 8s ease-in-out infinite;
+  transform-origin: 50% 50%;
+}
+
+@keyframes motifFloat {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6%);
+  }
+}
+
+.motif-float-slow {
+  animation: motifFloat 7s ease-in-out infinite;
+}
+
+.motif-float-med {
+  animation: motifFloat 5s ease-in-out infinite;
+  animation-delay: -1.5s;
+}
+
+.motif-float-fast {
+  animation: motifFloat 3.6s ease-in-out infinite;
+  animation-delay: -0.8s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .motif-breathe,
+  .motif-drift,
+  .motif-float-slow,
+  .motif-float-med,
+  .motif-float-fast {
+    animation: none;
+  }
 }

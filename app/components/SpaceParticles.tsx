@@ -1,17 +1,32 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import * as THREE from "three";
+// Named imports (not `import * as THREE`) so bundlers can tree-shake the
+// rest of three.js — a wildcard namespace import forces the whole library
+// into the chunk since every property access is reachable.
+import {
+  BufferAttribute,
+  BufferGeometry,
+  CanvasTexture,
+  Color,
+  MathUtils,
+  PerspectiveCamera,
+  Points,
+  PointsMaterial,
+  Scene,
+  Texture,
+  WebGLRenderer,
+} from "three";
 
-const PARTICLE_COUNT = 220;
-const INITIAL_PARTICLES = 100; // Reduced initial load
+const PARTICLE_COUNT = 130;
+const INITIAL_PARTICLES = 60; // Reduced initial load
 const FIELD_DEPTH = 60;
 const FIELD_WIDTH = 44;
 const CAMERA_Z = 18;
 const PHASE_SCROLL_SCREENS = 3;
 const MOBILE_BREAKPOINT = 768;
 
-function createCircleTexture(): THREE.Texture {
+function createCircleTexture(): Texture {
   const size = 128;
   const canvas = document.createElement("canvas");
   canvas.width = size;
@@ -23,7 +38,7 @@ function createCircleTexture(): THREE.Texture {
   gradient.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size, size);
-  return new THREE.CanvasTexture(canvas);
+  return new CanvasTexture(canvas);
 }
 
 export default function SpaceParticles() {
@@ -34,12 +49,12 @@ export default function SpaceParticles() {
     if (!canvas) return;
 
     const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
-    const initialCount = isMobile ? 50 : INITIAL_PARTICLES;
-    const finalCount = isMobile ? 120 : PARTICLE_COUNT;
+    const initialCount = isMobile ? 30 : INITIAL_PARTICLES;
+    const finalCount = isMobile ? 70 : PARTICLE_COUNT;
     const fieldWidth = isMobile ? 34 : FIELD_WIDTH;
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
+    const scene = new Scene();
+    const camera = new PerspectiveCamera(
       60,
       window.innerWidth / window.innerHeight,
       0.1,
@@ -47,13 +62,13 @@ export default function SpaceParticles() {
     );
     camera.position.z = CAMERA_Z;
 
-    const renderer = new THREE.WebGLRenderer({
+    const renderer = new WebGLRenderer({
       canvas,
       alpha: true,
       antialias: false, // Disabled for better performance
       powerPreference: "high-performance",
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25)); // Reduced from 2
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1)); // Reduced from 2
     renderer.setSize(window.innerWidth, window.innerHeight);
 
     // Rounded, faded-blue starfield drifting through the z axis
@@ -67,26 +82,26 @@ export default function SpaceParticles() {
       speeds[i] = 0.4 + Math.random() * 0.8;
     }
     
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new BufferAttribute(positions, 3));
     geometry.setDrawRange(0, initialCount); // Start with fewer particles
     
-    const material = new THREE.PointsMaterial({
+    const material = new PointsMaterial({
       map: createCircleTexture(),
-      color: new THREE.Color("#93c5fd"),
-      size: 0.3,
+      color: new Color("#93c5fd"),
+      size: 0.2,
       sizeAttenuation: true,
       transparent: true,
       opacity: 0.70,
       depthWrite: false,
     });
-    const field = new THREE.Points(geometry, material);
+    const field = new Points(geometry, material);
     scene.add(field);
 
-    const normalColor = new THREE.Color("#93c5fd");
-    const skyBlueColor = new THREE.Color("#9ad6ff");
-    const endWhiteColor = new THREE.Color("#f8fbff");
-    const phaseColor = new THREE.Color();
+    const normalColor = new Color("#93c5fd");
+    const skyBlueColor = new Color("#9ad6ff");
+    const endWhiteColor = new Color("#f8fbff");
+    const phaseColor = new Color();
 
     const mouse = { x: 0, y: 0 };
     const rotation = { x: 0, y: 0 };
@@ -96,7 +111,7 @@ export default function SpaceParticles() {
       const start = window.innerHeight * PHASE_SCROLL_SCREENS;
       const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
       const span = Math.max(maxScroll - start, window.innerHeight);
-      return THREE.MathUtils.clamp((y - start) / span, 0, 1);
+      return MathUtils.clamp((y - start) / span, 0, 1);
     };
 
     let blueProgress = getBlueProgress(window.scrollY);
@@ -129,7 +144,7 @@ export default function SpaceParticles() {
     window.addEventListener("resize", handleResize);
 
     let rafId: number;
-    const posAttr = geometry.getAttribute("position") as THREE.BufferAttribute;
+    const posAttr = geometry.getAttribute("position") as BufferAttribute;
     const posArray = posAttr.array as Float32Array;
     let currentParticleCount = initialCount;
 
@@ -156,16 +171,16 @@ export default function SpaceParticles() {
 
       // Particles drift forward only in response to scroll/wheel input
       scrollVelocity *= 0.9;
-      const warp = THREE.MathUtils.clamp(scrollVelocity, -2, 2);
+      const warp = MathUtils.clamp(scrollVelocity, -2, 2);
       const t = time * 0.001;
 
       const blueMix = Math.min(blueProgress / 0.72, 1);
-      const endPhaseMix = THREE.MathUtils.clamp((blueProgress - 0.72) / 0.28, 0, 1);
+      const endPhaseMix = MathUtils.clamp((blueProgress - 0.72) / 0.28, 0, 1);
 
       phaseColor.lerpColors(normalColor, skyBlueColor, blueMix);
       phaseColor.lerp(endWhiteColor, endPhaseMix);
       material.color.lerp(phaseColor, 0.06);
-      const targetOpacity = THREE.MathUtils.lerp(0.6, 0.3, endPhaseMix);
+      const targetOpacity = MathUtils.lerp(0.6, 0.3, endPhaseMix);
       material.opacity += (targetOpacity - material.opacity) * 0.06;
 
       // Slow whole-field drift keeps the stars alive without per-particle math
