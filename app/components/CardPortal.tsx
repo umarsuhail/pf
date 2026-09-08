@@ -550,8 +550,8 @@ export function CardPortal({
                       src="/SVG/astr.svg"
                       alt=""
                       fill
-                      sizes="(min-width: 1024px) 30vw, 40vh"
-                      className="object-contain object-bottom"
+                      sizes="(min-width: 600px) 30vw, 40vh"
+                      className="object-contain   p-8 object-bottom"
                       aria-hidden="true"
                     />
                   </motion.div>
@@ -565,7 +565,7 @@ export function CardPortal({
                     className="absolute inset-0"
                   >
                     <ParticleLogo
-                      src="/images/us.svg"
+                      src="/images/us.png"
                       particleCount={1800}
                       speed={0.8}
                       disperseStrength={110}

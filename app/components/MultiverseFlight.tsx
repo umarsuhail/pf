@@ -889,9 +889,23 @@ export default function MultiverseFlight() {
       const container = containerRef.current;
       if (!container) return;
 
-      const containerTop = window.scrollY + container.getBoundingClientRect().top;
-      const scrollable = container.offsetHeight - window.innerHeight;
+      // Mutable, not a one-time snapshot: a mobile browser's dynamic
+      // toolbar showing/hiding mid-tour changes window.innerHeight, which
+      // silently stales this conversion — the tour keeps interpolating the
+      // right *progress*, but the pixel target it converts that to drifts
+      // from what the viewport actually needs. Nothing corrects it during a
+      // multi-second dwell (see currentProgress below), so the drift shows
+      // up all at once as a visible pull-back the moment the next leg's
+      // first scrollTo lands on the newly-correct conversion. Refreshed
+      // every frame in tick() instead of trusting this initial read.
+      let containerTop = window.scrollY + container.getBoundingClientRect().top;
+      let scrollable = container.offsetHeight - window.innerHeight;
       if (scrollable <= 0) return;
+
+      const refreshScrollGeometry = () => {
+        containerTop = window.scrollY + container.getBoundingClientRect().top;
+        scrollable = container.offsetHeight - window.innerHeight;
+      };
 
       const toScrollTop = (p: number) => containerTop + scrollable * p;
 
@@ -1047,6 +1061,7 @@ export default function MultiverseFlight() {
         const eased = legs[index].linear ? t : ease(t);
         const p = from + (legs[index].target - from) * eased;
         currentProgress = p;
+        refreshScrollGeometry();
         window.scrollTo({ top: toScrollTop(p), behavior: "auto" });
         // window.scrollTo doesn't move the camera directly — every card's
         // transforms read smoothScrollProgress, which normally only updates
