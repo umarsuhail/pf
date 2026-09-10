@@ -93,10 +93,15 @@ export default function PageLoader() {
     >
       {/* Stays a landscape-shaped preview card on phones — a 70vh × 70vw box
          in portrait is an awkward tall crop of a wide background image. */}
-      <div
-        className="aspect-16/10 w-[86vw] rounded-2xl bg-cover bg-center shadow-2xl shadow-black/60 lg:aspect-auto lg:h-[70vh] lg:w-[70vw] lg:rounded-3xl"
-        style={{ backgroundImage: "url(/bg.jpg)" }}
-      />
+      <div className="relative aspect-16/10 w-[86vw] overflow-hidden rounded-2xl shadow-2xl shadow-black/60 lg:aspect-auto lg:h-[70vh] lg:w-[70vw] lg:rounded-3xl">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: "url(/bg.jpg)" }}
+        />
+        {/* Blue/steel ambient glow, drifting and screen-blended so it reads
+           as light moving across the card rather than a flat color wash. */}
+        <div aria-hidden="true" className="loader-card-glow absolute inset-0" />
+      </div>
 
       <div className="absolute inset-x-0 bottom-12 flex flex-col items-center gap-6">
         <div className="relative flex h-16 w-16 items-center justify-center">

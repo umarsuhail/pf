@@ -231,13 +231,48 @@ html {
   animation-delay: -0.8s;
 }
 
+/* Ambient glow drifting across the loading card's background image — two
+   soft blobs, blue and steel, that slowly swap emphasis and dominant
+   position so it reads as light moving through the scene rather than a
+   static tint. Screen-blended and kept faint so bg.jpg stays the subject. */
+@keyframes loaderCardGlow {
+
+  0%,
+  100% {
+    opacity: 0.5;
+    background-position:
+      18% 28%,
+      82% 74%;
+  }
+
+  50% {
+    opacity: 0.85;
+    background-position:
+      62% 58%,
+      28% 22%;
+  }
+}
+
+.loader-card-glow {
+  background-image:
+    radial-gradient(closest-side, rgba(56, 189, 248, 0.32), transparent 70%),
+    radial-gradient(closest-side, rgba(148, 163, 184, 0.26), transparent 70%);
+  background-size:
+    65% 65%,
+    58% 58%;
+  background-repeat: no-repeat;
+  mix-blend-mode: screen;
+  animation: loaderCardGlow 9s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   .motif-breathe,
   .motif-drift,
   .motif-float-slow,
   .motif-float-med,
-  .motif-float-fast {
+  .motif-float-fast,
+  .loader-card-glow {
     animation: none;
   }
 }

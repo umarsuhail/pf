@@ -21,6 +21,7 @@ import NarrationHighlights from "./NarrationHighlights";
 import NarratedText from "./NarratedText";
 import { NARRATION_DURATION } from "../data/narration";
 import SpaceParticles from "./SpaceParticles";
+import ParticleLogo from "./HeroLogo";
 import { getSkillGroups } from "../data/skillGroups";
 import Greeting from "./Greeting";
 
@@ -688,6 +689,16 @@ export default function MultiverseFlight() {
   // anything.
   const endEarthT = useTransform(scrollYProgress, [0.88, 1], [0, 1]);
   const endEarthReveal = useTransform(endEarthT, [0, 0.35, 1], [0, 1, 1]);
+  const endParticleOpacity = useTransform(endEarthT, [0.42, 0.72, 1], [0, 0.72, 1]);
+  const endParticleScale = useTransform(endEarthT, [0.42, 1], [0.72, 1]);
+  const [isEndParticleActive, setIsEndParticleActive] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = scrollYProgress.on("change", (value) => {
+      setIsEndParticleActive(value >= 0.9);
+    });
+    return unsubscribe;
+  }, [scrollYProgress]);
 
   // --- Overscroll "approach" -------------------------------------------
   // At max scroll the browser has nothing left to give, so the journey
@@ -1184,6 +1195,20 @@ export default function MultiverseFlight() {
           style={{ opacity: endEarthOpacity }}
         >
           {/* A photographic full-bleed shot, not an isolated 3D-rendered
+
+        <motion.div
+          className="pointer-events-auto absolute inset-0 z-10 flex items-center justify-center"
+          style={{ opacity: endParticleOpacity, scale: endParticleScale }}
+        >
+          <ParticleLogo
+            src="/images/us.png"
+            size={isMobile ? 210 : 280}
+            particleCount={isMobile ? 420 : 720}
+            disperseStrength={isMobile ? 260 : 360}
+            active={isEndParticleActive}
+            className="h-[min(58vw,420px)] w-[min(58vw,420px)]"
+          />
+        </motion.div>
              icon — it fills the screen and zooms rather than sitting in a
              small glowing circle. Scaled up slightly past 1 at rest so the
              edges never show through the overscan as it scales. */}
