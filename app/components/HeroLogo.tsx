@@ -69,6 +69,15 @@ type ParticleLogoProps = {
      * is the right default for a plain, normally-scrolled element.
      */
     active?: boolean;
+
+    /**
+     * Fires on click, alongside (not instead of) the built-in shatter
+     * flourish — the click handler already calls stopPropagation() to keep
+     * the shatter from being cut off by an ancestor's own click handler, so
+     * a parent that wants to react to the click (e.g. opening a panel)
+     * needs this rather than its own onClick.
+     */
+    onActivate?: () => void;
 };
 
 type FormControls = { formIn: () => void; formOut: () => void };
@@ -81,6 +90,7 @@ export default function ParticleLogo({
     disperseStrength = 480,
     size = 180,
     active,
+    onActivate,
 }: ParticleLogoProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     // Populated synchronously by the setup effect below, read by the
@@ -677,6 +687,7 @@ export default function ParticleLogo({
             event.stopPropagation();
             const rect = canvas.getBoundingClientRect();
             shatter(event.clientX - rect.left, event.clientY - rect.top);
+            onActivate?.();
         };
 
         // Uncontrolled mode (no `active` prop): the component watches its

@@ -1,14 +1,14 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cards } from "../data/sections";
 import { NARRATION_SPANS } from "../data/narration";
 import { CardIcon } from "./icons/card-icon";
-import { BotMessageSquareIcon } from "./icons/bot-message-square";
-import { XIcon } from "./icons/x";
 import type { AnimatedIconHandle } from "./icons/card-icon";
+import ParticleLogo from "./HeroLogo";
 
 // Overhead console: a small latch sits on the top edge, and pulling it drops
 // the whole assembly into the cockpit — a centre nav console flanked by two
@@ -823,17 +823,40 @@ export default function CockpitTray() {
             <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
 
             {/* VEGA chat — moved here from its own floating button; HoloChat
-               still owns the panel and its animation, this just flips it. */}
+               still owns the panel and its animation, this just flips it.
+               The brand mark doubles as the trigger: the static image is
+               always on screen (this bar never closes the way the tray
+               console does), with the particle canvas layered over it —
+               formed and idle most of the time, disperse-then-reform
+               "shatter" on click, which also fires toggleChat via
+               onActivate (the canvas's own click handler stopPropagates,
+               so a plain onClick here would never see the event). The
+               outer button's onClick stays as the keyboard/Enter path,
+               which never touches the canvas at all. */}
             <button
               type="button"
               onClick={toggleChat}
               aria-pressed={isChatOpen}
               aria-label={isChatOpen ? "Close VEGA" : "Open VEGA, the portfolio assistant"}
-              className={`relative z-10 flex h-5 w-5 items-center justify-center rounded-full transition-colors ${
-                isChatOpen ? "text-sky-200" : "text-slate-500 hover:text-sky-200"
-              }`}
+              className="relative z-10 h-5 w-5 shrink-0 overflow-hidden rounded-full"
             >
-              {isChatOpen ? <XIcon size={12} /> : <BotMessageSquareIcon size={12} />}
+              <Image
+                src="/images/us.png"
+                alt=""
+                fill
+                sizes="20px"
+                className="object-cover"
+                aria-hidden="true"
+              />
+              <ParticleLogo
+                src="/images/us.png"
+                particleCount={90}
+                speed={1.3}
+                disperseStrength={26}
+                size={16}
+                onActivate={toggleChat}
+                className="absolute inset-0"
+              />
             </button>
 
             <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
