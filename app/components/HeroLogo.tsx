@@ -69,6 +69,15 @@ type ParticleLogoProps = {
      * is the right default for a plain, normally-scrolled element.
      */
     active?: boolean;
+
+    /**
+     * Fires on click, alongside (not instead of) the built-in shatter
+     * flourish — the click handler already calls stopPropagation() to keep
+     * the shatter from being cut off by an ancestor's own click handler, so
+     * a parent that wants to react to the click (e.g. opening a panel)
+     * needs this rather than its own onClick.
+     */
+    onActivate?: () => void;
 };
 
 type FormControls = { formIn: () => void; formOut: () => void };
@@ -81,6 +90,7 @@ export default function ParticleLogo({
     disperseStrength = 480,
     size = 180,
     active,
+    onActivate,
 }: ParticleLogoProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     // Populated synchronously by the setup effect below, read by the
@@ -143,7 +153,11 @@ export default function ParticleLogo({
         );
         paintVisibilityObserver.observe(canvas);
 
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        // Every other canvas effect in the app caps this at 1.5 for the same
+        // reason: a retina/3x phone otherwise renders (and re-renders,
+        // every frame) at 4-9x the pixel count of a 1x display for no
+        // visible gain at this size.
+        const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
 
         const particles: Particle[] = [];
 
@@ -227,12 +241,18 @@ export default function ParticleLogo({
             }[] = [];
 
             /*
-             * Sample pixels from the logo.
+             * Sample pixels from the logo. One-time cost (runs once per
+             * mount, not per frame), but a 2px step over a 500x500 canvas is
+             * 62,500 getImageData reads on the main thread before the first
+             * particle even appears — a real startup hitch on slow devices,
+             * and denser than particleCount (900) actually needs a source
+             * pool for. 3px cuts that to ~27,900 while still leaving far
+             * more candidate points than particles requested.
              *
              * Transparent pixels are ignored.
              */
-            for (let y = 0; y < sampleSize; y += 2) {
-                for (let x = 0; x < sampleSize; x += 2) {
+            for (let y = 0; y < sampleSize; y += 3) {
+                for (let x = 0; x < sampleSize; x += 3) {
                     const index = (y * sampleSize + x) * 4;
 
                     const r = imageData.data[index];
@@ -667,6 +687,7 @@ export default function ParticleLogo({
             event.stopPropagation();
             const rect = canvas.getBoundingClientRect();
             shatter(event.clientX - rect.left, event.clientY - rect.top);
+            onActivate?.();
         };
 
         // Uncontrolled mode (no `active` prop): the component watches its
