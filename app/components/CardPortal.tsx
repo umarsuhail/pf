@@ -19,7 +19,6 @@ import {
 import { ArrowUpRightIcon } from "./icons/arrow-up-right";
 import type { AnimatedIconHandle } from "./icons/card-icon";
 import Space from "./Space";
-import ParticleLogo from "./HeroLogo";
 
 // Pure GSAP-style Quart-out curve (gsap.parseEase("power3.out")) used to
 // shape the reveal progress itself — not an animation, just math applied to
@@ -226,12 +225,6 @@ export function CardPortal({
     timeouts: [],
   });
   const [isActivating, setIsActivating] = useState(false);
-  // Drives the entry portal's ParticleLogo instances' form-in/disperse-out
-  // — derived from the same scroll-reveal math below rather than a plain
-  // viewport IntersectionObserver, since this card's visibility is CSS
-  // opacity/scale, not geometry (it stays inside the sticky flight
-  // container at all times).
-  const [particlesActive, setParticlesActive] = useState(false);
   const isEntry = index === 0;
   const atmosphere = atmospheres[index % atmospheres.length];
 
@@ -343,8 +336,6 @@ export function CardPortal({
       if (reveal === lastReveal && fade === lastFade) return;
       lastReveal = reveal;
       lastFade = fade;
-
-      if (isEntry) setParticlesActive(reveal > 0.6);
 
       applyReveal(power3Out(reveal), fade);
       // Draws in while approaching, then un-draws again on the way out —
@@ -536,42 +527,41 @@ export function CardPortal({
                 willChange: "transform",
               }}
             >
-              <AnimatePresence initial={false} mode="wait">
-                {isExpanded ? (
+              {/* The particle-formed mark used to render here alongside the
+                 static background image above — same source picture, two
+                 independently-sized/positioned copies of it on screen at
+                 once, reading as a stray second logo rather than one
+                 graphic. The background image already carries that mark, so
+                 this slot now only ever shows the astronaut once the bio
+                 expands, and shows nothing the rest of the time. */}
+              <AnimatePresence>
+                {isExpanded && (
                   <motion.div
                     key="astronaut"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
+                    // Slides in from off-screen left with a motion-blur
+                    // streak (heavy blur + a slight overshoot scale that
+                    // settles to 1) that clears as it decelerates into
+                    // place — the blur/opacity settle faster than the
+                    // slide/scale so the streak reads as trailing the
+                    // motion rather than just a blurred static image.
+                    initial={{ opacity: 0, x: "-70%", scale: 1.25, filter: "blur(24px)" }}
+                    animate={{ opacity: 1, x: 0, scale: 1, filter: "blur(0px)" }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    transition={{
+                      x: { duration: 1.4, ease: POWER3_OUT },
+                      scale: { duration: 1.4, ease: POWER3_OUT },
+                      opacity: { duration: 0.6, ease: POWER2_OUT },
+                      filter: { duration: 0.9, ease: POWER2_OUT },
+                    }}
                     className="absolute inset-0"
                   >
                     <Image
                       src="/SVG/astr.svg"
                       alt=""
                       fill
-                      sizes="(min-width: 1024px) 30vw, 40vh"
-                      className="object-contain object-bottom"
+                      sizes="(min-width: 600px) 30vw, 40vh"
+                      className="object-contain   p-8 object-bottom"
                       aria-hidden="true"
-                    />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="logo"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                    className="absolute inset-0"
-                  >
-                    <ParticleLogo
-                      src="/images/us.svg"
-                      particleCount={1800}
-                      speed={0.8}
-                      disperseStrength={110}
-                      size={150}
-                      active={particlesActive}
-                      className="object-contain object-bottom"
                     />
                   </motion.div>
                 )}
