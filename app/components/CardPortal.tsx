@@ -540,10 +540,21 @@ export function CardPortal({
                 {isExpanded ? (
                   <motion.div
                     key="astronaut"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
+                    // Slides in from off-screen left with a motion-blur
+                    // streak (heavy blur + a slight overshoot scale that
+                    // settles to 1) that clears as it decelerates into
+                    // place — the blur/opacity settle faster than the
+                    // slide/scale so the streak reads as trailing the
+                    // motion rather than just a blurred static image.
+                    initial={{ opacity: 0, x: "-70%", scale: 1.25, filter: "blur(24px)" }}
+                    animate={{ opacity: 1, x: 0, scale: 1, filter: "blur(0px)" }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    transition={{
+                      x: { duration: 1.4, ease: POWER3_OUT },
+                      scale: { duration: 1.4, ease: POWER3_OUT },
+                      opacity: { duration: 0.6, ease: POWER2_OUT },
+                      filter: { duration: 0.9, ease: POWER2_OUT },
+                    }}
                     className="absolute inset-0"
                   >
                     <Image

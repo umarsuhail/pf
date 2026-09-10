@@ -484,7 +484,7 @@ transition={{
           initial={false}
           animate={{ width: isMobile ? COMPACT_PORTAL_WIDTH : PORTAL_WIDTH }}
           transition={PHYSICS.expansion}
-          className="relative hidden min-h-[min(16.25rem,42vh)] shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] sm:block lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]"
+          className="relative block min-h-[min(16.25rem,42vh)] shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]"
         >
           <CardPortal
             index={index}
@@ -774,12 +774,16 @@ export default function MultiverseFlight() {
   }, [isMobile, pull]);
 
   // Exponential approach, not a linear one: growth decelerates hard as t
-  // nears 1, so the globe keeps drifting closer without ever quite arriving
+  // nears 1, so the image keeps pushing closer without ever quite arriving
   // — scrolling further just slows the approach rather than reaching it.
+  // Unlike the old small-icon treatment, this is a full-bleed photo (see
+  // object-cover below) — it starts at 1 (already filling the screen) and
+  // only zooms in from there, cropping tighter into the frame rather than
+  // shrinking down to a distant point.
   const endEarthScale = useTransform(() => {
     const t = Math.max(0, Math.min(1, endEarthT.get()));
-    const base = 0.45 + 0.5 * (1 - Math.exp(-3 * t));
-    return base * (1 + smoothPull.get() * 1.6);
+    const base = 1 + 0.3 * (1 - Math.exp(-3 * t));
+    return base * (1 + smoothPull.get() * 0.5);
   });
   // The closer you pull, the more it dissolves — it grows in the frame while
   // fading out of it, so the approach reads as chasing something receding
@@ -787,27 +791,14 @@ export default function MultiverseFlight() {
   const endEarthOpacity = useTransform(
     () => endEarthReveal.get() * (1 - smoothPull.get() * 0.8),
   );
-  // Spin tracks total scroll distance travelled, not a wall-clock timer —
-  // it's already partway through its turn by the time it comes into view,
-  // so it reads as something that's been drifting in the distance the whole
-  // flight, not an animation that just switched on. Pulling adds rotation of
-  // its own (so it never looks frozen at the bottom of the page), but on an
-  // exponential-decay curve: the closer you get, the more the spin slows,
-  // as if approaching it drags time out with it.
-  const scrollRotate = useTransform(scrollYProgress, [0, 1], [0, 300]);
-  const endEarthRotate = useTransform(
-    () => scrollRotate.get() + 34 * (1 - Math.exp(-2.5 * smoothPull.get())),
-  );
-  // The moon orbits rather than spins in place — it's the same scroll-driven
-  // rotate as the earth, on its own wrapper (not the earth's own spin), and
-  // faster, so the two read as independently in motion rather than one rigid
-  // system rotating together.
-  const moonOrbit = useTransform(
-    () => scrollRotate.get() * 1.7 + 70 * (1 - Math.exp(-2.5 * smoothPull.get())),
-  );
-  // Atmosphere brightens and the void closes in as you strain toward it
-  const approachGlow = useTransform(smoothPull, [0, 1], [0.25, 0.85]);
+  // The void closes in as you strain toward it
   const approachVignette = useTransform(smoothPull, [0, 1], [0, 0.55]);
+  // The scene's own gradient background is still a dark navy at this point
+  // (see sceneBackground/bgBottomColor above), not true black — this fades
+  // in a solid black backdrop a little ahead of the end-of-flight object
+  // itself, so by the time it appears "in the distance" it's against a real
+  // void rather than a lingering blue gradient.
+  const endVoidOpacity = useTransform(scrollYProgress, [0.8, 0.95], [0, 1]);
   const hintOpacity = useTransform(() => {
     const revealed = endEarthT.get() > 0.75 ? 1 : 0;
     return revealed * Math.max(0, 1 - smoothPull.get() * 5);
@@ -1167,58 +1158,45 @@ export default function MultiverseFlight() {
         
         <SpaceParticles />
 
+        {/* Solid black void behind the end-of-flight object — the scene's
+           own background gradient is still a dark navy this late in the
+           scroll, not true black, so this fades in ahead of the object
+           itself to sell "empty space, one distant thing out there". */}
         <motion.div
-          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          className="pointer-events-none absolute inset-0 bg-black"
+          style={{ opacity: endVoidOpacity }}
+        />
+
+        <motion.div
+          className="pointer-events-none absolute inset-0 overflow-hidden"
           style={{ opacity: endEarthOpacity }}
         >
+          {/* A photographic full-bleed shot, not an isolated 3D-rendered
+             icon — it fills the screen and zooms rather than sitting in a
+             small glowing circle. Scaled up slightly past 1 at rest so the
+             edges never show through the overscan as it scales. */}
+          <motion.div
+            className="absolute inset-0"
+            style={{ scale: endEarthScale }}
+          >
+            <Image
+              src="/images/eh.png"
+              alt=""
+              fill
+              sizes="100vw"
+              className="object-cover"
+            />
+          </motion.div>
+
           {/* Void closes in the harder you strain toward it */}
           <motion.div
             className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_transparent_25%,_#000_100%)]"
             style={{ opacity: approachVignette }}
           />
 
-          <motion.div
-            className="relative h-[15vh] w-[15vh] max-h-36 max-w-36"
-            style={{ scale: endEarthScale }}
-          >
-            {/* Atmosphere halo — brightens as the globe fills the view */}
-            <motion.div
-              className="absolute inset-[-22%] rounded-full blur-2xl"
-              style={{
-                opacity: approachGlow,
-                background:
-                  "radial-gradient(circle, rgba(125,211,252,0.45) 0%, rgba(125,211,252,0.14) 45%, transparent 72%)",
-              }}
-            />
-            <motion.div
-              className="relative h-full w-full"
-              style={{ rotate: endEarthRotate }}
-            >
-              <Image src="/a1.png" alt="" fill sizes="60vh" className="object-contain" />
-            </motion.div>
-
-            {/* Moon — orbits the earth on its own wrapper, so its rotate
-               sweeps position around the center rather than spinning the
-               moon image itself in place. */}
-            <motion.div
-              className="absolute inset-0"
-              style={{ rotate: moonOrbit }}
-            >
-              <div className="absolute left-1/2 top-0 h-[34%] w-[34%] -translate-x-1/2 -translate-y-[110%]">
-                <Image
-                  src="/a2.png"
-                  alt=""
-                  fill
-                  sizes="20vh"
-                  className="object-contain drop-shadow-[0_0_10px_rgba(226,232,240,0.35)]"
-                />
-              </div>
-            </motion.div>
-          </motion.div>
-
           {/* Invitation to keep pushing — fades the moment they do */}
           <motion.p
-            className="absolute bottom-16 text-[10px] font-semibold uppercase tracking-[0.42em] text-sky-100/60"
+            className="absolute bottom-16 inset-x-0 text-center text-[10px] font-semibold uppercase tracking-[0.42em] text-sky-100/60"
             style={{ opacity: hintOpacity }}
           >
             THE END,THANK YOU. PLEASE GO BACK TO THE BEGINNING TO START NEW FLIGHT.
