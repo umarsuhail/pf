@@ -188,7 +188,7 @@ export default function RouteMap() {
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onKeyDown={onKeyDown}
-        className="relative h-[52vh] w-36 touch-none select-none rounded-[28px] border border-white/12 bg-[linear-gradient(100deg,#1c2734_0%,#0e151f_45%,#0a1017_100%)] shadow-[inset_0_2px_6px_rgba(255,255,255,0.08),inset_0_-2px_10px_rgba(0,0,0,0.7),0_20px_50px_rgba(2,8,23,0.6)] outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60"
+        className="relative h-[52vh] w-36 touch-none select-none rounded-[28px] border border-white/15 bg-slate-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-12px_24px_rgba(2,8,23,0.4),0_20px_50px_rgba(2,8,23,0.45)] backdrop-blur-xl outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60"
         style={{
           perspective: "700px",
           cursor: dragging ? "grabbing" : "grab",

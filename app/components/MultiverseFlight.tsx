@@ -1195,20 +1195,6 @@ export default function MultiverseFlight() {
           style={{ opacity: endEarthOpacity }}
         >
           {/* A photographic full-bleed shot, not an isolated 3D-rendered
-
-        <motion.div
-          className="pointer-events-auto absolute inset-0 z-10 flex items-center justify-center"
-          style={{ opacity: endParticleOpacity, scale: endParticleScale }}
-        >
-          <ParticleLogo
-            src="/images/us.png"
-            size={isMobile ? 210 : 280}
-            particleCount={isMobile ? 420 : 720}
-            disperseStrength={isMobile ? 260 : 360}
-            active={isEndParticleActive}
-            className="h-[min(58vw,420px)] w-[min(58vw,420px)]"
-          />
-        </motion.div>
              icon — it fills the screen and zooms rather than sitting in a
              small glowing circle. Scaled up slightly past 1 at rest so the
              edges never show through the overscan as it scales. */}
@@ -1238,6 +1224,20 @@ export default function MultiverseFlight() {
           >
             THE END,THANK YOU. PLEASE GO BACK TO THE BEGINNING TO START NEW FLIGHT.
           </motion.p>
+        </motion.div>
+
+        <motion.div
+          className="pointer-events-auto absolute inset-0 z-10 flex items-center justify-center"
+          style={{ opacity: endParticleOpacity, scale: endParticleScale }}
+        >
+          <ParticleLogo
+            src="/images/us.png"
+            size={isMobile ? 210 : 280}
+            particleCount={isMobile ? 420 : 720}
+            disperseStrength={isMobile ? 260 : 360}
+            active={isEndParticleActive}
+            className="h-[min(58vw,420px)] w-[min(58vw,420px)]"
+          />
         </motion.div>
 
         <motion.div
