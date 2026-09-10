@@ -840,14 +840,7 @@ export default function CockpitTray() {
               aria-label={isChatOpen ? "Close VEGA" : "Open VEGA, the portfolio assistant"}
               className="relative z-10 h-5 w-5 shrink-0 overflow-hidden rounded-full"
             >
-              <Image
-                src="/images/us.png"
-                alt=""
-                fill
-                sizes="20px"
-                className="object-cover"
-                aria-hidden="true"
-              />
+            
               <ParticleLogo
                 src="/images/us.png"
                 particleCount={90}
