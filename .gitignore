@@ -1,6 +1,5 @@
 node_modules
 .next/
-*png
 .playwright-mcp/
 
 # local env files
