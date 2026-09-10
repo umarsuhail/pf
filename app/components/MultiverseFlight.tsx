@@ -922,16 +922,28 @@ export default function MultiverseFlight() {
         const target = getNavTargetProgress(card.id) ?? 0;
 
         if (i === 0) {
-          // Holds through the whole narration on one continuous, slow drift
-          // that travels all the way to the *next* card's own arrival point
-          // over that whole span, instead of creeping to a barely-there
-          // target and then hopping the rest of the way in a single quick
-          // second right as the narration ends.
+          // Parks on home, completely still, for the whole narration except
+          // its final AUTOPILOT_TRAVEL seconds, then eases into skills' own
+          // arrival point over that last stretch — not a hop (a full,
+          // cubic-eased leg, same shape every other card gets), and not
+          // moving at all until the narration has actually finished. This
+          // used to be one continuous slow drift toward skills across the
+          // *entire* narration instead — camera motion competing with the
+          // narration for attention the whole time it read.
           const next = cards[1] ? getNavTargetProgress(cards[1].id) ?? target : target;
+          const introTravelMs = AUTOPILOT_TRAVEL * 1000;
+          const introHoldMs = Math.max(AUTOPILOT_INTRO_HOLD * 1000 - introTravelMs, 0);
+          legs.push({
+            target: 0,
+            travelMs: 1,
+            linear: true,
+            holdMs: introHoldMs,
+            cardIndex: i,
+          });
           legs.push({
             target: next,
-            travelMs: AUTOPILOT_INTRO_HOLD * 1000,
-            linear: true,
+            travelMs: introTravelMs,
+            linear: false,
             holdMs: 0,
             cardIndex: i,
           });
