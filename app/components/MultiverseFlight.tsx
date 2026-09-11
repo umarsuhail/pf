@@ -224,6 +224,7 @@ function BillboardCard({
   card,
   index,
   isMobile,
+  isNarrow,
   mobileOffsetScale,
   smoothScrollProgress,
   revealStart,
@@ -232,6 +233,7 @@ function BillboardCard({
   card: FlightCard;
   index: number;
   isMobile: boolean;
+  isNarrow: boolean;
   mobileOffsetScale: number;
   smoothScrollProgress: MotionValue<number>;
   revealStart: number;
@@ -342,15 +344,22 @@ function BillboardCard({
       animate={{
         // Narrower than the desktop clamp so there is room either side for the
         // lateral offsets, but wide enough that the headline still gets a real
-        // measure once the portal takes its share.
-        width: isMobile ? "min(66vw, 500px)" : card.width,
+        // measure once the portal takes its share. Narrow phones stack text
+        // above the portal instead of sharing a row with it (see flex-col
+        // below), so they can afford — and need — a much wider card to give
+        // the now-full-width portal a reasonable size.
+        width: isNarrow ? "min(88vw, 440px)" : isMobile ? "min(66vw, 500px)" : card.width,
         // Same left/right stagger as desktop, scaled down to fit the
         // narrower viewport instead of being zeroed out — mobileOffsetScale
         // is proportional to actual viewport width, so a landscape phone
         // (wide) keeps close to the original stagger while a narrow
         // portrait phone gets a much smaller one, keeping the card on
-        // screen instead of clipping off its edges.
-        translateX: isMobile ? card.x * mobileOffsetScale : card.x,
+        // screen instead of clipping off its edges. Cut further still once
+        // stacked — the card is already close to the full viewport width,
+        // so even that reduced stagger risks clipping an edge.
+        translateX: isMobile
+          ? card.x * mobileOffsetScale * (isNarrow ? 0.4 : 1)
+          : card.x,
       }}
       transition={PHYSICS.expansion}
       className={`absolute flex rounded-3xl border sm:rounded-4xl ${
@@ -371,9 +380,14 @@ transition={{
   repeat: Infinity,
   ease: "easeInOut",
 }}
-        className={`flex w-full items-stretch ${isMobile ? "gap-3" : "gap-5 sm:gap-8"} ${
-          card.align === "right" ? "flex-row-reverse" : "flex-row"
-        }`}
+        // A tall, narrow portal squeezed beside the text on a narrow phone
+        // left almost no width for either — stacked (text above, portal as
+        // a full-width banner below) is the standard mobile-responsive
+        // pattern, and reads far better than a side-by-side row that no
+        // longer has the width to support it.
+        className={`flex w-full ${isNarrow ? "flex-col items-stretch" : "items-stretch"} ${
+          isMobile ? "gap-3" : "gap-5 sm:gap-8"
+        } ${!isNarrow && card.align === "right" ? "flex-row-reverse" : !isNarrow ? "flex-row" : ""}`}
         style={{ transformStyle: "preserve-3d" }}
       >
         <motion.div
@@ -482,9 +496,13 @@ transition={{
 
         <motion.div
           initial={false}
-          animate={{ width: isMobile ? COMPACT_PORTAL_WIDTH : PORTAL_WIDTH }}
+          animate={{
+            width: isNarrow ? "100%" : isMobile ? COMPACT_PORTAL_WIDTH : PORTAL_WIDTH,
+          }}
           transition={PHYSICS.expansion}
-          className="relative block min-h-[min(16.25rem,42vh)] shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]"
+          className={`relative block shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)] ${
+            isNarrow ? "h-40 w-full" : "min-h-[min(16.25rem,42vh)]"
+          }`}
         >
           <CardPortal
             index={index}
@@ -612,6 +630,11 @@ export default function MultiverseFlight() {
     viewportWidth > 0
       ? Math.min(0.45, Math.max(0.16, (viewportWidth / 900) * 0.45))
       : 0.45;
+  // Below this, the side-by-side text+portal row (tuned for a landscape
+  // phone's wide viewport) no longer has enough width to give either one a
+  // usable size — a portrait phone narrower than this stacks them instead
+  // (see BillboardCard's flex-col branch).
+  const isNarrow = viewportWidth > 0 && viewportWidth < 640;
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -1213,6 +1236,7 @@ export default function MultiverseFlight() {
               card={card}
               index={index}
               isMobile={isMobile}
+              isNarrow={isNarrow}
               mobileOffsetScale={mobileOffsetScale}
               smoothScrollProgress={smoothScrollProgress}
               revealStart={getRevealWindow(index).start}

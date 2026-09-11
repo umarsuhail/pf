@@ -158,6 +158,19 @@ export default function ParticleLogo({
         // every frame) at 4-9x the pixel count of a 1x display for no
         // visible gain at this size.
         const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+        // The logo is only ~150px wide in the flight. Rendering all 1,800
+        // requested particles at that size creates substantial overdraw (and
+        // hundreds of per-frame canvas state changes) with no readable
+        // detail. Cap the work by device class, retaining a dense mark on
+        // desktop while making the opening scroll responsive on phones.
+        const particleBudget =
+            window.innerWidth < 768
+                ? 480
+                : (navigator.hardwareConcurrency ?? 8) <= 4
+                    ? 640
+                    : 900;
+        const frameInterval = 1000 / (window.innerWidth < 768 ? 30 : 45);
+        let lastPaintTime = -Infinity;
 
         const particles: Particle[] = [];
 
@@ -319,7 +332,8 @@ export default function ParticleLogo({
 
             const count = Math.min(
                 particleCount,
-                points.length
+                points.length,
+                particleBudget,
             );
 
             for (let i = 0; i < count; i++) {
@@ -361,7 +375,10 @@ export default function ParticleLogo({
                     alpha: 0,
                     tone: random(0, 1),
                     twinkle: random(0, Math.PI * 2),
-                    isSpark: Math.random() > 0.9,
+                    // A small fraction still supplies the holographic spark
+                    // texture, without paying a canvas shadow-blur pass for
+                    // roughly one in every ten particles each frame.
+                    isSpark: Math.random() > 0.94,
 
                     delay: random(0, 0.8),
 
@@ -371,13 +388,19 @@ export default function ParticleLogo({
             }
         };
 
-        const draw = () => {
+        const draw = (frameTime = performance.now()) => {
             if (destroyed) return;
 
-            if (!isVisible) {
+            if (!isVisible || document.hidden) {
                 animationFrame = requestAnimationFrame(draw);
                 return;
             }
+
+            if (frameTime - lastPaintTime < frameInterval) {
+                animationFrame = requestAnimationFrame(draw);
+                return;
+            }
+            lastPaintTime = frameTime;
 
             const rect = canvas.getBoundingClientRect();
 
@@ -410,8 +433,6 @@ export default function ParticleLogo({
              * Mouse influence.
              */
             const mouse = mouseRef.current;
-            const frameTime = performance.now();
-
             particles.forEach((particle) => {
                 if (mouse.active) {
                     const dx = particle.x - mouse.x;

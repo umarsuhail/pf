@@ -49,6 +49,12 @@ export default function SpaceParticles() {
     if (!canvas) return;
 
     const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // This is an ambient backdrop, so running its WebGL render loop at the
+    // display refresh rate competes with the scroll-driven card transforms
+    // without adding visible fidelity. A stable 30fps is enough for the
+    // slow field drift and leaves a larger main-thread/GPU budget for input.
+    const frameInterval = 1000 / 30;
     const initialCount = isMobile ? 30 : INITIAL_PARTICLES;
     const finalCount = isMobile ? 70 : PARTICLE_COUNT;
     const fieldWidth = isMobile ? 34 : FIELD_WIDTH;
@@ -144,6 +150,7 @@ export default function SpaceParticles() {
     window.addEventListener("resize", handleResize);
 
     let rafId: number;
+    let lastRenderTime = -Infinity;
     const posAttr = geometry.getAttribute("position") as BufferAttribute;
     const posArray = posAttr.array as Float32Array;
     let currentParticleCount = initialCount;
@@ -162,6 +169,8 @@ export default function SpaceParticles() {
 
     const animate = (time: number) => {
       rafId = requestAnimationFrame(animate);
+      if (document.hidden || time - lastRenderTime < frameInterval) return;
+      lastRenderTime = time;
       addParticlesGradually();
 
       rotation.x += (mouse.y * 0.08 - rotation.x) * 0.04;
@@ -201,7 +210,17 @@ export default function SpaceParticles() {
 
       renderer.render(scene, camera);
     };
-    animate(0);
+
+    // Respect the user's motion preference with a single static render.
+    if (reduceMotion) renderer.render(scene, camera);
+    else rafId = requestAnimationFrame(animate);
+
+    const resumeAfterVisibilityChange = () => {
+      // Do not try to "catch up" after a background tab has been restored.
+      // The next scheduled frame renders the current scroll state instead.
+      lastRenderTime = -Infinity;
+    };
+    document.addEventListener("visibilitychange", resumeAfterVisibilityChange);
 
     return () => {
       cancelAnimationFrame(rafId);
@@ -209,6 +228,7 @@ export default function SpaceParticles() {
       window.removeEventListener("wheel", handleWheel);
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleResize);
+      document.removeEventListener("visibilitychange", resumeAfterVisibilityChange);
       renderer.dispose();
       geometry.dispose();
       material.map?.dispose();

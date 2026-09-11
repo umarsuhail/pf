@@ -8,7 +8,6 @@ import { cards } from "../data/sections";
 import { NARRATION_SPANS } from "../data/narration";
 import { CardIcon } from "./icons/card-icon";
 import type { AnimatedIconHandle } from "./icons/card-icon";
-import ParticleLogo from "./HeroLogo";
 
 // Overhead console: a small latch sits on the top edge, and pulling it drops
 // the whole assembly into the cockpit — a centre nav console flanked by two
@@ -824,15 +823,11 @@ export default function CockpitTray() {
 
             {/* VEGA chat — moved here from its own floating button; HoloChat
                still owns the panel and its animation, this just flips it.
-               The brand mark doubles as the trigger: the static image is
-               always on screen (this bar never closes the way the tray
-               console does), with the particle canvas layered over it —
-               formed and idle most of the time, disperse-then-reform
-               "shatter" on click, which also fires toggleChat via
-               onActivate (the canvas's own click handler stopPropagates,
-               so a plain onClick here would never see the event). The
-               outer button's onClick stays as the keyboard/Enter path,
-               which never touches the canvas at all. */}
+               The brand mark doubles as the trigger — a plain static image,
+               matching every other icon on this bar. The particle-canvas
+               version belongs on the intro card, where it has room to
+               actually form/disperse; crammed into a 20px bar icon it read
+               as visual noise rather than a mark. */}
             <button
               type="button"
               onClick={toggleChat}
@@ -847,15 +842,6 @@ export default function CockpitTray() {
                 sizes="20px"
                 className="object-cover"
                 aria-hidden="true"
-              />
-              <ParticleLogo
-                src="/images/us.png"
-                particleCount={90}
-                speed={1.3}
-                disperseStrength={26}
-                size={16}
-                onActivate={toggleChat}
-                className="absolute inset-0"
               />
             </button>
 
