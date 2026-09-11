@@ -507,6 +507,19 @@ export function CardPortal({
           style={{ scale: visualScale }}
           className="relative h-full w-full transform-flat"
         >
+          {/* Dolly-zoom "camera" for the astronaut reveal: this wraps the
+             whole backdrop (Space, tone overlay, the astronaut itself) and
+             pushes in as the bio expands, while the astronaut's own layer
+             below counter-scales down further than the push-in accounts
+             for — net effect, the backdrop reads as the camera moving
+             closer while the astronaut recedes/shrinks within it, instead
+             of both simply growing together. */}
+          <motion.div
+            className="absolute inset-0"
+            animate={{ scale: isEntry && isExpanded ? 1.18 : 1 }}
+            transition={{ duration: 1.4, ease: POWER3_OUT }}
+            style={{ transformOrigin: "50% 65%" }}
+          >
           {/* Space backdrop filling the window, carrying this section's portal color */}
           <Space tint={atmosphere.accent} />
 
@@ -546,13 +559,16 @@ export function CardPortal({
                   <motion.div
                     key="astronaut"
                     // Slides in from off-screen left with a motion-blur
-                    // streak (heavy blur + a slight overshoot scale that
-                    // settles to 1) that clears as it decelerates into
-                    // place — the blur/opacity settle faster than the
-                    // slide/scale so the streak reads as trailing the
-                    // motion rather than just a blurred static image.
+                    // streak (heavy blur + a slight overshoot scale) that
+                    // clears as it decelerates into place — the blur/opacity
+                    // settle faster than the slide/scale so the streak reads
+                    // as trailing the motion rather than just a blurred
+                    // static image. The scale settles well below 1 (not
+                    // back to it) so the astronaut itself reads as receding
+                    // — paired with the backdrop's own push-in above, that's
+                    // the "camera moves closer, subject drifts away" effect.
                     initial={{ opacity: 0, x: "-70%", scale: 1.25, filter: "blur(24px)" }}
-                    animate={{ opacity: 1, x: 0, scale: 1, filter: "blur(0px)" }}
+                    animate={{ opacity: 1, x: 0, scale: 0.62, filter: "blur(0px)" }}
                     exit={{ opacity: 0 }}
                     transition={{
                       x: { duration: 1.4, ease: POWER3_OUT },
@@ -613,6 +629,7 @@ export function CardPortal({
               )}
             </motion.div>
           )}
+          </motion.div>
         </motion.div>
 
         {/* 3. Punch-through flash layer - inside mask but outside the scaling container so it doesn't scale strangely */}
