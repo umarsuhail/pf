@@ -7,7 +7,7 @@
 export const NARRATION_SPANS = [
   {
     text: "Hi, I'm Umar Suhail, a Senior Frontend Developer with over seven years of experience building modern, scalable web applications. My experience spans frontend development, application architecture, UI engineering, and building data-driven and interactive digital experiences using a wide range of modern technologies and tools. I enjoy turning complex ideas into intuitive, high-performance products, from enterprise dashboards and business applications to AI-powered and interactive experiences. Welcome to my portfolio. Explore my work and see what I've been building.",
-    src: "/music/intro.mp3",
+    src: "/music/intro.wav",
     // Real duration comes from the loaded <audio> element the moment it's
     // available (see CockpitTray's onNarrationProgress) — this is only the
     // guess used before that, roughly the sum of the old four clips.

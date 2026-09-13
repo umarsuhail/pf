@@ -9,7 +9,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-grenze);
+  --font-sans: var(--font-marvel);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
@@ -17,10 +17,11 @@ body {
   background: linear-gradient(180deg, #002d54 0%, #00101f 100%);
   background-attachment: fixed;
   color: var(--foreground);
-  font-family: var(--font-grenze), "Segoe UI", Arial, sans-serif;
-  /* Grenze's x-height reads noticeably smaller than Urbanist's at the same
-     declared size — sized up ~20% across body and headings below to land
-     back at the same apparent size, not just a bigger number. */
+  font-family: var(--font-marvel), "Segoe UI", Arial, sans-serif;
+  /* Marvel is a condensed humanist sans with a small x-height, so it reads
+     smaller than a normal-width face at the same declared size. The ~20%
+     size-up across body and headings is there to land back at the same
+     apparent size rather than to make the numbers bigger. */
   font-size: clamp(1.2rem, 1.1rem + 0.3vw, 1.35rem);
   line-height: 1.65;
   letter-spacing: 0.005em;
@@ -59,32 +60,36 @@ li {
   h4,
   h5,
   h6 {
-    font-family: var(--font-grenze), "Segoe UI", Arial, sans-serif;
+    font-family: var(--font-marvel), "Segoe UI", Arial, sans-serif;
     line-height: 1.15;
     letter-spacing: -0.02em;
     text-wrap: balance;
   }
 
+  /* Marvel ships two weights only (400 and 700). The previous 640-760
+     values implied a variable axis that does not exist — every one of them
+     resolved to the 700 file, so the hierarchy here comes from size, not
+     weight. Stated explicitly so nobody tunes a number that cannot move. */
   h1 {
     font-size: clamp(2.5rem, 1.9rem + 2.9vw, 5rem);
-    font-weight: 760;
+    font-weight: 700;
   }
 
   h2 {
     font-size: clamp(2rem, 1.5rem + 1.9vw, 3.5rem);
-    font-weight: 720;
+    font-weight: 700;
   }
 
   h3 {
     font-size: clamp(1.6rem, 1.35rem + 1.25vw, 2.6rem);
-    font-weight: 680;
+    font-weight: 700;
   }
 
   h4,
   h5,
   h6 {
     font-size: clamp(1.35rem, 1.25rem + 0.55vw, 1.8rem);
-    font-weight: 640;
+    font-weight: 700;
   }
 }
 

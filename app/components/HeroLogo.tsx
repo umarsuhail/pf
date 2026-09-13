@@ -82,6 +82,24 @@ type ParticleLogoProps = {
 
 type FormControls = { formIn: () => void; formOut: () => void };
 
+// Three fixed colour bands the particles are drawn in. Kept as a lookup so
+// draw() can batch by band rather than deriving a colour string per particle.
+// Drawn with "lighter" compositing, so these accumulate where particles
+// overlap — the denser strokes of the mark bloom to near-white on their own
+// rather than needing a blur. Warmed and brightened from the previous
+// values, which left the assembled mark reading as flat grey-blue dust.
+const TONE_COLORS = [
+    "rgba(56, 170, 248, 0.8)",
+    "rgba(150, 220, 255, 0.86)",
+    "rgba(240, 250, 255, 0.92)",
+] as const;
+
+function toneBand(tone: number) {
+    if (tone > 0.72) return 2;
+    if (tone > 0.35) return 1;
+    return 0;
+}
+
 export default function ParticleLogo({
     src = "/images/us.png",
     className = "",
@@ -253,7 +271,22 @@ export default function ParticleLogo({
 
             sampleCtx.clearRect(0, 0, sampleSize, sampleSize);
 
-            sampleCtx.drawImage(logo, 0, 0, sampleSize, sampleSize);
+            // Letterboxed, not stretched. Drawing straight to sampleSize x
+            // sampleSize squashed any non-square source into a square — the
+            // sampled points then carried that distortion into the mark.
+            const ratio = Math.min(
+                sampleSize / logo.naturalWidth,
+                sampleSize / logo.naturalHeight,
+            );
+            const drawW = logo.naturalWidth * ratio;
+            const drawH = logo.naturalHeight * ratio;
+            sampleCtx.drawImage(
+                logo,
+                (sampleSize - drawW) / 2,
+                (sampleSize - drawH) / 2,
+                drawW,
+                drawH,
+            );
 
             const imageData = sampleCtx.getImageData(0, 0, sampleSize, sampleSize);
 
@@ -330,15 +363,35 @@ export default function ParticleLogo({
             const canvasWidth = rect.width;
             const canvasHeight = rect.height;
 
-            const logoSize = size;
+            // Fit to the mark's actual ink, not to the source image's frame.
+            //
+            // The old maths mapped the whole 500x500 sample box to `size` and
+            // centred *that* box. Any transparent padding baked into the PNG
+            // therefore became padding in the particle field: the mark landed
+            // off-centre by however asymmetric that padding was, and rendered
+            // smaller than the requested size (only the inked fraction of the
+            // box carried points), which is most of why the logo was hard to
+            // make out. Measuring the sampled points' own bounding box and
+            // fitting that to `size` makes the result independent of how the
+            // artwork happens to be positioned in its file.
+            let minX = Infinity;
+            let maxX = -Infinity;
+            let minY = Infinity;
+            let maxY = -Infinity;
+            for (const point of points) {
+                if (point.x < minX) minX = point.x;
+                if (point.x > maxX) maxX = point.x;
+                if (point.y < minY) minY = point.y;
+                if (point.y > maxY) maxY = point.y;
+            }
 
-            const scale = logoSize / 500;
-
-            const offsetX =
-                canvasWidth / 2 - logoSize / 2;
-
-            const offsetY =
-                canvasHeight / 2 - logoSize / 2;
+            const inkWidth = Math.max(maxX - minX, 1);
+            const inkHeight = Math.max(maxY - minY, 1);
+            // Longest ink axis fills `size`, so the aspect ratio of the
+            // original mark is preserved rather than stretched to a square.
+            const scale = size / Math.max(inkWidth, inkHeight);
+            const inkCenterX = (minX + maxX) / 2;
+            const inkCenterY = (minY + maxY) / 2;
 
             const count = Math.min(
                 particleCount,
@@ -349,10 +402,10 @@ export default function ParticleLogo({
                 const point = points[i];
 
                 const homeX =
-                    offsetX + point.x * scale;
+                    canvasWidth / 2 + (point.x - inkCenterX) * scale;
 
                 const homeY =
-                    offsetY + point.y * scale;
+                    canvasHeight / 2 + (point.y - inkCenterY) * scale;
 
                 /*
                  * Start particles randomly around the logo.
@@ -376,7 +429,11 @@ export default function ParticleLogo({
 
                     // Fine points and occasional four-point sparks feel more
                     // like a holographic instrument readout than confetti.
-                    size: random(0.5, 1.45),
+                    // Floor raised off 0.5: sub-pixel rects get antialiased
+                    // down to almost nothing, so a good share of the points
+                    // were paying full cost while being invisible — part of
+                    // why the assembled mark looked sparser than its count.
+                    size: random(0.53, 1.12),
 
                     // Starts invisible — formIn() fades it up. (point.alpha,
                     // the source pixel's own opacity, isn't used as a
@@ -392,6 +449,16 @@ export default function ParticleLogo({
                     rotationSpeed: random(-0.02, 0.02),
                 });
             }
+
+            // Grouped so draw() can set fillStyle once per colour band
+            // instead of assigning a colour string per particle per frame —
+            // each assignment re-parses the CSS colour natively. Sparks last
+            // within each band, since they draw differently.
+            particles.sort(
+                (a, b) =>
+                    toneBand(a.tone) - toneBand(b.tone) ||
+                    Number(a.isSpark) - Number(b.isSpark),
+            );
         };
 
         // True once the dormant branch below has wiped the canvas, so it
@@ -451,6 +518,9 @@ export default function ParticleLogo({
              */
             const mouse = mouseRef.current;
             const frameTime = performance.now();
+            // Tracks the last colour band written to the context so the batch
+            // below only reassigns fillStyle when the band actually changes.
+            let currentBand = -1;
 
             particles.forEach((particle) => {
                 if (mouse.active) {
@@ -493,55 +563,46 @@ export default function ParticleLogo({
                 particle.x += particle.vx;
                 particle.y += particle.vy;
 
-                particle.rotation +=
-                    particle.rotationSpeed;
-
-                ctx.save();
-
-                ctx.translate(
-                    particle.x,
-                    particle.y
-                );
-
-                ctx.rotate(
-                    particle.rotation
-                );
-
+                // Drawn in the canvas's own coordinate space — no save /
+                // translate / rotate / restore per particle. Those four calls
+                // times hundreds of particles times 60fps dominated this loop,
+                // and at a 1-2px draw size the rotation they existed to apply
+                // is not perceptible. `rotation` is still advanced for the
+                // sparks, which are large enough to read it.
                 const shimmer =
                     0.78 + Math.sin(frameTime * 0.002 + particle.twinkle) * 0.22;
                 ctx.globalAlpha = particle.alpha * shimmer;
 
-                /*
-                 * Particle appearance.
-                 */
-                const isBright = particle.tone > 0.72;
-                ctx.fillStyle = isBright
-                    ? "rgba(224, 242, 254, 1)"
-                    : particle.tone > 0.35
-                        ? "rgba(125, 211, 252, 0.92)"
-                        : "rgba(56, 189, 248, 0.82)";
-
-                if (particle.isSpark) {
-                    const arm = particle.size * 2.1;
-                    // Canvas shadow blur is a CPU-side blur pass per call —
-                    // by far the most expensive thing drawn here, done for
-                    // ~10% of every particle every frame. Kept small rather
-                    // than dropped entirely since the sparks read as flat
-                    // crosses without any glow at all.
-                    ctx.shadowBlur = 3;
-                    ctx.shadowColor = "rgba(56, 189, 248, 0.8)";
-                    ctx.fillRect(-particle.size * 0.38, -arm, particle.size * 0.76, arm * 2);
-                    ctx.fillRect(-arm, -particle.size * 0.38, arm * 2, particle.size * 0.76);
-                } else {
-                    // A rotated square is less playful than a soft circle and
-                    // gives the assembled image a contemporary, faceted grain.
-                    const edge = particle.size * 1.35;
-                    ctx.fillRect(-edge / 2, -edge / 2, edge, edge);
+                const band = toneBand(particle.tone);
+                if (band !== currentBand) {
+                    // Particles are pre-sorted by band, so this runs ~3x per
+                    // frame rather than once per particle.
+                    currentBand = band;
+                    ctx.fillStyle = TONE_COLORS[band];
                 }
 
-                ctx.restore();
+                if (particle.isSpark) {
+                    particle.rotation += particle.rotationSpeed;
+                    const arm = particle.size * 2.1;
+                    const thickness = particle.size * 0.76;
+                    // An axis-aligned cross with a faint wider core instead of
+                    // ctx.shadowBlur. Shadow blur is a native per-call blur
+                    // pass; at ~10% of the particles and two rects each it was
+                    // the single most expensive thing on the page, and it does
+                    // not show up in a JS profile because the cost is native.
+                    // The extra translucent square reads as the same bloom.
+                    ctx.fillRect(particle.x - thickness / 2, particle.y - arm, thickness, arm * 2);
+                    ctx.fillRect(particle.x - arm, particle.y - thickness / 2, arm * 2, thickness);
+                    ctx.globalAlpha = particle.alpha * shimmer * 0.28;
+                    const halo = particle.size * 2.6;
+                    ctx.fillRect(particle.x - halo / 2, particle.y - halo / 2, halo, halo);
+                } else {
+                    const edge = particle.size * 1.35;
+                    ctx.fillRect(particle.x - edge / 2, particle.y - edge / 2, edge, edge);
+                }
             });
 
+            ctx.globalAlpha = 1;
             ctx.globalCompositeOperation = "source-over";
 
             animationFrame =
@@ -837,14 +898,18 @@ export default function ParticleLogo({
         size,
     ]);
 
+    // No inline width/height, and no `h-full w-full` baked in. Both used to
+    // be here, and an inline style beats every class the caller passes — so a
+    // caller asking for `h-[min(58vw,420px)]` silently got a canvas stretched
+    // to its flex parent instead. In the end-of-flight cluster that parent is
+    // the full viewport, which meant a ~1400x760 canvas clearing, gradient-
+    // filling and redrawing every particle each frame (and it shoved the
+    // tagline and signature to opposite edges of the screen). The caller owns
+    // the box; `resize()` reads whatever that box actually is.
     return (
         <canvas
             ref={canvasRef}
-            className={`block h-full w-full cursor-pointer ${className}`}
-            style={{
-                width: "100%",
-                height: "100%",
-            }}
+            className={`block cursor-pointer ${className}`}
         />
     );
 }

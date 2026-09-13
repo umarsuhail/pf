@@ -19,6 +19,7 @@ import {
 import { ArrowUpRightIcon } from "./icons/arrow-up-right";
 import type { AnimatedIconHandle } from "./icons/card-icon";
 import Space from "./Space";
+import SignatureName from "./SignatureName";
 
 // Pure GSAP-style Quart-out curve (gsap.parseEase("power3.out")) used to
 // shape the reveal progress itself — not an animation, just math applied to
@@ -528,15 +529,61 @@ export function CardPortal({
           <Space tint={atmosphere.accent} active={isNear} />
 
           {isEntry && (
-            <Image
-              src="/images/us.png"
-              alt=""
-              width={300}
-              height={300}
-              sizes=" 30vw, 40vh"
-              className="object-cover opacity-55 mix-blend-screen p-8"
-              aria-hidden="true"
-            />
+            // Whole group lifted 14px: the mark reads better sitting slightly
+            // above the portal's optical centre.
+            <div className="absolute inset-0 -translate-y-3.5">
+              <div className="absolute inset-0 flex items-center justify-center">
+                {/* This wrapper is sized by the mark itself and is the
+                   signature's positioning context. The card is what stretches
+                   — the home portal grows tall when the bio expands — so
+                   anchoring the name to card percentages walked it up to the
+                   card's top edge, nowhere near the logo. Against the mark's
+                   own box it stays pinned to the logo at any card height or
+                   width (the image is capped by the portal's width on
+                   narrow screens, so its box is not a fixed 300px either). */}
+                <div className="relative">
+                  <Image
+                    src="/images/us.png"
+                    alt=""
+                    width={300}
+                    height={300}
+                    sizes=" 30vw, 40vh"
+                    className="object-cover opacity-55 mix-blend-screen px-8 py-2"
+                    aria-hidden="true"
+                  />
+
+                  {/* Same cycling signature the closing beat ends on, so the
+                     flight opens and closes on the same gesture.
+
+                     It swaps sides of the mark on expand: the astronaut flies
+                     in from below when the bio opens (see the AnimatePresence
+                     block further down) and was landing straight on top of the
+                     name. Rather than reordering a flex column — which would
+                     jump, and whose position framer's `layout` cannot reliably
+                     measure inside this card's 3D transform — it is absolutely
+                     placed and travels between two anchors, so the move itself
+                     is the animation. A spring rather than a tween: it reads as
+                     the name being displaced by the astronaut arriving.
+
+                     The two anchors are the mark's own top and bottom edges.
+                     us.png carries roughly a tenth of empty frame above and
+                     below the glyph, so a name centred on an edge clears the
+                     artwork by a comfortable gap while still reading as
+                     attached to it. */}
+                  <motion.div
+                    className="absolute inset-x-0 flex justify-center"
+                    initial={false}
+                    style={{ translateY: "-50%" }}
+                    animate={{ top: isExpanded ? "0%" : "100%" }}
+                    transition={{ type: "spring", stiffness: 190, damping: 23, mass: 0.9 }}
+                  >
+                    <SignatureName
+                      className="text-lg text-sky-100/85 sm:text-xl lg:text-2xl"
+                    />
+                  </motion.div>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Color overlay giving this section's universe its own tone */}

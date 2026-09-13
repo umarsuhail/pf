@@ -18,8 +18,15 @@ import {
   WebGLRenderer,
 } from "three";
 
-const PARTICLE_COUNT = 130;
-const INITIAL_PARTICLES = 60; // Reduced initial load
+// A THREE.Points field is a single draw call no matter how many points are
+// in it, so the count here is a purely visual decision, not a performance
+// one — the real per-frame cost is the position rewrite loop below (already
+// gated on actual scroll warp) and fragment shading, which is governed by
+// pixel ratio. This sits deliberately sparse: a denser field read as
+// texture behind the closing mark and competed with the logo's own
+// particles for the eye, which is the opposite of what it is for.
+const PARTICLE_COUNT = 620;
+const INITIAL_PARTICLES = 240;
 const FIELD_DEPTH = 60;
 const FIELD_WIDTH = 44;
 const CAMERA_Z = 18;
@@ -49,8 +56,8 @@ export default function SpaceParticles() {
     if (!canvas) return;
 
     const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
-    const initialCount = isMobile ? 30 : INITIAL_PARTICLES;
-    const finalCount = isMobile ? 70 : PARTICLE_COUNT;
+    const initialCount = isMobile ? 120 : INITIAL_PARTICLES;
+    const finalCount = isMobile ? 300 : PARTICLE_COUNT;
     const fieldWidth = isMobile ? 34 : FIELD_WIDTH;
 
     const scene = new Scene();
@@ -68,7 +75,12 @@ export default function SpaceParticles() {
       antialias: false, // Disabled for better performance
       powerPreference: "high-performance",
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1)); // Reduced from 2
+    // Deliberately 1.0. This is a full-viewport pass, so pixel ratio is the
+    // one setting here that scales cost quadratically — and the payoff is
+    // nil, because the points are soft round sprites with no hard edges to
+    // sharpen. Density and colour (above) are what make the field read; they
+    // cost almost nothing by comparison.
+    renderer.setPixelRatio(1);
     renderer.setSize(window.innerWidth, window.innerHeight);
 
     // Rounded, faded-blue starfield drifting through the z axis
@@ -88,17 +100,21 @@ export default function SpaceParticles() {
     
     const material = new PointsMaterial({
       map: createCircleTexture(),
-      color: new Color("#93c5fd"),
-      size: 0.2,
+      // Saturated blue at departure rather than the washed-out #93c5fd — the
+      // pale tint is where the field ends up late in the flight (see the
+      // lerp toward skyBlue/white below), so starting there meant the colour
+      // journey had nowhere to travel from.
+      color: new Color("#3b82f6"),
+      size: 0.26,
       sizeAttenuation: true,
       transparent: true,
-      opacity: 0.70,
+      opacity: 0.4,
       depthWrite: false,
     });
     const field = new Points(geometry, material);
     scene.add(field);
 
-    const normalColor = new Color("#93c5fd");
+    const normalColor = new Color("#3b82f6");
     const skyBlueColor = new Color("#9ad6ff");
     const endWhiteColor = new Color("#f8fbff");
     const phaseColor = new Color();
@@ -199,7 +215,11 @@ export default function SpaceParticles() {
       phaseColor.lerpColors(normalColor, skyBlueColor, blueMix);
       phaseColor.lerp(endWhiteColor, endPhaseMix);
       material.color.lerp(phaseColor, 0.06);
-      const targetOpacity = MathUtils.lerp(0.6, 0.3, endPhaseMix);
+      // Dimmer than the field was, and dimmer still by the end of the
+      // flight: the starfield sits directly behind the closing mark, and at
+      // full strength its own points competed with the logo's particles so
+      // the glyph shapes stopped reading as a logo at all.
+      const targetOpacity = MathUtils.lerp(0.4, 0.16, endPhaseMix);
       material.opacity += (targetOpacity - material.opacity) * 0.06;
 
       // Slow whole-field drift keeps the stars alive without per-particle math

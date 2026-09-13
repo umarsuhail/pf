@@ -25,7 +25,7 @@ const TRAY_SPRING = {
   mass: 0.8,
 } as const;
 
-// The soundtrack is a two-act programme, not a loop. intro.mp3 is the
+// The soundtrack is a two-act programme, not a loop. intro.wav is the
 // narration with its own background music already mixed in (see
 // data/narration.ts — still played through the "span" machinery below in
 // case it's ever split back into multiple clips, but there's just the one
@@ -290,7 +290,7 @@ export default function CockpitTray() {
     );
   };
 
-  // Bring tomoon.mp3 (looping) up under intro.mp3 and fade the intro out.
+  // Bring tomoon.wav (looping) up under intro.wav and fade the intro out.
   // Declared first since playNextSpan's own fallback (no more spans left,
   // or the browser refused the asset) skips straight here.
   const handOverToMain = useCallback(() => {
@@ -416,6 +416,40 @@ export default function CockpitTray() {
     });
   };
 
+  // Fullscreen rides along with the tour. Engaging is a real user gesture —
+  // the only context the Fullscreen API accepts a request from (scroll/wheel
+  // never qualify) — and the tour ending, however it ends (natural finish,
+  // Disengage, the visitor scrolling to take the controls back), drops back
+  // out. The ref means we only ever exit a fullscreen we ourselves entered:
+  // never one the visitor was already in, and not after they've already
+  // Esc'd out mid-tour (fullscreenElement is null by then, so exit is
+  // skipped). On platforms without element fullscreen (iPhone Safari) the
+  // request is simply absent and the tour runs windowed.
+  const wentFullscreenRef = useRef(false);
+
+  const enterFullscreen = useCallback(() => {
+    const el = document.documentElement;
+    if (typeof el.requestFullscreen !== "function") return;
+    try {
+      void el
+        .requestFullscreen()
+        .then(() => {
+          wentFullscreenRef.current = true;
+        })
+        .catch(() => {});
+    } catch {
+      // Older engines throw synchronously instead of rejecting.
+    }
+  }, []);
+
+  const exitFullscreen = useCallback(() => {
+    if (!wentFullscreenRef.current) return;
+    wentFullscreenRef.current = false;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+    }
+  }, []);
+
   // Engaging is the one click that starts everything: the tour flies itself
   // and the soundtrack runs under it. Audio can only ever begin here, from a
   // real gesture — nothing autoplays on load. The flight only exists on "/",
@@ -423,6 +457,9 @@ export default function CockpitTray() {
   // starts at the beginning, not wherever the visitor happened to be reading.
   const toggleAutopilot = useCallback(() => {
     if (isRunning) {
+      // Exit-fullscreen happens in the flight-autopilot-state listener when
+      // running flips false, so this path and every other way the tour ends
+      // share one exit point.
       window.dispatchEvent(
         new CustomEvent("flight-autopilot", { detail: { action: "stop" } }),
       );
@@ -430,6 +467,9 @@ export default function CockpitTray() {
     }
     requestPlayback();
     setIsOpen(false);
+    // Must be called here, synchronously inside the click's user
+    // activation — it would be rejected from the tour's own async flow.
+    enterFullscreen();
 
     if (pathname !== "/") {
       sessionStorage.setItem("autopilot-pending", "1");
@@ -440,10 +480,11 @@ export default function CockpitTray() {
     window.dispatchEvent(
       new CustomEvent("flight-autopilot", { detail: { action: "start" } }),
     );
-  }, [isRunning, pathname, requestPlayback, router]);
+  }, [isRunning, pathname, requestPlayback, router, enterFullscreen]);
 
   // The tour also ends on its own, or when the user takes the controls back
-  // by scrolling — the music follows it either way.
+  // by scrolling — the music and the fullscreen both follow it either way,
+  // since every way a tour can end funnels through this one running:false.
   useEffect(() => {
     const onState = (event: Event) => {
       const detail = (event as CustomEvent<{ running?: boolean; index?: number }>)
@@ -451,7 +492,10 @@ export default function CockpitTray() {
       const running = Boolean(detail?.running);
       setIsRunning(running);
       setLeg(running ? (detail?.index ?? -1) : -1);
-      if (!running) stopAudio();
+      if (!running) {
+        stopAudio();
+        exitFullscreen();
+      }
     };
 
     window.addEventListener("flight-autopilot-state", onState as EventListener);
@@ -460,7 +504,7 @@ export default function CockpitTray() {
         "flight-autopilot-state",
         onState as EventListener,
       );
-  }, [stopAudio]);
+  }, [stopAudio, exitFullscreen]);
 
   const navigate = (id: string) => {
     setActiveId(id);

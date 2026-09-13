@@ -5,26 +5,75 @@ import PageLoader from "./components/PageLoader";
 import ChromeBeforeMain from "./components/ChromeBeforeMain";
 import ChromeAfterMain from "./components/ChromeAfterMain";
 
-const grenze = localFont({
+// Body family, replacing the deleted Grenze variable font.
+//
+// All four files are declared as one family rather than as four separate
+// fonts. That is what makes `<em>` and `<strong>` (and font-semibold, etc.)
+// pick up Marvel's own italic and bold drawings — declare only Regular and
+// the browser fakes them instead, shearing the roman for italics and
+// smearing it for bold, which on a condensed face like this looks visibly
+// wrong. Marvel ships no intermediate weights, so 600/semibold resolves to
+// the 700 file: the site's `font-semibold` classes still get a real bold.
+const marvel = localFont({
   src: [
-    {
-      path: "../public/Grenze-VariableFont_wght.ttf",
-      style: "normal",
-      weight: "100 900",
-    },
+    { path: "../public/fonts/Marvel-Regular.ttf", weight: "400", style: "normal" },
+    { path: "../public/fonts/Marvel-Italic.ttf", weight: "400", style: "italic" },
+    { path: "../public/fonts/Marvel-Bold.ttf", weight: "700", style: "normal" },
+    { path: "../public/fonts/Marvel-BoldItalic.ttf", weight: "700", style: "italic" },
   ],
-  variable: "--font-grenze",
+  variable: "--font-marvel",
   display: "swap",
   fallback: ["Segoe UI", "Arial", "sans-serif"],
 });
 
-// Decorative display face for the flight's time-of-day greeting.
-const twinkleStar = localFont({
-  src: "../public/TwinkleStar-Regular.ttf",
-  variable: "--font-twinkle-star",
-  display: "swap",
+// Faces the signature and the greeting cycle through, in public/fonts/signs.
+// All script/handwriting faces — a signature should read as handwriting, and
+// an earlier set mixed serifs and geometric sans, so the swaps looked like a
+// font-picker demo rather than one name written several ways.
+//
+// `display: "block"` rather than "swap": these only ever render inside the
+// signature, and a fallback swapping in mid-cycle would read as a glitch.
+// Note these are NOT subset — next/font/local serves the file as-is, so the
+// weight of each file is the weight shipped. That is why ZhiMangXing is not
+// among them: it is a CJK face carrying thousands of glyphs (~3.9MB, more
+// than these four combined) to render eleven Latin characters.
+const signLeckerli = localFont({
+  src: "../public/fonts/signs/LeckerliOne-Regular.ttf",
+  variable: "--font-sign-leckerli",
+  display: "block",
   fallback: ["cursive"],
 });
+const signPacifico = localFont({
+  src: "../public/fonts/signs/Pacifico-Regular.ttf",
+  variable: "--font-sign-pacifico",
+  display: "block",
+  fallback: ["cursive"],
+});
+const signSendFlowers = localFont({
+  src: "../public/fonts/signs/SendFlowers-Regular.ttf",
+  variable: "--font-sign-sendflowers",
+  display: "block",
+  fallback: ["cursive"],
+});
+const signStyleScript = localFont({
+  src: "../public/fonts/signs/StyleScript-Regular.ttf",
+  variable: "--font-sign-stylescript",
+  display: "block",
+  fallback: ["cursive"],
+});
+const passion = localFont({
+  src: "../public/fonts/signs/PassionsConflict-Regular.ttf",
+  variable: "--font-sign-passion",
+  display: "block",
+  fallback: ["cursive"],
+});
+const signatureFontVars = [
+  signLeckerli.variable,
+  signPacifico.variable,
+  signSendFlowers.variable,
+  signStyleScript.variable,
+  passion.variable,
+].join(" ");
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://umar.website"),
@@ -110,7 +159,9 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className={`${grenze.variable} ${twinkleStar.variable} relative min-h-screen antialiased`}>
+      <body
+        className={`${marvel.variable} ${signatureFontVars} relative min-h-screen antialiased`}
+      >
         <PageLoader />
         <ChromeBeforeMain />
         <main className="relative z-10">{children}</main>

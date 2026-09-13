@@ -65,7 +65,7 @@ const WHAT_I_DO = [
 ];
 
 const PANEL_CLASS =
-  "relative overflow-hidden rounded-[2rem] border border-white/15 p-8 shadow-[0_32px_80px_-20px_rgba(2,8,23,0.7)] sm:p-12";
+  "relative overflow-hidden rounded-[1.5rem] border border-white/15 p-5 shadow-[0_32px_80px_-20px_rgba(2,8,23,0.7)] sm:rounded-[2rem] sm:p-10 lg:p-12";
 
 function Eyebrow({ card }: { card: FlightCard }) {
   return (
@@ -196,9 +196,12 @@ export function SectionContent({
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className={`relative z-10 mx-auto w-full px-6 pb-24 pt-28 sm:px-8 ${
-          card.id === "projects" || card.id === "home" ? "max-w-6xl" : "max-w-4xl"
-        }`}
+        // Runs to the full width of a desktop display instead of stopping at
+        // a 4xl/6xl column — on a 1440px+ screen that left roughly a third of
+        // the viewport empty on either side. Tighter gutters on phones
+        // (px-4) buy back real reading width where it is scarcest, and the
+        // 8xl ceiling keeps line length sane on ultrawide monitors.
+        className="relative z-10 mx-auto w-full max-w-[110rem] px-4 pb-20 pt-24 sm:px-8 sm:pb-24 sm:pt-28 lg:px-12 xl:px-16"
       >
         <motion.div variants={itemVariants}>
           <Link
@@ -217,7 +220,7 @@ export function SectionContent({
           <>
             <motion.header
               variants={itemVariants}
-              className="mt-12 grid gap-10 sm:mt-16 lg:grid-cols-2 lg:items-center"
+              className="mt-12 grid gap-10 sm:mt-16 lg:grid-cols-2 lg:items-center lg:gap-16"
             >
               <div>
                 <Eyebrow card={card} />
@@ -232,7 +235,7 @@ export function SectionContent({
                   <span className="h-1 w-1 rounded-full bg-emerald-300/60" aria-hidden="true" />
                   7+ Years Experience
                 </p>
-                <p className="mt-6 max-w-[52ch] text-base leading-relaxed text-slate-100/80 sm:text-lg">
+                <p className="mt-6 max-w-[62ch] text-lg leading-relaxed text-slate-100/80 sm:text-xl lg:text-[1.375rem]">
                   I build modern, scalable, and high-performance web applications with a strong
                   focus on clean UI, great user experience, and solving real-world problems
                   through code.
@@ -257,7 +260,7 @@ export function SectionContent({
               </div>
 
               {/* Portrait — TODO: swap for a higher-res headshot if you have one */}
-              <div className="relative mx-auto w-full max-w-sm">
+              <div className="relative mx-auto w-full max-w-sm lg:max-w-none">
                 <div className="pointer-events-none absolute inset-0 rounded-full bg-emerald-400/10 blur-3xl" />
                 <div className="relative aspect-square w-full overflow-hidden rounded-[2rem] border border-white/10">
                   <Image src="/images/me-s.jpg" alt="Umar Suhail" fill className="object-cover" />
@@ -281,7 +284,7 @@ export function SectionContent({
 
             <motion.div
               variants={itemVariants}
-              className="mt-10 grid grid-cols-2 gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-6 sm:grid-cols-4"
+              className="mt-10 grid grid-cols-2 gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:grid-cols-4 sm:p-6"
             >
               {HOME_STATS.map(({ Icon, value, label }) => (
                 <div key={label} className="flex items-center gap-3">
@@ -296,7 +299,7 @@ export function SectionContent({
               ))}
             </motion.div>
 
-            <motion.div variants={itemVariants} className="mt-16 grid gap-10 lg:grid-cols-2">
+            <motion.div variants={itemVariants} className="mt-16 grid gap-10 lg:grid-cols-2 lg:gap-14">
               <div>
                 <h2 className="text-lg font-semibold text-sky-50">What I Do</h2>
                 <div className="mt-4 h-px w-12 bg-emerald-300/50" />
@@ -315,7 +318,7 @@ export function SectionContent({
               <div>
                 <h2 className="text-lg font-semibold text-sky-50">Tech I Work With</h2>
                 <div className="mt-4 h-px w-12 bg-emerald-300/50" />
-                <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-4">
+                <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-5">
                   {homeTechItems.map((item) => (
                     <div
                       key={item.label}
@@ -345,10 +348,10 @@ export function SectionContent({
           >
             <div className="relative z-10">
               <Eyebrow card={card} />
-              <h1 className="mt-6 max-w-[20ch] text-4xl font-semibold leading-[1.1] text-sky-50 sm:text-5xl lg:text-6xl">
+              <h1 className="mt-6 max-w-[24ch] text-[2.5rem] font-semibold leading-[1.08] text-sky-50 sm:text-6xl lg:text-7xl">
                 <HandwritingText className="text-5xl font-semibold">{card.title}</HandwritingText>
               </h1>
-              <p className="mt-6 max-w-[54ch] text-base leading-relaxed text-slate-100/90 sm:text-lg">
+              <p className="mt-6 max-w-[62ch] text-lg leading-relaxed text-slate-100/90 sm:text-xl lg:text-[1.375rem]">
                 <NarratedText id={card.id} text={card.description} />
               </p>
             </div>
@@ -360,14 +363,14 @@ export function SectionContent({
         {card.id === "projects" && (
           <motion.header
             variants={itemVariants}
-            className="mt-12 grid gap-10 lg:grid-cols-2 lg:items-center"
+            className="mt-12 grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16"
           >
             <div>
               <Eyebrow card={card} />
               <h1 className="mt-6 text-4xl font-semibold leading-[1.1] text-sky-50 sm:text-5xl">
                 <HandwritingText className="text-4xl font-semibold sm:text-5xl">{card.title}</HandwritingText>
               </h1>
-              <p className="mt-6 max-w-[52ch] text-base leading-relaxed text-slate-100/80 sm:text-lg">
+              <p className="mt-6 max-w-[62ch] text-lg leading-relaxed text-slate-100/80 sm:text-xl lg:text-[1.375rem]">
                 <NarratedText id={card.id} text={card.description} />
               </p>
               <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -418,7 +421,7 @@ export function SectionContent({
               </div>
             </div>
 
-            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {visibleProjects.map((project) => {
                 const { Icon, accent } = PROJECT_ICONS[project.title] ?? DEFAULT_PROJECT_ICON;
                 return (
@@ -504,7 +507,7 @@ export function SectionContent({
                   <h3 className="mt-1.5 text-lg font-semibold text-sky-50">
                     {job.role} — {job.company}
                   </h3>
-                  <p className="mt-2 max-w-[60ch] text-sm leading-relaxed text-slate-100/80">
+                  <p className="mt-2 max-w-[72ch] text-base leading-relaxed text-slate-100/80">
                     {job.summary}
                   </p>
                 </motion.div>
@@ -522,14 +525,14 @@ export function SectionContent({
           >
             <div className="relative z-10">
               <Eyebrow card={card} />
-              <h1 className="mt-6 max-w-[20ch] text-4xl font-semibold leading-[1.1] text-sky-50 sm:text-5xl lg:text-6xl">
+              <h1 className="mt-6 max-w-[24ch] text-[2.5rem] font-semibold leading-[1.08] text-sky-50 sm:text-6xl lg:text-7xl">
                 <HandwritingText className="text-4xl font-semibold sm:text-5xl lg:text-6xl">{card.title}</HandwritingText>
               </h1>
-              <p className="mt-6 max-w-[54ch] text-base leading-relaxed text-slate-100/90 sm:text-lg">
+              <p className="mt-6 max-w-[62ch] text-lg leading-relaxed text-slate-100/90 sm:text-xl lg:text-[1.375rem]">
                 <NarratedText id={card.id} text={card.description} />
               </p>
 
-              <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {card.details.map((line) => {
                   const { label, value } = parseContactLine(line);
                   return (

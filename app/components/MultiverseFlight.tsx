@@ -2,7 +2,6 @@
 
 import {
   motion,
-  useMotionTemplate,
   useMotionValue,
   useMotionValueEvent,
   useScroll,
@@ -12,7 +11,7 @@ import {
 } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CardPortal } from "./CardPortal";
 import { CardIcon } from "./icons/card-icon";
 import { DownloadIcon, type DownloadIconHandle } from "./icons/download";
@@ -25,6 +24,7 @@ import SpaceParticles from "./SpaceParticles";
 import ParticleLogo from "./HeroLogo";
 import { getSkillGroups } from "../data/skillGroups";
 import Greeting from "./Greeting";
+import SignatureName from "./SignatureName";
 import { POWER3_OUT } from "../lib/easings";
 
 import {
@@ -74,18 +74,129 @@ const PORTAL_WIDTH = "clamp(150px, 20vw, 320px)";
 // leave the headline squeezed into a sliver.
 const COMPACT_PORTAL_WIDTH = "clamp(96px, 30vh, 150px)";
 
-// Unified ultra-smooth physics configurations
+// Spring used for the cards' own width/offset settle when the breakpoint
+// changes. There is deliberately no camera spring: see smoothScrollProgress.
 const PHYSICS = {
-  // stiffness 60/damping 20/mass 0.8 (overdamped, ratio ~1.28) was tuned for
-  // a slow cinematic drift, but on desktop wheel/trackpad input — discrete,
-  // stepped deltas rather than touch's continuous drag — that same softness
-  // reads as the camera lagging behind the scrollbar rather than gliding:
-  // it visibly takes a beat to catch up after every wheel tick. Stiffer and
-  // lighter closes that gap while staying just past critical damping
-  // (ratio ~1.2, still no bounce/overshoot) instead of raw 1:1 tracking.
-  camera: { stiffness: 260, damping: 30, mass: 0.6, restDelta: 0.0001 },
   expansion: { type: "spring", stiffness: 180, damping: 22, mass: 0.9 },
 } as const;
+
+// --- Space regions ------------------------------------------------------
+// The corridor passes through distinct volumes of space rather than fading
+// one navy into another. Each region is anchored to a section's own stop and
+// takes its hue from that section's portal accent (see CardPortal's
+// `atmospheres`), so the surrounding space and the card's "universe" agree
+// instead of reading as two unrelated colour systems.
+//
+// Every layer's background is a *static* string. Travel is expressed purely
+// by cross-fading their opacities (and drifting them), which the compositor
+// handles without repainting — the reason this can afford far more colour
+// than the single animated gradient it replaces. Consecutive regions share
+// each other's stops as their fade edges, so the sum stays ~1 throughout and
+// there is never a gap or a double-bright seam.
+type SpaceRegion = {
+  id: string;
+  /** Progress this region is fully established at. */
+  at: number;
+  /** Static, layered radial gradients — the region's "shape" in space. */
+  background: string;
+  /**
+   * Vertical drift across the whole flight, as a % of the layer's own
+   * height. Layers are 200vh tall and inset -50vh top/bottom, so anything
+   * past about -20% pulls the layer's bottom edge up into frame as a visible
+   * horizontal seam. Kept well inside that.
+   */
+  drift: number;
+};
+
+const SPACE_REGIONS: SpaceRegion[] = [
+  {
+    // Departure — still inside a lit atmosphere, brightest point of the trip.
+    id: "departure",
+    at: 0,
+    background:
+      "radial-gradient(130% 90% at 50% -15%, rgba(186,230,253,0.3) 0%, rgba(56,189,248,0.16) 32%, rgba(12,74,110,0.1) 58%, transparent 78%), linear-gradient(180deg, #05263f 0%, #021421 100%)",
+    drift: -3,
+  },
+  {
+    // Skills — emerald gas cloud, matching that portal's #34d399.
+    id: "emerald",
+    at: 0.22,
+    background:
+      "radial-gradient(90% 70% at 22% 38%, rgba(52,211,153,0.17) 0%, rgba(16,185,129,0.08) 42%, transparent 70%), radial-gradient(80% 60% at 82% 72%, rgba(14,165,233,0.11) 0%, transparent 62%), linear-gradient(180deg, #021a21 0%, #010d13 100%)",
+    drift: -6,
+  },
+  {
+    // Projects — electric blue trench, the deepest "open water" stretch.
+    id: "azure",
+    at: 0.56,
+    background:
+      "radial-gradient(100% 80% at 74% 32%, rgba(96,165,250,0.18) 0%, rgba(37,99,235,0.09) 40%, transparent 70%), radial-gradient(70% 60% at 18% 76%, rgba(129,140,248,0.1) 0%, transparent 60%), linear-gradient(180deg, #05132b 0%, #010611 100%)",
+    drift: -9,
+  },
+  {
+    // Experience — a warm amber nebula. The one hot colour in the run; it is
+    // what keeps the second half from reading as one long blue dissolve.
+    id: "amber",
+    at: 0.69,
+    background:
+      "radial-gradient(95% 75% at 30% 62%, rgba(251,191,36,0.15) 0%, rgba(217,119,6,0.08) 38%, transparent 68%), radial-gradient(75% 60% at 80% 24%, rgba(244,63,94,0.09) 0%, transparent 60%), linear-gradient(180deg, #160b04 0%, #090306 100%)",
+    drift: -12,
+  },
+  {
+    // Resume — cooling back down through violet as the warmth falls behind.
+    id: "violet",
+    at: 0.81,
+    background:
+      "radial-gradient(90% 70% at 62% 44%, rgba(167,139,250,0.14) 0%, rgba(99,102,241,0.07) 40%, transparent 68%), linear-gradient(180deg, #0b071d 0%, #030208 100%)",
+    drift: -15,
+  },
+  {
+    // Contact and the tail — the void. Almost no colour left to give.
+    id: "void",
+    at: 0.94,
+    background:
+      "radial-gradient(80% 60% at 50% 40%, rgba(125,211,252,0.06) 0%, transparent 58%), linear-gradient(180deg, #000104 0%, #000000 100%)",
+    drift: -18,
+  },
+];
+
+function SpaceRegionLayer({
+  region,
+  index,
+  scrollProgress,
+}: {
+  region: SpaceRegion;
+  index: number;
+  scrollProgress: MotionValue<number>;
+}) {
+  const previous = SPACE_REGIONS[index - 1]?.at ?? region.at;
+  const next = SPACE_REGIONS[index + 1]?.at ?? region.at;
+
+  // First and last regions hold rather than fade off the ends of the track:
+  // the opening must be fully lit at progress 0, and the void must still be
+  // solid at 1, so neither gets a ramp on its outer side.
+  const isFirst = index === 0;
+  const isLast = index === SPACE_REGIONS.length - 1;
+  const stops = toStrictlyIncreasing([
+    isFirst ? 0 : previous,
+    region.at,
+    isLast ? 1 : next,
+  ]);
+  const opacity = useTransform(scrollProgress, stops, [
+    isFirst ? 1 : 0,
+    1,
+    isLast ? 1 : 0,
+  ]);
+  const y = useTransform(scrollProgress, [0, 1], ["0%", `${region.drift}%`]);
+
+  return (
+    <motion.div
+      aria-hidden="true"
+      className="pointer-events-none absolute -inset-y-1/2 inset-x-0"
+      style={{ background: region.background, opacity, y }}
+    />
+  );
+}
 
 const NAV_ZOOM_FRACTION = 0.55;
 
@@ -196,6 +307,12 @@ const AUTOPILOT_LAYOVER_HOLD = 2.6;
 // in progress units — the fixed span's hang time scaled by the zoom fraction.
 const NAV_ZOOM_PROGRESS = DEPART_SPAN * 0.3 * NAV_ZOOM_FRACTION;
 
+// Progress by which the last billboard must be fully gone. Everything in the
+// closing sequence is timed against this: the black void reaches full
+// opacity here, and the closing beat only begins fading in afterwards, so
+// the corridor is genuinely empty before the ending is shown.
+const LAST_CARD_CLEARED = 0.95;
+
 function getDepartWindow(index: number) {
   const current = sectionProgressStops[index];
   const next =
@@ -216,10 +333,21 @@ function getDepartWindow(index: number) {
   // by the gap to the next card too, so a departing card always finishes
   // clearing before the next one is reached.
   const span = Math.min(DEPART_SPAN, (1 - current) / 0.85, (next - current) / 0.85);
-  return {
-    start: Math.min(current + span * 0.3, 1),
-    end: Math.min(current + span * 0.85, 1),
-  };
+  const start = Math.min(current + span * 0.3, 1);
+  let end = Math.min(current + span * 0.85, 1);
+
+  // The final card is the exception. Every other card's fade ends when the
+  // next card arrives, but this one has no successor, so the generic maths
+  // stretched its fade all the way to progress 1.0 — meaning it was still
+  // ~half opaque, and blown up to pass-through size, underneath the entire
+  // closing beat. (That is what put fragments of the contact copy behind
+  // the signature.) Finish it before the closing content arrives instead,
+  // which is what LAST_CARD_CLEARED exists to pin down.
+  if (index === sectionProgressStops.length - 1) {
+    end = Math.min(end, LAST_CARD_CLEARED);
+  }
+
+  return { start, end };
 }
 
 function toStrictlyIncreasing(values: number[]) {
@@ -661,58 +789,31 @@ export default function MultiverseFlight() {
     offset: ["start start", "end end"],
   });
 
-  // The secret to cinematic smoothness: applying spring physics to the global
-  // scroll progress, rather than driving the camera off raw scroll directly.
-  // Touch already carries its own momentum, so a spring tuned as tight as
-  // desktop's would fight the finger instead of following it — this one
-  // stays softer specifically to absorb that, not because touch needs less
-  // responsiveness in general.
-  const smoothScrollProgress = useSpring(
-    scrollYProgress,
-    compact
-      ? { stiffness: 130, damping: 26, mass: 0.5, restDelta: 0.0005 }
-      : PHYSICS.camera,
-  );
-
-  // Coming back from a section page, the browser restores scroll position
-  // instantly but the camera spring still starts at 0 and has to travel there,
-  // sweeping every card through its reveal/depart window on the way — the
-  // whole flight replays in fast-forward. Snap the spring to wherever the
-  // page actually is on the first frames instead of animating into it.
-  useEffect(() => {
-    let frames = 0;
-    let raf = 0;
-    const settle = () => {
-      smoothScrollProgress.jump(scrollYProgress.get());
-      // Scroll restoration can land a tick or two after mount, so hold the
-      // snap for a few frames rather than trusting a single one.
-      if (++frames < 5) raf = requestAnimationFrame(settle);
-    };
-    raf = requestAnimationFrame(settle);
-    return () => cancelAnimationFrame(raf);
-  }, [scrollYProgress, smoothScrollProgress]);
+  // The camera reads raw scroll position — no spring in between. A spring here
+  // is what made the flight feel floaty and detached: the wheel stops, the
+  // camera keeps coasting, and every re-tune only traded "laggy" for "twitchy"
+  // because the lag was structural, not a damping value. Scroll is already a
+  // smooth, continuous signal; the browser interpolates it natively and the
+  // transforms below are pure functions of it, so reading it directly is both
+  // 1:1 responsive and cheaper (no per-frame spring integration, and values
+  // stop changing the instant scrolling stops). This is the one knob that
+  // separated this from the reference implementation's feel.
+  //
+  // It also removes the need for the old mount-time snap: with no spring to
+  // travel from 0, a restored scroll position (coming back from a section
+  // page) is simply correct on the first frame instead of replaying the
+  // whole flight in fast-forward while the spring caught up.
+  const smoothScrollProgress = scrollYProgress;
 
   const zCamera = useTransform(smoothScrollProgress, [0, 1], [0, isMobile ? 7800 : 8400]);
 
-  // Crossing the third section (skills, stop 0.22) grades the whole scene
-  // from the opening blue into a darker, blacker deep-space palette — the
-  // flight is leaving the lit part of the journey behind.
-  const bgCrossStart = sectionProgressStops[2];
-  const bgCrossEnd = bgCrossStart + 0.16;
-  const bgTopColor = useTransform(
-    smoothScrollProgress,
-    [bgCrossStart, bgCrossEnd],
-    ["#002d54", "#00203f"],
-  );
-  const bgBottomColor = useTransform(
-    smoothScrollProgress,
-    [bgCrossStart, bgCrossEnd],
-    ["#00101f", "#000000"],
-  );
-  const sceneBackground = useMotionTemplate`linear-gradient(180deg, ${bgTopColor} 0%, ${bgBottomColor} 100%)`;
-  
-  const lightGlowOpacity = useTransform(smoothScrollProgress, [0, 0.28, 0.42], [1, 0.8, 0]);
-  const deepGlowOpacity = useTransform(smoothScrollProgress, [0.42, 0.58, 1], [0, 0.8, 1]);
+  // Colour now comes from the cross-faded SPACE_REGIONS layers below rather
+  // than from animating this gradient's own colour stops. Interpolating a
+  // gradient string re-paints the entire viewport on every frame it changes;
+  // cross-fading fixed-colour layers is pure compositing, so the richer
+  // journey actually costs *less* than the two-navy version it replaces.
+  // This stays as the static floor the regions sit on.
+  const deepGlowOpacity = useTransform(smoothScrollProgress, [0.4, 0.62, 1], [0, 0.85, 1]);
 
   // --- Parallax ---------------------------------------------------------
   // The camera flies through the cards, but every layer behind them was
@@ -720,8 +821,9 @@ export default function MultiverseFlight() {
   // layer now travels a different distance for the same scroll: the further
   // back it sits, the less it moves. The near glow drifts the opposite way,
   // which widens the apparent gap between the planes.
+  // The mid plane's job (the opening sky glow) is now the departure region's,
+  // which carries its own drift — see SPACE_REGIONS.
   const parallaxFar = useTransform(smoothScrollProgress, [0, 1], ["0%", "-7%"]);
-  const parallaxMid = useTransform(smoothScrollProgress, [0, 1], ["0%", "-18%"]);
   const parallaxNear = useTransform(smoothScrollProgress, [0, 1], ["0%", "12%"]);
   // Creeping scale on the furthest plane so its edges never slide into view
   // as it translates, and so the void feels like it is opening up.
@@ -733,17 +835,40 @@ export default function MultiverseFlight() {
   // anything.
   const endEarthT = useTransform(scrollYProgress, [0.88, 1], [0, 1]);
   const endEarthReveal = useTransform(endEarthT, [0, 0.35, 1], [0, 1, 1]);
-  // A one-way latch, not a live scroll-bound value: the tagline/logo/name
-  // closing beat should stay on screen once it's played, not fade back out
-  // if the visitor so much as nudges back up near the very bottom — trackpad
-  // rubber-banding at the max-scroll boundary especially made this flicker
-  // in and out on exactly the threshold crossing. Once true, this never
-  // goes false again for the life of the page.
+  // The contact card — the last billboard — holds full opacity until 0.948
+  // and only finishes clearing at 1.0 (that is getDepartWindow(5), squeezed
+  // because there is no track left past it). The closing beat therefore
+  // cannot be armed anywhere near 0.9: doing that put the tagline, mark and
+  // signature straight on top of a fully-lit card. These thresholds sit
+  // inside the card's own fade, so the two crossfade instead of colliding.
+  const END_ARM = 0.955;
+  const END_RELEASE = 0.935;
+
+  // Driven by the armed boolean, NOT by a scroll transform. A scroll-mapped
+  // opacity looked like the safer choice (it cannot outrun the departing
+  // card) but measured 0.357 at progress 0.96, 0.909 at 0.98 and then *0* at
+  // exactly 1.0 — framer's scroll measurement is not dependable on the
+  // document's very last pixel, so the whole ending vanished precisely where
+  // it matters most. The boolean is stable there, and it is safe from the
+  // original collision for a different reason: it arms at END_ARM (0.955),
+  // by which point LAST_CARD_CLEARED (0.95) has already forced the final
+  // billboard to finish fading. Timing, not layering, keeps them apart.
+
+  // Scroll-bound with hysteresis — deliberately NOT a one-way latch. Latching
+  // it "so the closing beat can't flicker" pinned a full-screen layer, 900
+  // live canvas particles and an infinite opacity loop over the page forever:
+  // scrolling back up left the mark painted across the cards and the tab
+  // pegged. Separate enter/exit thresholds solve the flicker the latch was
+  // reaching for while still shutting everything down on the way back out.
   const [isEndParticleActive, setIsEndParticleActive] = useState(false);
 
   useEffect(() => {
     const unsubscribe = scrollYProgress.on("change", (value) => {
-      if (value >= 0.9) setIsEndParticleActive(true);
+      setIsEndParticleActive((prev) => {
+        if (!prev && value >= END_ARM) return true;
+        if (prev && value < END_RELEASE) return false;
+        return prev;
+      });
     });
     return unsubscribe;
   }, [scrollYProgress]);
@@ -768,29 +893,81 @@ export default function MultiverseFlight() {
   // would just dead-stop on a static globe. Instead we capture the wheel /
   // touch input the page can no longer consume and feed it into `pull`.
   // Every increment is damped by (1 - pull)², so each step closer costs
-  // disproportionately more than the last — the globe keeps growing but the
-  // curve is asymptotic and can never arrive. Stop pushing and it drifts
-  // back out, like straining against a tether.
+  // disproportionately more than the last. Keep pushing and the strain
+  // eventually completes the loop (see LOOP_AT below); stop pushing and it
+  // drifts back out, like slackening a tether.
   const pull = useMotionValue(0);
   const smoothPull = useSpring(pull, { stiffness: 70, damping: 18, mass: 0.7 });
 
-  useEffect(() => {
-    if (isMobile) return;
+  // --- The loop ---------------------------------------------------------
+  // The flight comes back round to its own beginning rather than ending on
+  // a wall. Pushing past the bottom builds strain; once it passes LOOP_AT,
+  // the journey wraps: a black veil closes, scroll is reset to the top
+  // underneath it, and the veil opens again on the departure gradient.
+  //
+  // The seam is hidden by where it happens, not by cleverness — the closing
+  // frame is already near-black and the veil only has to cover the instant
+  // of the jump, so the wrap reads as flying out of the void back into the
+  // light instead of as a page reset. This reuses the tether's own
+  // accumulator rather than adding a second listener competing for the same
+  // wheel/touch events at the same scroll position.
+  const LOOP_AT = 0.6;
+  const [isWrapping, setIsWrapping] = useState(false);
+  // Guards against a second trigger while a wrap is already in flight: the
+  // wheel keeps firing during the veil, and each event would otherwise
+  // restart the sequence.
+  const wrappingRef = useRef(false);
 
+  const runLoop = useCallback(() => {
+    if (wrappingRef.current) return;
+    wrappingRef.current = true;
+    setIsWrapping(true);
+
+    // Veil in, jump underneath it, then veil out. The jump is deliberately
+    // instant ("auto") — a smooth scroll would animate the whole flight
+    // backwards in fast-forward behind the veil.
+    window.setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "auto" });
+      pull.set(0);
+      smoothPull.jump(0);
+    }, 260);
+
+    window.setTimeout(() => {
+      setIsWrapping(false);
+      wrappingRef.current = false;
+    }, 620);
+  }, [pull, smoothPull]);
+
+  useEffect(() => {
+    // Runs on touch too. This used to bail out on mobile, which was fine
+    // while the tether was only a flourish — but it now carries the loop,
+    // and a phone reaching the end of the flight with no way round would be
+    // stuck at a dead stop.
     const PULL_IN = 0.0006; // per px of forward wheel delta
     const PULL_OUT = 0.0009; // reverse scroll pushes back out faster
     const DECAY_PER_MS = 0.0016; // drift back once the user stops pushing
     const IDLE_BEFORE_DECAY_MS = 320;
-    const MAX_PULL = 0.97; // never 1 — the globe is never actually reached
+    const MAX_PULL = 0.97;
 
     let lastInput = 0;
     let lastTouchY: number | null = null;
     let lastFrame = performance.now();
     let raf = 0;
 
+    // document.documentElement.scrollHeight forces a layout to read, and this
+    // was read on *every* wheel event — the exact moment the main thread is
+    // most contended. The value only changes when the document resizes, so
+    // it is cached and invalidated rather than re-measured per event.
+    let cachedScrollHeight = document.documentElement.scrollHeight;
+    let cachedInnerHeight = window.innerHeight;
+    const remeasure = () => {
+      cachedScrollHeight = document.documentElement.scrollHeight;
+      cachedInnerHeight = window.innerHeight;
+    };
+    window.addEventListener("resize", remeasure);
+
     const atBottom = () =>
-      window.scrollY + window.innerHeight >=
-      document.documentElement.scrollHeight - 2;
+      window.scrollY + cachedInnerHeight >= cachedScrollHeight - 2;
 
     const applyDelta = (deltaY: number) => {
       const current = pull.get();
@@ -798,8 +975,10 @@ export default function MultiverseFlight() {
         // Only "pull" once the page itself is out of scroll to give
         if (!atBottom()) return;
         const resistance = (1 - current) ** 2;
-        pull.set(Math.min(current + deltaY * PULL_IN * resistance, MAX_PULL));
+        const next = Math.min(current + deltaY * PULL_IN * resistance, MAX_PULL);
+        pull.set(next);
         lastInput = performance.now();
+        if (next >= LOOP_AT) runLoop();
       } else if (deltaY < 0 && current > 0) {
         // Scrolling back up releases the tether before the page scrolls
         pull.set(Math.max(current + deltaY * PULL_OUT, 0));
@@ -807,7 +986,10 @@ export default function MultiverseFlight() {
       }
     };
 
-    const onWheel = (e: WheelEvent) => applyDelta(e.deltaY);
+    const onWheel = (e: WheelEvent) => {
+      applyDelta(e.deltaY);
+      ensureTicking();
+    };
     const onTouchStart = (e: TouchEvent) => {
       lastTouchY = e.touches[0]?.clientY ?? null;
     };
@@ -816,22 +998,40 @@ export default function MultiverseFlight() {
       if (y == null || lastTouchY == null) return;
       applyDelta((lastTouchY - y) * 2.2);
       lastTouchY = y;
+      ensureTicking();
     };
     const onTouchEnd = () => {
       lastTouchY = null;
     };
 
+    // Self-suspending: the decay loop only needs to run while there is
+    // actually tension to release. It used to hold an unconditional rAF for
+    // the entire session — a permanent frame subscription (and, through
+    // smoothPull, a live spring driving a full-screen scale) that did nothing
+    // at all except at the very bottom of the track. It now stops itself once
+    // pull reaches 0 and is restarted by the next real input.
     const tick = (now: number) => {
-      raf = requestAnimationFrame(tick);
       const dt = Math.min(now - lastFrame, 50);
       lastFrame = now;
-      if (now - lastInput < IDLE_BEFORE_DECAY_MS) return;
+      if (now - lastInput < IDLE_BEFORE_DECAY_MS) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
       const current = pull.get();
       if (current > 0.0005) {
         pull.set(Math.max(current - dt * DECAY_PER_MS * current, 0));
+        raf = requestAnimationFrame(tick);
+        return;
       }
+      pull.set(0);
+      raf = 0;
     };
-    raf = requestAnimationFrame(tick);
+
+    const ensureTicking = () => {
+      if (raf) return;
+      lastFrame = performance.now();
+      raf = requestAnimationFrame(tick);
+    };
 
     window.addEventListener("wheel", onWheel, { passive: true });
     window.addEventListener("touchstart", onTouchStart, { passive: true });
@@ -840,12 +1040,13 @@ export default function MultiverseFlight() {
 
     return () => {
       cancelAnimationFrame(raf);
+      window.removeEventListener("resize", remeasure);
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
     };
-  }, [isMobile, pull]);
+  }, [pull, runLoop, LOOP_AT]);
 
   // Exponential approach, not a linear one: growth decelerates hard as t
   // nears 1, so the image keeps pushing closer without ever quite arriving
@@ -867,12 +1068,14 @@ export default function MultiverseFlight() {
   );
   // The void closes in as you strain toward it
   const approachVignette = useTransform(smoothPull, [0, 1], [0, 0.55]);
-  // The scene's own gradient background is still a dark navy at this point
-  // (see sceneBackground/bgBottomColor above), not true black — this fades
-  // in a solid black backdrop a little ahead of the end-of-flight object
-  // itself, so by the time it appears "in the distance" it's against a real
-  // void rather than a lingering blue gradient.
-  const endVoidOpacity = useTransform(scrollYProgress, [0.8, 0.95], [0, 1]);
+  // The scene's own gradient background is still a dark navy at this point,
+  // not true black — this fades in a solid black backdrop ahead of the
+  // end-of-flight content, so it arrives against a real void rather than a
+  // lingering blue gradient. Now that it genuinely sits above the corridor
+  // (see z-[5] on the element), it also does the job of clearing the last
+  // card away: it starts only once the contact card has been read (its stop
+  // is 0.92) and is fully solid by 0.95, just as the closing beat arms.
+  const endVoidOpacity = useTransform(scrollYProgress, [0.915, 0.952], [0, 1]);
   const hintOpacity = useTransform(() => {
     const revealed = endEarthT.get() > 0.75 ? 1 : 0;
     return revealed * Math.max(0, 1 - smoothPull.get() * 5);
@@ -1240,23 +1443,29 @@ export default function MultiverseFlight() {
         {/* Furthest plane — barely moves, and is over-sized so translating it
            never drags an edge into frame. */}
         <motion.div
-          className="absolute -inset-y-1/4 inset-x-0"
+          className="absolute -inset-y-1/4 inset-x-0 bg-[#01030a]"
           style={{
-            background: sceneBackground,
             y: parallaxFar,
             scale: parallaxFarScale,
           }}
         />
-        {/* Mid plane — the opening sky glow, travelling further than the void
-           behind it. */}
-        <motion.div
-          className="absolute inset-x-0 top-[-10vh] h-[60vh] bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.22),_transparent_62%)]"
-          style={{ opacity: lightGlowOpacity, y: parallaxMid }}
-        />
+
+        {/* The volumes of space the corridor passes through. Each is a fixed
+           gradient cross-faded by progress, so the colour journey is
+           composited rather than repainted — see SPACE_REGIONS. */}
+        {SPACE_REGIONS.map((region, index) => (
+          <SpaceRegionLayer
+            key={region.id}
+            region={region}
+            index={index}
+            scrollProgress={smoothScrollProgress}
+          />
+        ))}
+
         {/* Nearest plane — drifts against the others, so the depth between
            them is legible rather than everything sliding as one sheet. */}
         <motion.div
-          className="absolute -inset-y-1/4 inset-x-0 bg-[radial-gradient(circle_at_50%_55%,_rgba(56,189,248,0.12),_transparent_48%)]"
+          className="absolute -inset-y-1/4 inset-x-0 bg-[radial-gradient(circle_at_50%_55%,_rgba(56,189,248,0.22)_0%,_rgba(79,70,229,0.14)_38%,_transparent_62%)]"
           style={{ opacity: deepGlowOpacity, y: parallaxNear }}
         />
         
@@ -1265,14 +1474,21 @@ export default function MultiverseFlight() {
         {/* Solid black void behind the end-of-flight object — the scene's
            own background gradient is still a dark navy this late in the
            scroll, not true black, so this fades in ahead of the object
-           itself to sell "empty space, one distant thing out there". */}
+           itself to sell "empty space, one distant thing out there".
+
+           z-[5] is load-bearing. The billboard cards come later in the DOM
+           with z-index auto, so without an explicit layer above them this
+           "void" painted *under* the whole corridor and blacked out nothing:
+           the contact card stayed lit right through the closing beat. It now
+           sits above the cards (which are clearing over the same stretch)
+           and below the end-of-flight content at z-[6]/z-10. */}
         <motion.div
-          className="pointer-events-none absolute inset-0 bg-black"
+          className="pointer-events-none absolute inset-0 z-[5] bg-black"
           style={{ opacity: endVoidOpacity }}
         />
 
         <motion.div
-          className="pointer-events-none absolute inset-0 overflow-hidden"
+          className="pointer-events-none absolute inset-0 z-[6] overflow-hidden"
           style={{ opacity: endEarthOpacity }}
         >
           {/* A photographic full-bleed shot, not an isolated 3D-rendered
@@ -1298,30 +1514,78 @@ export default function MultiverseFlight() {
             style={{ opacity: approachVignette }}
           />
 
-          {/* Invitation to keep pushing — fades the moment they do */}
-          <motion.p
-            className="absolute bottom-16 inset-x-0 text-center text-[10px] font-semibold uppercase tracking-[0.42em] text-sky-100/60"
+          {/* Invitation to keep pushing — fades the moment they do. Was one
+             long full-width sentence at 0.42em tracking and 60% opacity,
+             which at 10px is a grey smear rather than something you read.
+             Split into a bright label and a dimmer instruction so there is
+             a hierarchy to catch, and pulled in from the edges. */}
+          <motion.div
+            className="pointer-events-none absolute inset-x-0 bottom-10 flex flex-col items-center gap-2 px-6 text-center"
             style={{ opacity: hintOpacity }}
           >
-            THE END,THANK YOU. PLEASE GO BACK TO THE BEGINNING TO START NEW FLIGHT.
-          </motion.p>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.44em] text-sky-100/85 sm:text-[11px]">
+              Thank you for flying
+            </span>
+            <span className="text-[10px] font-medium normal-case tracking-[0.08em] text-sky-100/45">
+              Keep scrolling to come back around
+            </span>
+          </motion.div>
         </motion.div>
 
+        {/* pointer-events tracks the reveal: this layer spans the whole
+           viewport at z-10, so leaving it clickable while invisible put a
+           dead sheet over every card's Next/CTA for the entire flight.
+           Unmounted outright when dismissed (not merely transparent) so the
+           particle canvas inside stops existing rather than idling. */}
         <motion.div
-          className="pointer-events-auto absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 px-6 text-center sm:gap-8"
+          className={`absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center ${
+            isEndParticleActive ? "pointer-events-auto" : "pointer-events-none"
+          }`}
           initial={false}
-          animate={{ opacity: isEndParticleActive ? 1 : 0, scale: isEndParticleActive ? 1 : 0.85 }}
-          transition={{ duration: 0.7, ease: "easeOut" }}
+          animate={{
+            opacity: isEndParticleActive ? 1 : 0,
+            scale: isEndParticleActive ? 1 : 0.9,
+          }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
         >
+          {/* Arrival bloom. The mark was assembling against flat black with
+             nothing to sit in, which is most of why it read as scattered
+             debris rather than an object arriving. This is a soft volume of
+             light behind it — one static gradient whose opacity and scale
+             breathe, so it costs nothing but gives the particles somewhere
+             to land. Sized off the viewport's short edge so it stays behind
+             the mark at any aspect ratio. */}
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-1/2 top-1/2 h-[min(86vh,760px)] w-[min(86vh,760px)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,_rgba(56,189,248,0.16)_0%,_rgba(14,165,233,0.07)_38%,_transparent_68%)]"
+            initial={false}
+            animate={
+              showEndLogo
+                ? { opacity: [0.55, 1, 0.55], scale: [0.94, 1.06, 0.94] }
+                : { opacity: 0, scale: 0.9 }
+            }
+            transition={
+              showEndLogo
+                ? { duration: 7, repeat: Infinity, ease: "easeInOut", delay: 0.4 }
+                : { duration: 0.5 }
+            }
+          />
           {/* Beat one: the tagline appears dead-centre and zooms in. Once
              showEndLogo arms (see the effect above), it slides up on that
              same element instead of a second one — one continuous motion
-             from "just arrived" to "made room" rather than a swap. */}
-          <motion.p
+             from "just arrived" to "made room" rather than a swap.
+
+             The three elements used to be spaced by the parent's flex gap on
+             top of a 420px canvas box, which spread them across the whole
+             viewport height and left them reading as three unrelated things
+             rather than one composition. Spacing is now owned here, as
+             margins tuned against the canvas's own generous padding, and the
+             shift is smaller so the group stays optically centred. */}
+          <motion.div
             initial={false}
             animate={
               isEndParticleActive
-                ? { opacity: 1, scale: 1, y: showEndLogo ? -44 : 0 }
+                ? { opacity: 1, scale: 1, y: showEndLogo ? -18 : 0 }
                 : { opacity: 0, scale: 0.55, y: 0 }
             }
             transition={
@@ -1333,39 +1597,73 @@ export default function MultiverseFlight() {
                   }
                 : { duration: 0.3 }
             }
-            className="text-lg font-semibold uppercase leading-snug tracking-[0.18em] text-sky-50 drop-shadow-[0_4px_20px_rgba(2,8,23,0.65)] sm:text-2xl lg:text-3xl"
+            className="relative z-10 flex flex-col items-center"
           >
-            I BUILD. YOU IMAGINE.
-            <br />
-            TOGETHER, WE CREATE.
-          </motion.p>
+            {/* A quiet kicker gives the tagline a head to sit under, so the
+               block has a hierarchy instead of starting cold on the big
+               line. Arrives with the mark, not the tagline. */}
+            <motion.span
+              initial={false}
+              animate={{ opacity: showEndLogo ? 1 : 0, y: showEndLogo ? 0 : -6 }}
+              transition={{ duration: 0.7, delay: showEndLogo ? 0.25 : 0, ease: "easeOut" }}
+              className="mb-4 text-[9px] font-semibold uppercase tracking-[0.5em] text-sky-200/45 sm:text-[10px]"
+            >
+              End of transmission
+            </motion.span>
+            <p className="text-lg font-semibold uppercase leading-[1.35] tracking-[0.18em] text-sky-50 drop-shadow-[0_4px_20px_rgba(2,8,23,0.65)] sm:text-2xl lg:text-[2rem]">
+              I BUILD. YOU IMAGINE.
+              <br />
+              TOGETHER, WE CREATE.
+            </p>
+          </motion.div>
 
           {/* Beat two: once the tagline has made room, the particle mark
              forms in underneath it — `active` (not isEndParticleActive)
              is what actually triggers HeroLogo's own form-in tween, so the
              particles don't start assembling until this second beat. */}
+          {/* The mark is drawn larger and denser than before. It previously
+             read as a sparse ring of debris rather than a logo: 560 points
+             spread over a 280px sample is below the density where the glyph
+             shapes close up. This canvas is now genuinely ~420px (the sizing
+             bug that stretched it full-screen is fixed) and the draw loop no
+             longer does per-particle save/rotate or shadow blur, so it can
+             carry roughly double the points for a fraction of the old cost —
+             measured at a full 60fps with the canvas contributing ~nothing.
+             shrink-0 keeps the flex column from stretching or squashing it. */}
           <ParticleLogo
             src="/images/us2.png"
-            size={isMobile ? 210 : 280}
-            particleCount={isMobile ? 420 : 900}
+            size={isMobile ? 250 : 340}
+            particleCount={isMobile ? 490 : 840}
             disperseStrength={isMobile ? 260 : 360}
             active={showEndLogo}
-            className="h-[min(58vw,420px)] w-[min(58vw,420px)]"
+            className="-my-4 h-[min(64vw,460px)] w-[min(64vw,460px)] shrink-0 sm:-my-6"
           />
-          {/* Closing signature — the same cursive display face Greeting uses
-             for the time-of-day words, so the flight's opening and closing
-             beats share one voice. Held back with the particle mark (beat
-             two) rather than the tagline, since it's the label for that
-             mark, not a separate beat of its own. */}
-          <motion.p
+          {/* Closing signature. It used to blink — a full fade to zero and
+             back on a loop — which read as the name being unsure whether it
+             belonged on screen. It now stays put and re-sets itself in a
+             different typeface every couple of seconds instead, so the
+             motion carries some meaning (a designer's name, shown in a
+             range of voices) rather than just pulsing. Held back with the
+             particle mark (beat two), since it labels that mark rather than
+             being a beat of its own. */}
+          <motion.div
             initial={false}
-            animate={{ opacity: showEndLogo ? 1 : 0 }}
-            transition={{ duration: 0.6, delay: showEndLogo ? 0.9 : 0, ease: "easeOut" }}
-            className="text-4xl text-sky-100/90 sm:text-5xl lg:text-6xl"
-            style={{ fontFamily: "var(--font-twinkle-star)" }}
+            animate={{ opacity: showEndLogo ? 1 : 0, y: showEndLogo ? 0 : 8 }}
+            transition={{ duration: 0.8, delay: showEndLogo ? 0.9 : 0, ease: "easeOut" }}
+            className="relative z-10 flex flex-col items-center"
           >
-            Umar Suhail
-          </motion.p>
+            <SignatureName
+              active={showEndLogo}
+              className="text-4xl text-sky-100/90 sm:text-5xl lg:text-6xl"
+            />
+            {/* A hairline that fades out at both ends, so the signature has
+               a base to sit on instead of floating. Sized in ch units to
+               track the name's own width across breakpoints. */}
+            <span
+              aria-hidden="true"
+              className="mt-3 h-px w-[14ch] bg-[linear-gradient(90deg,transparent,rgba(125,211,252,0.55),transparent)] sm:mt-4"
+            />
+          </motion.div>
         </motion.div>
 
         <motion.div
@@ -1395,6 +1693,19 @@ export default function MultiverseFlight() {
             smoothScrollProgress={smoothScrollProgress}
           />
         ))}
+
+        {/* The loop's veil. Sits above everything so it can cover the instant
+           scroll is reset to the top (see runLoop). It only needs to mask a
+           single jump, so it is a plain black sheet rather than anything
+           elaborate — and because the closing frame is already near-black,
+           closing it barely registers as a change at all. */}
+        <motion.div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-50 bg-black"
+          initial={false}
+          animate={{ opacity: isWrapping ? 1 : 0 }}
+          transition={{ duration: isWrapping ? 0.26 : 0.36, ease: "easeInOut" }}
+        />
       </div>
     </div>
   );
