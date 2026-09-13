@@ -116,13 +116,22 @@ export default function SpaceParticles() {
 
     let blueProgress = getBlueProgress(window.scrollY);
 
+    // Timestamp of the last real input. While the visitor is idle the
+    // starfield's only motion is the barely-perceptible z-drift and
+    // twinkle, so the render loop drops to a third of the frame rate —
+    // freeing the GPU/compositor budget for the rest of the page — and
+    // snaps back to full rate the instant anything moves.
+    let lastActivity = performance.now();
+
     const handleMouseMove = (e: MouseEvent) => {
       mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
       mouse.y = (e.clientY / window.innerHeight) * 2 - 1;
+      lastActivity = performance.now();
     };
 
     const handleWheel = (e: WheelEvent) => {
       scrollVelocity += e.deltaY * 0.001;
+      lastActivity = performance.now();
     };
 
     const handleScroll = () => {
@@ -130,6 +139,7 @@ export default function SpaceParticles() {
       scrollVelocity += (currentY - lastScrollY) * 0.006;
       lastScrollY = currentY;
       blueProgress = getBlueProgress(currentY);
+      lastActivity = performance.now();
     };
 
     const handleResize = () => {
@@ -160,8 +170,17 @@ export default function SpaceParticles() {
       }
     };
 
+    let frameCount = 0;
+
     const animate = (time: number) => {
       rafId = requestAnimationFrame(animate);
+      frameCount++;
+
+      // Idle throttle — see lastActivity above. 2s after the last input,
+      // only every third frame renders; the slow drift/twinkle is
+      // indistinguishable at 20fps and the other two frames cost nothing.
+      if (time - lastActivity > 2000 && frameCount % 3 !== 0) return;
+
       addParticlesGradually();
 
       rotation.x += (mouse.y * 0.08 - rotation.x) * 0.04;

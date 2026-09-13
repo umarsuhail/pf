@@ -266,7 +266,10 @@ export default function ScrollDial() {
       </svg>
 
       {/* Current page label, written beside the knob */}
-      <div className="pointer-events-none flex flex-col rounded-full border border-white/10 bg-slate-900/80 px-4 py-2 backdrop-blur-md">
+      {/* Near-opaque plate instead of backdrop-blur — pinned over the
+         flight scene, a backdrop filter here re-blurred its patch of the
+         scene on every scroll frame. */}
+      <div className="pointer-events-none flex flex-col rounded-full border border-white/10 bg-slate-900/95 px-4 py-2">
         <span ref={percentRef} className="text-[9px] font-semibold uppercase tracking-[0.28em] text-slate-400">
           {Math.round(progressRef.current * 100)}%
         </span>

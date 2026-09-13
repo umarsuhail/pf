@@ -119,7 +119,7 @@ export default function NarrationHighlights() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 6, scale: 0.94 }}
           transition={{ type: "spring", stiffness: 320, damping: 26 }}
-          className={`pointer-events-none absolute z-20 flex items-center gap-2 rounded-full border border-white/15 bg-slate-950/85 py-2 pl-3 pr-4 text-sky-50 shadow-[0_12px_32px_rgba(2,8,23,0.55)] backdrop-blur-xl ${position}`}
+          className={`pointer-events-none absolute z-20 flex items-center gap-2 rounded-full border border-white/15 bg-slate-950/90 py-2 pl-3 pr-4 text-sky-50 shadow-[0_12px_32px_rgba(2,8,23,0.55)] ${position}`}
         >
           <Icon ref={iconRef} size={16} className="text-(--accent)" />
           <span className="whitespace-nowrap text-xs font-semibold tracking-wide">

@@ -675,7 +675,11 @@ export function CardPortal({
 
       {/* Action label — faint baseline (touch), brightens on hover-capable pointer hover */}
       <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center opacity-70 transition-opacity duration-300 group-hover:opacity-100">
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/30 px-4 py-2 text-xs font-medium text-sky-50 backdrop-blur-sm">
+        {/* Solid-ish plate, not backdrop-blur: a backdrop filter here would
+           sit inside a 3D-transformed card over a scene that repaints every
+           scroll frame, forcing a re-blur of its backdrop each time — six
+           cards' worth. The darker background reads the same. */}
+        <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/55 px-4 py-2 text-xs font-medium text-sky-50">
           <ArrowUpRightIcon ref={arrowRef} size={14} aria-hidden="true" />
           {actionLabel}
         </span>

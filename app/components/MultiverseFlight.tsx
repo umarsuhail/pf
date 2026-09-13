@@ -323,9 +323,20 @@ function BillboardCard({
   const activeRotateX = useTransform(straightening, (v) => baseRotateX * Math.max(0, 1 - v * 2));
 
   const activeReadabilityBoost = useTransform(straightening, [0, 1], [0, 1]);
-  const effectiveBlur = useTransform(() => upcomingBlur.get() * (1 - straightening.get()));
   const effectiveOpacity = useTransform(() => Math.min(1, upcomingOpacity.get() + activeReadabilityBoost.get() * 0.38));
-  const cardFilter = useMotionTemplate`blur(${effectiveBlur}px)`;
+  // A continuously-animating blur() is one of the most expensive styles on
+  // the page: every fractional radius change forces the compositor to
+  // re-rasterize the whole card layer (large, box-shadowed, rounded), and
+  // during scroll that was happening on every frame for every card at once.
+  // Quantizing to 0.5px steps keeps the visual identical while cutting the
+  // re-rasters to a handful per transit — and "none" (rather than blur(0px))
+  // while a card is sharp frees the compositor from the filter entirely in
+  // the state cards spend most of their time in.
+  const cardFilter = useTransform(() => {
+    const raw = upcomingBlur.get() * (1 - straightening.get());
+    const stepped = Math.round(raw * 2) / 2;
+    return stepped <= 0 ? "none" : `blur(${stepped}px)`;
+  });
   // Faded-out cards are still hit-testable — and since every card is
   // absolutely stacked in the same container, the later ones sit on top and
   // swallow clicks meant for the card actually in view (that's what made
@@ -548,7 +559,14 @@ function SkillLayoverCluster({
   const opacity = useTransform(smoothScrollProgress, stops, [0, 1, 0]);
   const scale = useTransform(smoothScrollProgress, stops, [0.9, 1, 0.9]);
   const blur = useTransform(smoothScrollProgress, stops, [8, 0, 8]);
-  const filter = useMotionTemplate`blur(${blur}px)`;
+  // Quantized to whole pixels, and "none" while sharp — same reasoning as
+  // the billboard cards' cardFilter: every fractional blur change forces a
+  // full layer re-raster, and this cluster fades through its blur window on
+  // every scroll frame of the Skills → Projects transit.
+  const filter = useTransform(blur, (b) => {
+    const stepped = Math.round(b);
+    return stepped <= 0 ? "none" : `blur(${stepped}px)`;
+  });
   const pointerEvents = useTransform(opacity, (o) => (o > 0.55 ? "auto" : "none"));
 
   return (
@@ -586,7 +604,7 @@ function SkillLayoverCluster({
               />
             </motion.div>
             <span
-              className={`rounded bg-slate-950/40 px-1.5 py-0.5 text-slate-100/90 backdrop-blur-sm ${
+              className={`rounded bg-slate-950/70 px-1.5 py-0.5 text-slate-100/90 ${
                 isMobile ? "text-[9px]" : "text-[11px] sm:text-xs"
               }`}
             >
@@ -715,13 +733,17 @@ export default function MultiverseFlight() {
   // anything.
   const endEarthT = useTransform(scrollYProgress, [0.88, 1], [0, 1]);
   const endEarthReveal = useTransform(endEarthT, [0, 0.35, 1], [0, 1, 1]);
-  const endParticleOpacity = useTransform(endEarthT, [0.42, 0.72, 1], [0, 0.72, 1]);
-  const endParticleScale = useTransform(endEarthT, [0.42, 1], [0.72, 1]);
+  // A one-way latch, not a live scroll-bound value: the tagline/logo/name
+  // closing beat should stay on screen once it's played, not fade back out
+  // if the visitor so much as nudges back up near the very bottom — trackpad
+  // rubber-banding at the max-scroll boundary especially made this flicker
+  // in and out on exactly the threshold crossing. Once true, this never
+  // goes false again for the life of the page.
   const [isEndParticleActive, setIsEndParticleActive] = useState(false);
 
   useEffect(() => {
     const unsubscribe = scrollYProgress.on("change", (value) => {
-      setIsEndParticleActive(value >= 0.9);
+      if (value >= 0.9) setIsEndParticleActive(true);
     });
     return unsubscribe;
   }, [scrollYProgress]);
@@ -1287,7 +1309,9 @@ export default function MultiverseFlight() {
 
         <motion.div
           className="pointer-events-auto absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 px-6 text-center sm:gap-8"
-          style={{ opacity: endParticleOpacity, scale: endParticleScale }}
+          initial={false}
+          animate={{ opacity: isEndParticleActive ? 1 : 0, scale: isEndParticleActive ? 1 : 0.85 }}
+          transition={{ duration: 0.7, ease: "easeOut" }}
         >
           {/* Beat one: the tagline appears dead-centre and zooms in. Once
              showEndLogo arms (see the effect above), it slides up on that

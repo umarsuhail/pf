@@ -187,13 +187,36 @@ export default function ParticleLogo({
             });
         };
 
+        // Cached canvas dimensions — draw() runs every frame, and calling
+        // getBoundingClientRect there is a forced layout read 60 times a
+        // second. The size only changes on resize, so it's read once here.
+        let viewW = 0;
+        let viewH = 0;
+        // The bloom gradient only depends on the canvas size, so it's built
+        // here on resize rather than re-created inside every draw() frame.
+        let halo: CanvasGradient | null = null;
+
         const resize = () => {
             const rect = canvas.getBoundingClientRect();
+            viewW = rect.width;
+            viewH = rect.height;
 
             canvas.width = rect.width * dpr;
             canvas.height = rect.height * dpr;
 
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            halo = ctx.createRadialGradient(
+                viewW / 2,
+                viewH / 2,
+                0,
+                viewW / 2,
+                viewH / 2,
+                Math.min(viewW, viewH) * 0.46,
+            );
+            halo.addColorStop(0, "rgba(56, 189, 248, 0.11)");
+            halo.addColorStop(0.52, "rgba(14, 165, 233, 0.035)");
+            halo.addColorStop(1, "rgba(14, 165, 233, 0)");
         };
 
         const getLogoPoints = (): Promise<
@@ -371,6 +394,10 @@ export default function ParticleLogo({
             }
         };
 
+        // True once the dormant branch below has wiped the canvas, so it
+        // doesn't re-clear on every skipped frame.
+        let dormantClean = false;
+
         const draw = () => {
             if (destroyed) return;
 
@@ -379,31 +406,44 @@ export default function ParticleLogo({
                 return;
             }
 
-            const rect = canvas.getBoundingClientRect();
+            // Dormant gate. The observer above only knows geometry, and this
+            // canvas lives in a full-screen sticky wrapper — geometrically
+            // "on screen" from the moment the page loads, even while its
+            // wrapper sits at opacity 0 for the whole flight. Between
+            // formOut's completed fade and the next formIn every particle's
+            // alpha has tweened to ~0, so running the physics and painting
+            // hundreds of invisible rects each frame was a permanent tax on
+            // the entire page. One cheap alpha scan skips all of it until
+            // the next reveal actually starts.
+            if (!visible) {
+                let anyAlive = false;
+                for (const particle of particles) {
+                    if (particle.alpha > 0.004) {
+                        anyAlive = true;
+                        break;
+                    }
+                }
+                if (!anyAlive) {
+                    if (!dormantClean) {
+                        ctx.clearRect(0, 0, viewW, viewH);
+                        dormantClean = true;
+                    }
+                    animationFrame = requestAnimationFrame(draw);
+                    return;
+                }
+            }
+            dormantClean = false;
 
-            ctx.clearRect(
-                0,
-                0,
-                rect.width,
-                rect.height
-            );
+            ctx.clearRect(0, 0, viewW, viewH);
 
-            // The formed portrait gets a restrained ice-blue bloom. This is
-            // drawn once per frame, rather than putting a costly blur on every
-            // particle, so the mark stays crisp on lower-power devices.
-            const halo = ctx.createRadialGradient(
-                rect.width / 2,
-                rect.height / 2,
-                0,
-                rect.width / 2,
-                rect.height / 2,
-                Math.min(rect.width, rect.height) * 0.46
-            );
-            halo.addColorStop(0, "rgba(56, 189, 248, 0.11)");
-            halo.addColorStop(0.52, "rgba(14, 165, 233, 0.035)");
-            halo.addColorStop(1, "rgba(14, 165, 233, 0)");
-            ctx.fillStyle = halo;
-            ctx.fillRect(0, 0, rect.width, rect.height);
+            // The formed portrait gets a restrained ice-blue bloom. Cached on
+            // resize (it only depends on canvas size) and drawn once per
+            // frame, rather than putting a costly blur on every particle, so
+            // the mark stays crisp on lower-power devices.
+            if (halo) {
+                ctx.fillStyle = halo;
+                ctx.fillRect(0, 0, viewW, viewH);
+            }
             ctx.globalCompositeOperation = "lighter";
 
             /*
