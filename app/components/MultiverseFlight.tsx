@@ -76,7 +76,14 @@ const COMPACT_PORTAL_WIDTH = "clamp(96px, 30vh, 150px)";
 
 // Unified ultra-smooth physics configurations
 const PHYSICS = {
-  camera: { stiffness: 60, damping: 20, mass: 0.8, restDelta: 0.0001 },
+  // stiffness 60/damping 20/mass 0.8 (overdamped, ratio ~1.28) was tuned for
+  // a slow cinematic drift, but on desktop wheel/trackpad input — discrete,
+  // stepped deltas rather than touch's continuous drag — that same softness
+  // reads as the camera lagging behind the scrollbar rather than gliding:
+  // it visibly takes a beat to catch up after every wheel tick. Stiffer and
+  // lighter closes that gap while staying just past critical damping
+  // (ratio ~1.2, still no bounce/overshoot) instead of raw 1:1 tracking.
+  camera: { stiffness: 260, damping: 30, mass: 0.6, restDelta: 0.0001 },
   expansion: { type: "spring", stiffness: 180, damping: 22, mass: 0.9 },
 } as const;
 
@@ -637,9 +644,11 @@ export default function MultiverseFlight() {
   });
 
   // The secret to cinematic smoothness: applying spring physics to the global
-  // scroll progress. Touch scrolling already carries its own momentum, so the
-  // soft desktop spring stacks on top of it and reads as lag — phones get a
-  // stiffer, tighter-settling one that tracks the finger.
+  // scroll progress, rather than driving the camera off raw scroll directly.
+  // Touch already carries its own momentum, so a spring tuned as tight as
+  // desktop's would fight the finger instead of following it — this one
+  // stays softer specifically to absorb that, not because touch needs less
+  // responsiveness in general.
   const smoothScrollProgress = useSpring(
     scrollYProgress,
     compact
