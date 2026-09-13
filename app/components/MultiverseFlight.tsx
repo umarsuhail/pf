@@ -4,6 +4,7 @@ import {
   motion,
   useMotionTemplate,
   useMotionValue,
+  useMotionValueEvent,
   useScroll,
   useSpring,
   useTransform,
@@ -24,6 +25,7 @@ import SpaceParticles from "./SpaceParticles";
 import ParticleLogo from "./HeroLogo";
 import { getSkillGroups } from "../data/skillGroups";
 import Greeting from "./Greeting";
+import { POWER3_OUT } from "../lib/easings";
 
 import {
   cardGradients,
@@ -326,6 +328,20 @@ function BillboardCard({
     o > 0.55 ? "auto" : "none",
   );
 
+  // The gentle float/pulse below used to run its `repeat: Infinity` loop on
+  // every card for the whole session, even the ones sitting fully faded out
+  // elsewhere in the corridor — every one of those is still a live RAF-driven
+  // animation doing real interpolation work each frame for something nobody
+  // can see. Only the card(s) actually legible get the loop; the rest hold
+  // still until they fade back in.
+  const [isBobbing, setIsBobbing] = useState(() => effectiveOpacity.get() > 0.55);
+  useMotionValueEvent(effectiveOpacity, "change", (value) => {
+    setIsBobbing((prev) => {
+      const next = value > 0.55;
+      return prev === next ? prev : next;
+    });
+  });
+
   return (
     <motion.div
       style={{
@@ -363,15 +379,16 @@ function BillboardCard({
       {card.id === "home" && <NarrationHighlights />}
 
       <motion.div
-       animate={{
-  y: [0, -12, 0, 12, 0],
-  opacity: [0.7, 1, 0.85, 1, 0.7],
-}}
-transition={{
-  duration: 7 + index * 0.5,
-  repeat: Infinity,
-  ease: "easeInOut",
-}}
+        animate={
+          isBobbing
+            ? { y: [0, -12, 0, 12, 0], opacity: [0.7, 1, 0.85, 1, 0.7] }
+            : { y: 0, opacity: 1 }
+        }
+        transition={
+          isBobbing
+            ? { duration: 7 + index * 0.5, repeat: Infinity, ease: "easeInOut" }
+            : { duration: 0.4, ease: "easeOut" }
+        }
         className={`flex w-full items-stretch ${isMobile ? "gap-3" : "gap-5 sm:gap-8"} ${
           card.align === "right" ? "flex-row-reverse" : "flex-row"
         }`}
@@ -700,6 +717,21 @@ export default function MultiverseFlight() {
     return unsubscribe;
   }, [scrollYProgress]);
 
+  // The closing beat plays as a sequence, not all at once: the tagline
+  // zooms in centered first, then — once that's had a moment to read —
+  // it slides up to make room and the particle mark forms in underneath.
+  // `showEndLogo` is that second beat's own delayed trigger, armed a fixed
+  // stretch after the tagline first appears rather than sharing its timing.
+  const [showEndLogo, setShowEndLogo] = useState(false);
+  useEffect(() => {
+    if (!isEndParticleActive) {
+      setShowEndLogo(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => setShowEndLogo(true), 1100);
+    return () => window.clearTimeout(timeout);
+  }, [isEndParticleActive]);
+
   // --- Overscroll "approach" -------------------------------------------
   // At max scroll the browser has nothing left to give, so the journey
   // would just dead-stop on a static globe. Instead we capture the wheel /
@@ -898,8 +930,9 @@ export default function MultiverseFlight() {
       // from what the viewport actually needs. Nothing corrects it during a
       // multi-second dwell (see currentProgress below), so the drift shows
       // up all at once as a visible pull-back the moment the next leg's
-      // first scrollTo lands on the newly-correct conversion. Refreshed
-      // every frame in tick() instead of trusting this initial read.
+      // first scrollTo lands on the newly-correct conversion. Checked every
+      // frame in tick() instead of trusting this initial read (see
+      // refreshScrollGeometryIfNeeded below for how that check stays cheap).
       let containerTop = window.scrollY + container.getBoundingClientRect().top;
       let scrollable = container.offsetHeight - window.innerHeight;
       if (scrollable <= 0) return;
@@ -907,6 +940,23 @@ export default function MultiverseFlight() {
       const refreshScrollGeometry = () => {
         containerTop = window.scrollY + container.getBoundingClientRect().top;
         scrollable = container.offsetHeight - window.innerHeight;
+      };
+
+      // The container's height is a vh unit (see the `h-[1800vh]` track
+      // below), so it — and the resulting `scrollable` — only actually
+      // change when window.innerHeight does (the mobile-toolbar case the
+      // comment above describes). Re-reading layout via
+      // getBoundingClientRect()/offsetHeight on every rAF frame regardless
+      // was a needless main-thread cost through the whole tour; gating the
+      // real refresh behind a plain number comparison keeps the same
+      // mid-dwell correction without paying for a layout read on frames
+      // where nothing moved.
+      let lastInnerHeight = window.innerHeight;
+      const refreshScrollGeometryIfNeeded = () => {
+        const innerHeight = window.innerHeight;
+        if (innerHeight === lastInnerHeight) return;
+        lastInnerHeight = innerHeight;
+        refreshScrollGeometry();
       };
 
       const toScrollTop = (p: number) => containerTop + scrollable * p;
@@ -1075,7 +1125,7 @@ export default function MultiverseFlight() {
         const eased = legs[index].linear ? t : ease(t);
         const p = from + (legs[index].target - from) * eased;
         currentProgress = p;
-        refreshScrollGeometry();
+        refreshScrollGeometryIfNeeded();
         window.scrollTo({ top: toScrollTop(p), behavior: "auto" });
         // window.scrollTo doesn't move the camera directly — every card's
         // transforms read smoothScrollProgress, which normally only updates
@@ -1227,17 +1277,62 @@ export default function MultiverseFlight() {
         </motion.div>
 
         <motion.div
-          className="pointer-events-auto absolute inset-0 z-10 flex items-center justify-center"
+          className="pointer-events-auto absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 px-6 text-center sm:gap-8"
           style={{ opacity: endParticleOpacity, scale: endParticleScale }}
         >
+          {/* Beat one: the tagline appears dead-centre and zooms in. Once
+             showEndLogo arms (see the effect above), it slides up on that
+             same element instead of a second one — one continuous motion
+             from "just arrived" to "made room" rather than a swap. */}
+          <motion.p
+            initial={false}
+            animate={
+              isEndParticleActive
+                ? { opacity: 1, scale: 1, y: showEndLogo ? -44 : 0 }
+                : { opacity: 0, scale: 0.55, y: 0 }
+            }
+            transition={
+              isEndParticleActive
+                ? {
+                    opacity: { duration: 0.5, ease: "easeOut" },
+                    scale: { duration: 0.7, ease: POWER3_OUT },
+                    y: { duration: 0.7, ease: "easeInOut" },
+                  }
+                : { duration: 0.3 }
+            }
+            className="text-lg font-semibold uppercase leading-snug tracking-[0.18em] text-sky-50 drop-shadow-[0_4px_20px_rgba(2,8,23,0.65)] sm:text-2xl lg:text-3xl"
+          >
+            I BUILD. YOU IMAGINE.
+            <br />
+            TOGETHER, WE CREATE.
+          </motion.p>
+
+          {/* Beat two: once the tagline has made room, the particle mark
+             forms in underneath it — `active` (not isEndParticleActive)
+             is what actually triggers HeroLogo's own form-in tween, so the
+             particles don't start assembling until this second beat. */}
           <ParticleLogo
-            src="/images/us.png"
+            src="/images/us2.png"
             size={isMobile ? 210 : 280}
-            particleCount={isMobile ? 420 : 720}
+            particleCount={isMobile ? 420 : 900}
             disperseStrength={isMobile ? 260 : 360}
-            active={isEndParticleActive}
+            active={showEndLogo}
             className="h-[min(58vw,420px)] w-[min(58vw,420px)]"
           />
+          {/* Closing signature — the same cursive display face Greeting uses
+             for the time-of-day words, so the flight's opening and closing
+             beats share one voice. Held back with the particle mark (beat
+             two) rather than the tagline, since it's the label for that
+             mark, not a separate beat of its own. */}
+          <motion.p
+            initial={false}
+            animate={{ opacity: showEndLogo ? 1 : 0 }}
+            transition={{ duration: 0.6, delay: showEndLogo ? 0.9 : 0, ease: "easeOut" }}
+            className="text-4xl text-sky-100/90 sm:text-5xl lg:text-6xl"
+            style={{ fontFamily: "var(--font-twinkle-star)" }}
+          >
+            Umar Suhail
+          </motion.p>
         </motion.div>
 
         <motion.div

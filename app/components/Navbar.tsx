@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const navLinks = [
   {
@@ -90,10 +90,17 @@ const PILL_SPRING = { type: "spring", stiffness: 320, damping: 32, mass: 0.7 } a
 
 export default function NeumorphicNavbar() {
   const [activeId, setActiveId] = useState("home");
-  const [journeyProgress, setJourneyProgress] = useState(0);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isPillOpen, setIsPillOpen] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
+  // Scroll progress used to just be React state, but the flight broadcasts
+  // it on every scroll tick (~60/s) — routing that through setState forced
+  // a full re-render of this whole nav on every frame while scrolling, just
+  // to change one bar's height. It's read here instead, and the bar's DOM
+  // node is written to directly, so scrolling no longer re-renders this
+  // component at all.
+  const journeyProgressRef = useRef(0);
+  const progressBarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isPillOpen) return;
@@ -114,7 +121,11 @@ export default function NeumorphicNavbar() {
       const nextActive = customEvent.detail?.activeId;
 
       if (typeof progress === "number") {
-        setJourneyProgress(Math.min(1, Math.max(0, progress)));
+        const clamped = Math.min(1, Math.max(0, progress));
+        journeyProgressRef.current = clamped;
+        if (progressBarRef.current) {
+          progressBarRef.current.style.height = `${Math.max(6, clamped * 100)}%`;
+        }
       }
 
       if (nextActive) {
@@ -137,7 +148,11 @@ export default function NeumorphicNavbar() {
 
   const handleNavigate = (id: string) => {
     setActiveId(id);
-    setJourneyProgress(sectionProgressMap[id] ?? 0);
+    const target = sectionProgressMap[id] ?? 0;
+    journeyProgressRef.current = target;
+    if (progressBarRef.current) {
+      progressBarRef.current.style.height = `${Math.max(6, target * 100)}%`;
+    }
     navigateToSection(id);
   };
 
@@ -393,8 +408,9 @@ export default function NeumorphicNavbar() {
           {!isCollapsed && (
             <div className="relative h-88 w-2.5 rounded-full bg-slate-200 [@media(max-height:560px)]:h-56">
               <div
+                ref={progressBarRef}
                 className="absolute bottom-0 left-0 w-full rounded-full bg-[linear-gradient(180deg,#2f78bc_0%,#124677_100%)] transition-[height] duration-500"
-                style={{ height: `${Math.max(6, journeyProgress * 100)}%` }}
+                style={{ height: `${Math.max(6, journeyProgressRef.current * 100)}%` }}
               />
             </div>
           )}

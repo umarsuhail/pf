@@ -28,8 +28,21 @@ function hexToRgb(hex: string): [number, number, number] {
   return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 }
 
-export default function Space({ tint }: { tint?: string }) {
+export default function Space({
+  tint,
+  active = true,
+}: {
+  tint?: string;
+  // Lets a parent that already knows its own scroll-driven visibility
+  // (e.g. CardPortal's reveal/fade) short-circuit drawing directly,
+  // without waiting on IntersectionObserver — which only reacts to actual
+  // geometry, not a card that's simply faded to opacity 0 in place. See
+  // the comment on the RAF loop below.
+  active?: boolean;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const activeRef = useRef(active);
+  activeRef.current = active;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -43,6 +56,11 @@ export default function Space({ tint }: { tint?: string }) {
     let width = 0;
     let height = 0;
     let dpr = 1;
+    // The nebula wash never changes frame-to-frame (tint/width/height are
+    // fixed once seeded) — building a fresh CanvasGradient for it on every
+    // single draw() call, times six cards, times sixty frames a second,
+    // was pure waste. Built once in resize() below, reused here.
+    let nebulaGradient: CanvasGradient | null = null;
 
     const seed = () => {
       const count = Math.floor(width * height * STARS_PER_PIXEL);
@@ -63,19 +81,8 @@ export default function Space({ tint }: { tint?: string }) {
       ctx.fillRect(0, 0, width, height);
 
       // Bake this portal's accent color into the space as a soft nebula wash
-      if (tintRgb) {
-        const [r, g, b] = tintRgb;
-        const glow = ctx.createRadialGradient(
-          width * 0.5,
-          height * 0.55,
-          0,
-          width * 0.5,
-          height * 0.55,
-          Math.max(width, height) * 0.75,
-        );
-        glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.24)`);
-        glow.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-        ctx.fillStyle = glow;
+      if (nebulaGradient) {
+        ctx.fillStyle = nebulaGradient;
         ctx.fillRect(0, 0, width, height);
       }
 
@@ -101,6 +108,21 @@ export default function Space({ tint }: { tint?: string }) {
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      if (tintRgb) {
+        const [r, g, b] = tintRgb;
+        nebulaGradient = ctx.createRadialGradient(
+          width * 0.5,
+          height * 0.55,
+          0,
+          width * 0.5,
+          height * 0.55,
+          Math.max(width, height) * 0.75,
+        );
+        nebulaGradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.24)`);
+        nebulaGradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+      }
+
       seed();
       draw(0);
     };
@@ -111,10 +133,13 @@ export default function Space({ tint }: { tint?: string }) {
     // Every card in the flight mounts its own Space instance up front (see
     // MultiverseFlight/CardPortal), so with seven of these all drawing every
     // frame the six the visitor isn't looking at were burning main-thread
-    // time for nothing. The 3D transforms that carry a distant/departed card
-    // off to the side or into the perspective vanishing point still register
-    // as "not intersecting" here, so this only keeps drawing the ones
-    // actually contributing a visible pixel.
+    // time for nothing. This IntersectionObserver only catches a card that's
+    // geometrically left the viewport (translated off to the side, or
+    // scaled toward the perspective vanishing point) — it says nothing
+    // about a card that's sitting in place at opacity 0, which is the
+    // common case for most of the scroll (a card faded out but not yet
+    // moved). `active` (the caller's own reveal*fade signal, see CardPortal)
+    // covers that gap; both gates have to pass for a frame to actually draw.
     let isVisible = true;
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -128,7 +153,7 @@ export default function Space({ tint }: { tint?: string }) {
     if (!reduceMotion) {
       const animate = (time: number) => {
         rafId = requestAnimationFrame(animate);
-        if (isVisible) draw(time);
+        if (isVisible && activeRef.current) draw(time);
       };
       rafId = requestAnimationFrame(animate);
     }

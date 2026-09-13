@@ -59,13 +59,42 @@ function describeArc(cx: number, cy: number, r: number, startDeg: number, endDeg
 }
 
 export default function ScrollDial() {
-  const [angleDeg, setAngleDeg] = useState(MIN_ANGLE);
-  const [progress, setProgress] = useState(0);
   const [activeId, setActiveId] = useState("home");
   const [dragging, setDragging] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const draggingRef = useRef(false);
   const faceRef = useRef<SVGSVGElement>(null);
+  // Progress/angle used to be React state, but the flight broadcasts scroll
+  // progress on every scroll tick (~60/s) — routing that through setState
+  // forced a full re-render of the whole dial every frame while scrolling.
+  // It's kept in a ref instead and the affected DOM nodes (knob rotation,
+  // arc path, percent readout) are written to directly; only `activeId`
+  // (which changes at most a handful of times per scroll) stays as state,
+  // since that's what actually needs a re-render (label text, tick colors).
+  const progressRef = useRef(0);
+  const knobGroupRef = useRef<SVGGElement>(null);
+  const progressArcRef = useRef<SVGPathElement>(null);
+  const percentRef = useRef<HTMLSpanElement>(null);
+
+  const applyVisual = (p: number) => {
+    progressRef.current = p;
+    const angle = progressToAngle(p);
+    if (knobGroupRef.current) {
+      knobGroupRef.current.style.transform = `rotate(${angle}deg)`;
+    }
+    if (progressArcRef.current) {
+      progressArcRef.current.setAttribute(
+        "d",
+        describeArc(50, 50, 40, MIN_ANGLE, angle),
+      );
+    }
+    if (percentRef.current) {
+      percentRef.current.textContent = `${Math.round(p * 100)}%`;
+    }
+    if (faceRef.current) {
+      faceRef.current.setAttribute("aria-valuenow", String(Math.round(p * 100)));
+    }
+  };
 
   // Shown/hidden from the cockpit tray's own toggle, mirroring RouteMap.
   useEffect(() => {
@@ -85,9 +114,7 @@ export default function ScrollDial() {
       if (draggingRef.current) return;
       const detail = (event as CustomEvent<{ progress?: number; activeId?: string }>).detail;
       if (typeof detail?.progress === "number") {
-        const clamped = clamp01(detail.progress);
-        setProgress(clamped);
-        setAngleDeg(progressToAngle(clamped));
+        applyVisual(clamp01(detail.progress));
       }
       if (detail?.activeId) setActiveId(detail.activeId);
     };
@@ -98,7 +125,7 @@ export default function ScrollDial() {
 
   const angleFromPoint = (clientX: number, clientY: number) => {
     const el = faceRef.current;
-    if (!el) return angleDeg;
+    if (!el) return progressToAngle(progressRef.current);
     const rect = el.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
@@ -110,8 +137,7 @@ export default function ScrollDial() {
 
   const applyProgress = (p: number) => {
     const clamped = clamp01(p);
-    setAngleDeg(progressToAngle(clamped));
-    setProgress(clamped);
+    applyVisual(clamped);
     setActiveId(getActiveId(clamped));
     scrollToProgress(clamped);
   };
@@ -135,7 +161,7 @@ export default function ScrollDial() {
     setDragging(false);
   };
 
-  const nudge = (delta: number) => applyProgress(progress + delta);
+  const nudge = (delta: number) => applyProgress(progressRef.current + delta);
   const onKeyDown = (e: React.KeyboardEvent<SVGSVGElement>) => {
     if (e.key === "ArrowRight" || e.key === "ArrowUp") {
       nudge(0.02);
@@ -153,7 +179,9 @@ export default function ScrollDial() {
   };
 
   const activeLabel = stops.find((s) => s.id === activeId)?.label ?? "Hello";
+  const activeIndex = stops.findIndex((s) => s.id === activeId);
   const trackPath = describeArc(50, 50, 40, MIN_ANGLE, MAX_ANGLE);
+  const angleDeg = progressToAngle(progressRef.current);
   const progressPath = describeArc(50, 50, 40, MIN_ANGLE, angleDeg);
   const needleTransition = dragging ? "none" : "transform 0.3s ease-out";
 
@@ -171,8 +199,8 @@ export default function ScrollDial() {
         aria-label="Scroll through the journey"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={Math.round(progress * 100)}
-        aria-valuetext={`${activeLabel}, ${Math.round(progress * 100)}%`}
+        aria-valuenow={Math.round(progressRef.current * 100)}
+        aria-valuetext={`${activeLabel}, ${Math.round(progressRef.current * 100)}%`}
         width="76"
         height="76"
         viewBox="0 0 100 100"
@@ -191,6 +219,7 @@ export default function ScrollDial() {
         <path d={trackPath} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="4" strokeLinecap="round" />
         {/* Lit progress arc */}
         <path
+          ref={progressArcRef}
           d={progressPath}
           fill="none"
           stroke="url(#scroll-dial-gradient)"
@@ -206,11 +235,11 @@ export default function ScrollDial() {
         </defs>
 
         {/* Section tick marks */}
-        {stops.map((stop) => {
+        {stops.map((stop, stopIndex) => {
           const deg = progressToAngle(stop.progress);
           const inner = polarToCartesian(50, 50, 34, deg);
           const outer = polarToCartesian(50, 50, 40, deg);
-          const passed = progress >= stop.progress;
+          const passed = stopIndex <= activeIndex;
           return (
             <line
               key={stop.id}
@@ -226,7 +255,10 @@ export default function ScrollDial() {
         })}
 
         {/* Rotating knob body + pointer notch */}
-        <g style={{ transform: `rotate(${angleDeg}deg)`, transformOrigin: "50px 50px", transition: needleTransition }}>
+        <g
+          ref={knobGroupRef}
+          style={{ transform: `rotate(${angleDeg}deg)`, transformOrigin: "50px 50px", transition: needleTransition }}
+        >
           <circle cx="50" cy="50" r="26" fill="rgba(20,28,38,0.95)" stroke="rgba(255,255,255,0.18)" strokeWidth="1" />
           <line x1="50" y1="50" x2="50" y2="26" stroke="#e0f2fe" strokeWidth="3" strokeLinecap="round" />
           <circle cx="50" cy="26" r="2.4" fill="#7dd3fc" style={{ filter: "drop-shadow(0 0 4px rgba(125,211,252,0.9))" }} />
@@ -235,8 +267,8 @@ export default function ScrollDial() {
 
       {/* Current page label, written beside the knob */}
       <div className="pointer-events-none flex flex-col rounded-full border border-white/10 bg-slate-900/80 px-4 py-2 backdrop-blur-md">
-        <span className="text-[9px] font-semibold uppercase tracking-[0.28em] text-slate-400">
-          {Math.round(progress * 100)}%
+        <span ref={percentRef} className="text-[9px] font-semibold uppercase tracking-[0.28em] text-slate-400">
+          {Math.round(progressRef.current * 100)}%
         </span>
         <span className="whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-sky-100">
           {activeLabel}

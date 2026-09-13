@@ -1,12 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import RouteMap from "./components/RouteMap";
 import PageLoader from "./components/PageLoader";
-import HoloChat from "./components/HoloChat";
-import CockpitTray from "./components/CockpitTray";
-import AutopilotStartToast from "./components/AutopilotStartToast";
-import ScrollSound from "./components/ScrollSound";
+import ChromeBeforeMain from "./components/ChromeBeforeMain";
+import ChromeAfterMain from "./components/ChromeAfterMain";
 
 const grenze = localFont({
   src: [
@@ -115,12 +112,9 @@ export default function RootLayout({
       </head>
       <body className={`${grenze.variable} ${twinkleStar.variable} relative min-h-screen antialiased`}>
         <PageLoader />
-        <ScrollSound />
-        <CockpitTray />
-        <AutopilotStartToast />
-        <RouteMap />
+        <ChromeBeforeMain />
         <main className="relative z-10">{children}</main>
-        <HoloChat />
+        <ChromeAfterMain />
       </body>
     </html>
   );

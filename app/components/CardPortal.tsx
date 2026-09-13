@@ -227,6 +227,16 @@ export function CardPortal({
   const [isActivating, setIsActivating] = useState(false);
   const isEntry = index === 0;
   const atmosphere = atmospheres[index % atmospheres.length];
+  // Space (this card's starfield backdrop) mounts once per card — six of
+  // them exist at once — and only stops drawing on its own when it's
+  // geometrically outside the viewport. A card that's just faded to
+  // opacity 0 without actually moving (the common case: most cards sit
+  // faded out at the same screen position for most of the scroll) doesn't
+  // trip that check, so five starfields were drawing every frame for
+  // nothing most of the time. This tracks the same reveal/fade this effect
+  // already computes and passes it down so Space can skip drawing whenever
+  // there's nothing visible to draw.
+  const [isNear, setIsNear] = useState(isEntry);
 
   // Entry card: earth rises from a bottom corner as percentages of its own
   // size (translate(x%, y%) reproduces gsap's xPercent/yPercent exactly).
@@ -336,6 +346,9 @@ export function CardPortal({
       if (reveal === lastReveal && fade === lastFade) return;
       lastReveal = reveal;
       lastFade = fade;
+
+      const nextIsNear = reveal * fade > 0.02;
+      setIsNear((prev) => (prev === nextIsNear ? prev : nextIsNear));
 
       applyReveal(power3Out(reveal), fade);
       // Draws in while approaching, then un-draws again on the way out —
@@ -512,7 +525,7 @@ export function CardPortal({
             style={{ transformOrigin: "50% 65%" }}
           >
           {/* Space backdrop filling the window, carrying this section's portal color */}
-          <Space tint={atmosphere.accent} />
+          <Space tint={atmosphere.accent} active={isNear} />
 
           {isEntry && (
             <Image

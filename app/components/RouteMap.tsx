@@ -63,12 +63,46 @@ function scrollToProgress(p: number) {
 }
 
 export default function RouteMap() {
-  const [indexPosition, setIndexPosition] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
   const [dragging, setDragging] = useState(false);
   const draggingRef = useRef(false);
   const dragStartY = useRef(0);
   const dragStartIndex = useRef(0);
+  // indexPosition used to be React state, but the flight broadcasts scroll
+  // progress on every scroll tick (~60/s) — routing that through setState
+  // forced a full re-render (recomputing every stop's transform) on every
+  // frame while scrolling. It's kept in a ref instead and each stop's DOM
+  // node is written to directly; `centeredIndex` stays as state since it
+  // only actually needs to change (and re-render, for its className-driven
+  // styling) when the rounded stop index changes — a handful of times per
+  // scroll, not 60 times a second.
+  const indexPositionRef = useRef(0);
+  const [centeredIndex, setCenteredIndex] = useState(0);
+  const stopRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const labelRefs = useRef<(HTMLSpanElement | null)[]>([]);
+
+  const applyIndexPosition = (x: number) => {
+    indexPositionRef.current = x;
+    const rounded = Math.round(x);
+    setCenteredIndex((prev) => (prev === rounded ? prev : rounded));
+
+    stops.forEach((_stop, i) => {
+      const angle = (i - x) * ANGLE_STEP;
+      const el = stopRefs.current[i];
+      if (!el) return;
+      if (Math.abs(angle) > MAX_VISIBLE_ANGLE) {
+        el.style.display = "none";
+        return;
+      }
+      el.style.display = "";
+      const rad = (angle * Math.PI) / 180;
+      const facing = Math.cos(rad);
+      el.style.transform = `translateY(-50%) rotateX(${angle}deg) translateZ(${RADIUS}px)`;
+      el.style.opacity = String(Math.max(facing, 0) ** 1.6);
+      const label = labelRefs.current[i];
+      if (label) label.style.transform = `scale(${0.82 + facing * 0.18})`;
+    });
+  };
 
   // Shown/hidden from the cockpit tray's own toggle, not owned locally —
   // kept mounted (opacity/pointer-events only) so scroll position isn't
@@ -92,7 +126,7 @@ export default function RouteMap() {
       const customEvent = event as CustomEvent<{ progress?: number }>;
       if (typeof customEvent.detail?.progress === "number") {
         const clamped = clamp(customEvent.detail.progress, 0, 1);
-        setIndexPosition(progressToIndexPosition(clamped));
+        applyIndexPosition(progressToIndexPosition(clamped));
       }
     };
 
@@ -109,7 +143,7 @@ export default function RouteMap() {
 
   const navigate = (id: string) => {
     const targetIndex = stops.findIndex((stop) => stop.id === id);
-    if (targetIndex !== -1) setIndexPosition(targetIndex);
+    if (targetIndex !== -1) applyIndexPosition(targetIndex);
     window.dispatchEvent(
       new CustomEvent("navigate-flight-section", { detail: { id } }),
     );
@@ -120,7 +154,7 @@ export default function RouteMap() {
     draggingRef.current = true;
     setDragging(true);
     dragStartY.current = e.clientY;
-    dragStartIndex.current = indexPosition;
+    dragStartIndex.current = indexPositionRef.current;
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -133,7 +167,7 @@ export default function RouteMap() {
       0,
       stops.length - 1,
     );
-    setIndexPosition(nextIndex);
+    applyIndexPosition(nextIndex);
     scrollToProgress(indexPositionToProgress(nextIndex));
   };
 
@@ -144,22 +178,20 @@ export default function RouteMap() {
     // Settles on whichever stop the drum is nearest, like a detent —
     // dragging is for scrubbing the flight live, but letting go should
     // still land somewhere identifiable rather than mid-turn.
-    const nearest = Math.round(indexPosition);
-    setIndexPosition(nearest);
+    const nearest = Math.round(indexPositionRef.current);
+    applyIndexPosition(nearest);
     scrollToProgress(stops[nearest].progress);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "ArrowUp" || e.key === "ArrowRight") {
       e.preventDefault();
-      navigate(stops[Math.min(Math.round(indexPosition) + 1, stops.length - 1)].id);
+      navigate(stops[Math.min(centeredIndex + 1, stops.length - 1)].id);
     } else if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
       e.preventDefault();
-      navigate(stops[Math.max(Math.round(indexPosition) - 1, 0)].id);
+      navigate(stops[Math.max(centeredIndex - 1, 0)].id);
     }
   };
-
-  const centeredIndex = Math.round(indexPosition);
 
   return (
     <nav
@@ -203,28 +235,39 @@ export default function RouteMap() {
           style={{ transformStyle: "preserve-3d" }}
         >
           {stops.map((stop, i) => {
-            const angle = (i - indexPosition) * ANGLE_STEP;
-            if (Math.abs(angle) > MAX_VISIBLE_ANGLE) return null;
-
+            // These derive from the ref (not the throttled `centeredIndex`
+            // state) so a re-render triggered by anything else — dragging,
+            // isVisible — still reflects exactly where the drum currently
+            // sits, matching the imperative per-frame writes in
+            // applyIndexPosition rather than snapping back to a stale value.
+            const x = indexPositionRef.current;
+            const angle = (i - x) * ANGLE_STEP;
             const rad = (angle * Math.PI) / 180;
             const facing = Math.cos(rad); // 1 = dead centre, 0 = edge-on
             const isCentered = i === centeredIndex;
-            const isPassed = stop.progress <= indexPositionToProgress(indexPosition);
+            const isPassed = i <= centeredIndex;
 
             return (
               <button
                 key={stop.id}
+                ref={(el) => {
+                  stopRefs.current[i] = el;
+                }}
                 type="button"
                 tabIndex={-1}
                 onClick={() => navigate(stop.id)}
                 aria-hidden="true"
                 className="absolute inset-x-3 top-1/2 flex items-center justify-end gap-2 text-right"
                 style={{
+                  display: Math.abs(angle) > MAX_VISIBLE_ANGLE ? "none" : undefined,
                   transform: `translateY(-50%) rotateX(${angle}deg) translateZ(${RADIUS}px)`,
                   opacity: Math.max(facing, 0) ** 1.6,
                 }}
               >
                 <span
+                  ref={(el) => {
+                    labelRefs.current[i] = el;
+                  }}
                   className={`whitespace-nowrap font-semibold uppercase tracking-[0.18em] transition-colors ${
                     isCentered
                       ? "text-[12px] text-sky-100"
