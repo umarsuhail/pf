@@ -26,6 +26,7 @@ import { getSkillGroups } from "../data/skillGroups";
 import Greeting from "./Greeting";
 import SignatureName from "./SignatureName";
 import { POWER3_OUT } from "../lib/easings";
+import { playTick } from "../lib/tick-sound";
 
 import {
   cardGradients,
@@ -49,6 +50,11 @@ const nextCardProgress = sectionProgressStops[skillsCardIndex + 1] ?? skillsStop
 // reveal, with a small pause so the card reads clearly first.
 const skillsCardReadyProgress = getRevealWindow(skillsCardIndex).end;
 const SKILL_LAYOVER_SPAN = 0.045;
+// How much of a layover's fade window the travelling frame sweeps across.
+// Less than the whole of it on purpose — see the sweep itself below.
+const HIGHLIGHT_SWEEP = 0.62;
+
+type Slot = { x: number; y: number; w: number; h: number };
 const skillLayoverStart = Math.max(
   skillsStopProgress + (nextCardProgress - skillsStopProgress) * 0.28,
   skillsCardReadyProgress + SKILL_LAYOVER_SPAN + 0.01,
@@ -697,6 +703,72 @@ function SkillLayoverCluster({
   });
   const pointerEvents = useTransform(opacity, (o) => (o > 0.55 ? "auto" : "none"));
 
+  // The travelling frame. Rather than lighting the whole cluster at once,
+  // the scroll walks a single metal box across the technologies one at a
+  // time, and each landing clicks with the same dial tick the scroll itself
+  // makes — so the pass-through reads as the camera actually inspecting the
+  // row rather than just drifting past it.
+  const items = layover.group.items;
+  const gridRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  // `index` is where the frame is parked and `visible` is whether the sweep
+  // is running — two fields rather than one nullable index, so that when the
+  // sweep ends the frame fades out where it stopped instead of sliding back
+  // to the first item on its way out.
+  const [frame, setFrame] = useState({ index: 0, visible: false });
+  // The scroll handler compares against a ref, not the state it sets: it runs
+  // on every frame of a scroll and must not re-subscribe each time the index
+  // changes.
+  const sweptIndex = useRef(-1);
+
+  // Measured with offsetLeft/Top rather than getBoundingClientRect: the icons
+  // carry a looping bob and the cluster itself is scaled and blurred by the
+  // scroll, all of which a rect folds in. Offsets are pre-transform layout,
+  // so the frame sits still over an icon that is gently floating.
+  useEffect(() => {
+    const measure = () => {
+      setSlots(
+        itemRefs.current.map((el) =>
+          el
+            ? { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }
+            : { x: 0, y: 0, w: 0, h: 0 },
+        ),
+      );
+    };
+    measure();
+    // The labels set in a webfont and the row wraps, so the layout these
+    // offsets describe changes once when the font lands.
+    document.fonts?.ready.then(measure).catch(() => {});
+    const observer = new ResizeObserver(measure);
+    if (gridRef.current) observer.observe(gridRef.current);
+    return () => observer.disconnect();
+  }, [items.length, isMobile]);
+
+  useMotionValueEvent(smoothScrollProgress, "change", (progress) => {
+    // Short of the full fade window at both ends, so the first technology is
+    // framed only once the cluster has actually faded in and the last one is
+    // released before it fades back out.
+    const from = layover.peak - span * HIGHLIGHT_SWEEP;
+    const to = layover.peak + span * HIGHLIGHT_SWEEP;
+    const t = (progress - from) / (to - from);
+    const next =
+      t < 0 || t > 1 ? -1 : Math.min(items.length - 1, Math.floor(t * items.length));
+    if (next === sweptIndex.current) return;
+    sweptIndex.current = next;
+    if (next < 0) {
+      setFrame((f) => (f.visible ? { ...f, visible: false } : f));
+      return;
+    }
+    setFrame({ index: next, visible: true });
+    // A gentle rise across the row — same click, walking up a step per
+    // technology, so a sweep sounds like a sequence rather than a stutter.
+    playTick(0.94 + (next / Math.max(items.length - 1, 1)) * 0.3);
+  });
+
+  const slot = slots[frame.index];
+  const pad = isMobile ? 7 : 10;
+
   return (
     <motion.div
       style={{ opacity, scale, filter, pointerEvents }}
@@ -710,11 +782,53 @@ function SkillLayoverCluster({
         {layover.group.name}
       </span>
       <div
-        className="flex flex-wrap items-start justify-center gap-x-6 gap-y-5"
+        ref={gridRef}
+        className="relative flex flex-wrap items-start justify-center gap-x-6 gap-y-5"
         style={{ maxWidth: isMobile ? 260 : 460 }}
       >
+        {/* Drawn before the items, each of which is `relative` — so with all
+           of them at z-auto, paint order puts the icons and labels over the
+           frame. It is a box the technology sits inside, not a panel laid
+           across it. */}
+        {slot && (
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-0 top-0 rounded-2xl"
+            initial={false}
+            animate={{
+              opacity: frame.visible ? 1 : 0,
+              x: slot.x - pad,
+              y: slot.y - pad,
+              width: slot.w + pad * 2,
+              height: slot.h + pad * 2,
+            }}
+            transition={{
+              // Stiff enough to arrive with the tick rather than trailing it,
+              // damped enough not to ring on a fast scroll through the row.
+              type: "spring",
+              stiffness: 420,
+              damping: 34,
+              mass: 0.6,
+              opacity: { duration: 0.22, ease: "easeOut" },
+            }}
+            style={{
+              background:
+                "linear-gradient(155deg, rgba(248,250,252,0.18) 0%, rgba(148,163,184,0.07) 42%, rgba(15,23,42,0.12) 64%, rgba(226,232,240,0.15) 100%)",
+              border: "1px solid rgba(226,232,240,0.5)",
+              boxShadow:
+                "inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(2,8,23,0.55), 0 10px 28px rgba(2,8,23,0.5), 0 0 18px rgba(125,211,252,0.22)",
+            }}
+          />
+        )}
+
         {layover.group.items.map((item, i) => (
-          <div key={item.label} className="flex flex-col items-center gap-1.5">
+          <div
+            key={item.label}
+            ref={(el) => {
+              itemRefs.current[i] = el;
+            }}
+            className="relative flex flex-col items-center gap-1.5"
+          >
             <motion.div
               animate={{ y: [0, -6, 0] }}
               transition={{

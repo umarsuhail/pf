@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { primeTicks, playTick, registerForUnlock } from "../lib/tick-sound";
 
 // A dial-rotation tick that responds to how fast the visitor scrolls.
 // Wheel/touch input only — the autopilot tour moves the page via
@@ -16,8 +17,6 @@ import { useEffect } from "react";
 const TICK_DISTANCE = 45; // px of scroll per tick
 const STOP_DELAY = 150; // ms of no input before the dial is considered stopped
 const FAST_VELOCITY = 1.6; // px/ms threshold to switch to the multi-tick burst
-const TICK_POOL_SIZE = 6;
-const TICK_VOLUME = 0.4;
 const BURST_VOLUME = 0.4;
 // How much a single new velocity sample can move the running estimate (0-1).
 // Wheel/trackpad events arrive in uneven, coalesced bursts, so reacting to
@@ -27,13 +26,10 @@ const VELOCITY_SMOOTHING = 0.35;
 
 export default function ScrollSound() {
   useEffect(() => {
-    const tickPool = Array.from({ length: TICK_POOL_SIZE }, () => {
-      const a = new Audio("/music/page.wav");
-      a.preload = "auto";
-      a.volume = TICK_VOLUME;
-      return a;
-    });
-    let tickIndex = 0;
+    // The tick itself (pool, volume and the autoplay unlock below) lives in
+    // lib/tick-sound, shared with the skill layover's travelling frame so the
+    // two make the same click and unlock together.
+    primeTicks();
 
     const burst = new Audio("/music/page_1.wav");
     burst.preload = "auto";
@@ -41,51 +37,17 @@ export default function ScrollSound() {
     burst.volume = BURST_VOLUME;
     let burstPlaying = false;
 
-    // Browsers only allow audio-with-sound to start during a handful of
-    // "activation" gestures — click, keydown, pointerdown, touchend/start.
-    // Wheel and touchmove, the events this component actually listens to,
-    // don't qualify, so a play() fired from them is silently rejected (the
-    // .catch below swallows it) until the visitor happens to click or tap
-    // something else on the page first — which is exactly the "sometimes it
-    // just doesn't play" symptom. Priming every element (muted, so it's
-    // inaudible) on the very first qualifying gesture anywhere on the page
-    // unlocks them for every wheel/touchmove-triggered play afterwards.
-    let unlocked = false;
-    const unlock = () => {
-      if (unlocked) return;
-      unlocked = true;
-      for (const a of [...tickPool, burst]) {
-        a.muted = true;
-        void a
-          .play()
-          .then(() => a.pause())
-          .catch(() => {})
-          .finally(() => {
-            a.currentTime = 0;
-            a.muted = false;
-          });
-      }
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
-      window.removeEventListener("touchstart", unlock);
-    };
-    window.addEventListener("pointerdown", unlock);
-    window.addEventListener("keydown", unlock);
-    window.addEventListener("touchstart", unlock, { passive: true });
+    // Wheel and touchmove are not "activation" gestures, so a play() fired
+    // from them stays silent until something unlocks audio — see tick-sound.
+    // The burst is this component's own clip, so it registers for that same
+    // unlock rather than waiting on a gesture it will never see.
+    registerForUnlock(burst);
 
     let accumulated = 0;
     let lastTime = 0;
     let smoothedVelocity = 0;
     let lastTouchY: number | null = null;
     let stopTimer = 0;
-
-    const playTick = (rate: number) => {
-      const a = tickPool[tickIndex];
-      tickIndex = (tickIndex + 1) % tickPool.length;
-      a.playbackRate = rate;
-      a.currentTime = 0;
-      void a.play().catch(() => {});
-    };
 
     const stopBurst = () => {
       burstPlaying = false;
@@ -154,11 +116,7 @@ export default function ScrollSound() {
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
-      window.removeEventListener("touchstart", unlock);
       stopBurst();
-      tickPool.forEach((a) => a.pause());
     };
   }, []);
 
