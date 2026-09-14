@@ -9,7 +9,6 @@ import {
   useTransform,
   type MotionValue,
 } from "framer-motion";
-import Image from "next/image";
 import Link from "next/link";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CardPortal } from "./CardPortal";
@@ -50,6 +49,10 @@ const nextCardProgress = sectionProgressStops[skillsCardIndex + 1] ?? skillsStop
 // reveal, with a small pause so the card reads clearly first.
 const skillsCardReadyProgress = getRevealWindow(skillsCardIndex).end;
 const SKILL_LAYOVER_SPAN = 0.045;
+// Fraction of the span held at full opacity/sharpness around the peak,
+// rather than the cluster being sharp for a single instant and immediately
+// fading back out again.
+const SKILL_LAYOVER_HOLD = 0.4;
 // How much of a layover's fade window the travelling frame sweeps across.
 // Less than the whole of it on purpose — see the sweep itself below.
 const HIGHLIGHT_SWEEP = 0.62;
@@ -689,10 +692,22 @@ function SkillLayoverCluster({
   smoothScrollProgress: MotionValue<number>;
 }) {
   const span = SKILL_LAYOVER_SPAN;
-  const stops = [layover.peak - span, layover.peak, layover.peak + span];
-  const opacity = useTransform(smoothScrollProgress, stops, [0, 1, 0]);
-  const scale = useTransform(smoothScrollProgress, stops, [0.9, 1, 0.9]);
-  const blur = useTransform(smoothScrollProgress, stops, [8, 0, 8]);
+  // A bare 3-point [peak-span, peak, peak+span] window is only sharp for a
+  // single instant — the moment scroll passes `peak` it's already fading
+  // back out, so at normal scroll speeds the cluster reads as blurring
+  // almost as soon as it arrives. Holding full opacity/sharpness across a
+  // small plateau around the peak gives it an actual dwell before the
+  // fade-out begins.
+  const hold = span * SKILL_LAYOVER_HOLD;
+  const stops = [
+    layover.peak - span,
+    layover.peak - hold,
+    layover.peak + hold,
+    layover.peak + span,
+  ];
+  const opacity = useTransform(smoothScrollProgress, stops, [0, 1, 1, 0]);
+  const scale = useTransform(smoothScrollProgress, stops, [0.9, 1, 1, 0.9]);
+  const blur = useTransform(smoothScrollProgress, stops, [8, 0, 0, 8]);
   // Quantized to whole pixels, and "none" while sharp — same reasoning as
   // the billboard cards' cardFilter: every fractional blur change forces a
   // full layer re-raster, and this cluster fades through its blur window on
@@ -1162,18 +1177,6 @@ export default function MultiverseFlight() {
     };
   }, [pull, runLoop, LOOP_AT]);
 
-  // Exponential approach, not a linear one: growth decelerates hard as t
-  // nears 1, so the image keeps pushing closer without ever quite arriving
-  // — scrolling further just slows the approach rather than reaching it.
-  // Unlike the old small-icon treatment, this is a full-bleed photo (see
-  // object-cover below) — it starts at 1 (already filling the screen) and
-  // only zooms in from there, cropping tighter into the frame rather than
-  // shrinking down to a distant point.
-  const endEarthScale = useTransform(() => {
-    const t = Math.max(0, Math.min(1, endEarthT.get()));
-    const base = 1 + 0.3 * (1 - Math.exp(-3 * t));
-    return base * (1 + smoothPull.get() * 0.5);
-  });
   // The closer you pull, the more it dissolves — it grows in the frame while
   // fading out of it, so the approach reads as chasing something receding
   // rather than closing a gap. Reinforces that it can never be reached.
@@ -1605,23 +1608,6 @@ export default function MultiverseFlight() {
           className="pointer-events-none absolute inset-0 z-[6] overflow-hidden"
           style={{ opacity: endEarthOpacity }}
         >
-          {/* A photographic full-bleed shot, not an isolated 3D-rendered
-             icon — it fills the screen and zooms rather than sitting in a
-             small glowing circle. Scaled up slightly past 1 at rest so the
-             edges never show through the overscan as it scales. */}
-          <motion.div
-            className="absolute inset-0"
-            style={{ scale: endEarthScale }}
-          >
-            <Image
-              src="/images/eh.png"
-              alt=""
-              fill
-              sizes="100vw"
-              className="object-cover"
-            />
-          </motion.div>
-
           {/* Void closes in the harder you strain toward it */}
           <motion.div
             className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_transparent_25%,_#000_100%)]"
