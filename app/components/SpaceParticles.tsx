@@ -158,10 +158,25 @@ export default function SpaceParticles() {
       lastActivity = performance.now();
     };
 
+    // renderer.setSize() reallocates the WebGL drawing buffer — the most
+    // expensive thing on this page that a scroll can trigger. A mobile
+    // browser fires `resize` on every URL-bar slide, which is exactly during
+    // a scroll, and only reports a height change of ~60-100px. The canvas
+    // itself is laid out at 100vh (stable across that slide) and the field is
+    // a soft, depth-faded star wash with no hard edges, so a vertical
+    // mismatch that small is invisible. An orientation change or a desktop
+    // window drag clears the threshold and resizes properly.
+    let lastWidth = window.innerWidth;
+    let lastHeight = window.innerHeight;
     const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      if (width === lastWidth && Math.abs(height - lastHeight) < 140) return;
+      lastWidth = width;
+      lastHeight = height;
+      camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(width, height);
     };
 
     window.addEventListener("mousemove", handleMouseMove);

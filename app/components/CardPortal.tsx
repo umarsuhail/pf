@@ -37,6 +37,11 @@ interface CardPortalProps {
   // the portal's particle-logo mark for the astronaut illustration so the
   // visual matches the more contemplative, unhurried moment.
   isExpanded?: boolean;
+  // Portrait phones stack the billboard, which turns the portal from a tall
+  // window beside the copy into a wide letterbox above it. Nothing inside is
+  // laid out in percentages of that box — the entry mark is a fixed-ratio
+  // image — so the pieces that would overflow a short box are told to fit.
+  letterbox?: boolean;
 }
 
 const sectionProgressStops = [0, 0.22, 0.56, 0.69, 0.81, 0.92];
@@ -91,15 +96,45 @@ const atmospheres: { overlay: string; motif: MotifType; accent: string }[] = [
   },
 ];
 
-// Non-entry cards that have a real hero image, keyed by card index (1-based
-// after the entry/earth card at index 0); indices without an entry fall back
-// to the drawn PortalMotif below.
-const imageSrcByIndex: Record<number, string> = {
-  1: "/a3.svg",
-  2: "/a4.svg",
-  3: "/a5.svg",
-  4: "/a6.svg",
-  5: "/a7.svg",
+// Every non-entry portal draws the same illustration. It used to be five
+// separate files (a3-a7), four of which never existed — /a3.svg, /a5.svg,
+// /a6.svg and /a7.svg all 404'd, so four of the five portals silently fell
+// back to a broken image while only /a4.svg ever resolved. One file, hued
+// per card, is both what actually ships and the more coherent idea: the
+// flight passes through one universe seen five ways, not five unrelated
+// pictures.
+const PORTAL_ILLUSTRATION = "/images/a3.svg";
+
+// a3.svg ships in a coral/plum palette with a saturation-weighted dominant
+// hue of ~0°. Each non-entry card rotates that onto its own atmosphere
+// accent (see `atmospheres` above) so the illustration arrives already
+// belonging to the colour of the space around it.
+//
+// Keyed by card index, 1-based after the entry/earth card at index 0;
+// indices without an entry fall back to the drawn PortalMotif below.
+//
+// The rotations are measured, not arithmetic. CSS hue-rotate is a matrix
+// approximation of an HSL rotation, so it neither lands where subtraction
+// says it will (the naive "accent minus 313°" put the emerald card on blue)
+// nor preserves saturation across the sweep. Each value below was picked by
+// sampling the filtered artwork and choosing the rotation whose dominant hue
+// sits nearest that card's accent — every one lands within 2°. The paired
+// saturate() then pulls intensity back to the artwork's native 0.71, which
+// is what keeps the amber and emerald cards from reading washed out next to
+// the blue ones rather than being a stylistic flourish.
+const illustrationFilterByIndex: Record<number, string> = {
+  // 1 skills — emerald #34d399 (lands 162°)
+  1: "hue-rotate(160deg) saturate(1.5)",
+  // 2 projects — blue #60a5fa (lands 216°)
+  2: "hue-rotate(225deg) saturate(1.05)",
+  // 3 experience — amber #fbbf24 (lands 44°)
+  3: "hue-rotate(55deg) saturate(1.5)",
+  // 4 resume — slate #94a3b8. The one accent that is near-neutral, so this
+  // shares the blue card's rotation and desaturates instead of chasing a
+  // hue no amount of rotation can reach.
+  4: "hue-rotate(225deg) saturate(0.4)",
+  // 5 contact — sky #7dd3fc (lands 200°)
+  5: "hue-rotate(205deg) saturate(1.25)",
 };
 
 function PortalMotif({ motif, accent }: { motif: MotifType; accent: string }) {
@@ -216,6 +251,7 @@ export function CardPortal({
   actionLabel,
   ariaLabel,
   isExpanded = false,
+  letterbox = false,
 }: CardPortalProps) {
   const arrowRef = useRef<AnimatedIconHandle>(null);
   const hasEnteredRef = useRef(false);
@@ -227,6 +263,11 @@ export function CardPortal({
   });
   const [isActivating, setIsActivating] = useState(false);
   const isEntry = index === 0;
+  // Mirrors `isNear` for the scroll handlers, which run on every frame of a
+  // scroll and must read the current value without re-subscribing each time
+  // it flips (the same reason the reveal effect compares against locals
+  // rather than state).
+  const isNearRef = useRef(isEntry);
   const atmosphere = atmospheres[index % atmospheres.length];
   // Space (this card's starfield backdrop) mounts once per card — six of
   // them exist at once — and only stops drawing on its own when it's
@@ -283,32 +324,20 @@ export function CardPortal({
     let lastReveal = -1;
     let lastFade = -1;
 
-    // Retargeting animate() calls (rather than jumping straight to the
-    // value) keeps per-scroll updates smooth — the motion-value equivalent
-    // of GSAP's quickTo setters.
     let applyReveal: (eased: number, fade: number) => void;
     if (isEntry) {
       // Earth rises from the bottom corner, staying clipped inside the window
       const cornerDirection = align === "left" ? 1 : -1;
       applyReveal = (eased) => {
-        animate(earthXPercent, cornerDirection * 30 * (1 - eased), {
-          duration: 0.6,
-          ease: POWER3_OUT,
-        });
-        animate(earthYPercent, 105 * (1 - eased), {
-          duration: 0.6,
-          ease: POWER3_OUT,
-        });
+        earthXPercent.set(cornerDirection * 30 * (1 - eased));
+        earthYPercent.set(105 * (1 - eased));
       };
       // Entry card rises rather than fading — no depart dim to apply.
     } else {
       // Other universes' motifs fade and settle into view instead of fading
       applyReveal = (eased, fade) => {
-        animate(motifOpacity, eased * fade, { duration: 0.6, ease: POWER2_OUT });
-        animate(motifScale, 0.85 + eased * 0.15, {
-          duration: 0.6,
-          ease: POWER3_OUT,
-        });
+        motifOpacity.set(eased * fade);
+        motifScale.set(0.85 + eased * 0.15);
       };
     }
 
@@ -319,7 +348,7 @@ export function CardPortal({
     const applyProgressDash = isEntry
       ? null
       : (value: number) =>
-        animate(progressDashOffset, value, { duration: 0.6, ease: POWER2_OUT });
+        progressDashOffset.set(value);
 
     const update = (progress: number) => {
       let reveal = 0;
@@ -349,6 +378,7 @@ export function CardPortal({
       lastFade = fade;
 
       const nextIsNear = reveal * fade > 0.02;
+      isNearRef.current = nextIsNear;
       setIsNear((prev) => (prev === nextIsNear ? prev : nextIsNear));
 
       applyReveal(power3Out(reveal), fade);
@@ -384,11 +414,18 @@ export function CardPortal({
 
     // Staggered start angle so the globes aren't all locked in unison
     const offset = index * 40;
-    const update = (progress: number) =>
-      animate(spinRotate, offset + progress * 260, {
-        duration: 0.8,
-        ease: POWER2_OUT,
-      });
+    let lastAngle = Number.NEGATIVE_INFINITY;
+    const update = (progress: number) => {
+      const angle = offset + progress * 260;
+      // Sub-degree steps are invisible on a globe this size but still cost a
+      // full MotionValue notification. Keep the scroll-bound rotation direct:
+      // scroll is already the easing source, and allocating tweens for every
+      // portal during a wheel gesture is exactly the work that made the Z
+      // flight feel late.
+      if (Math.abs(angle - lastAngle) < 0.35) return;
+      lastAngle = angle;
+      spinRotate.set(angle);
+    };
 
     update(scrollYProgress.get());
     const unsubscribe = scrollYProgress.on("change", update);
@@ -556,7 +593,9 @@ export function CardPortal({
                     width={300}
                     height={300}
                     sizes=" 30vw, 40vh"
-                    className="object-cover opacity-55 mix-blend-screen px-8 py-2"
+                    className={`object-cover opacity-55 mix-blend-screen ${
+                      letterbox ? "max-h-[min(8rem,13vh)] px-4 py-1" : "px-8 py-2"
+                    }`}
                     aria-hidden="true"
                   />
 
@@ -586,7 +625,11 @@ export function CardPortal({
                     transition={{ type: "spring", stiffness: 190, damping: 23, mass: 0.9 }}
                   >
                     <SignatureName
-                      className="text-lg text-sky-100/85 sm:text-xl lg:text-2xl"
+                      className={
+                        letterbox
+                          ? "text-sm text-sky-100/85"
+                          : "text-lg text-sky-100/85 sm:text-xl lg:text-2xl"
+                      }
                     />
                   </motion.div>
                 </div>
@@ -651,14 +694,15 @@ export function CardPortal({
               className="absolute inset-0"
               style={{ opacity: motifOpacity, scale: motifScale, willChange: "opacity, transform" }}
             >
-              {imageSrcByIndex[index] ? (
+              {illustrationFilterByIndex[index] ? (
                 <motion.div className="absolute inset-0" style={{ rotate: spinRotate }}>
                   <Image
-                    src={imageSrcByIndex[index]}
+                    src={PORTAL_ILLUSTRATION}
                     alt=""
                     fill
                     sizes="(min-width: 1024px) 30vw, 30vh"
                     className="object-contain"
+                    style={{ filter: illustrationFilterByIndex[index] }}
                   />
                 </motion.div>
               ) : (
@@ -679,7 +723,11 @@ export function CardPortal({
       </div>
 
       {/* Aperture glow ring — ambient invitation, always animating */}
-      <div className="portal-aperture-pulse pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-inset ring-(--accent)/40 lg:rounded-3xl" />
+      <div
+        className={`pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-inset ring-(--accent)/40 lg:rounded-3xl ${
+          isNear ? "portal-aperture-pulse" : ""
+        }`}
+      />
 
       {/* Scroll-progress stroke — traces the rounded border in as this
          card's own portal comes into focus (see the reveal effect above).

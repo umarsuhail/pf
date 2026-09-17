@@ -114,7 +114,41 @@ export function BrandIcon({
   ...props
 }: HTMLAttributes<SVGSVGElement> & { slug: string }) {
   const icon = REGISTRY[slug as BrandIconSlug];
-  if (!icon) return null;
+
+  // Not every technology worth listing ships a mark we can embed — Zustand is
+  // the current example. Returning null for those made the skill vanish from
+  // the grid entirely with nothing to show it had been dropped, which is how
+  // a listed skill can silently stop rendering. A monogram keeps the card in
+  // place and reads as deliberate next to the brand logos rather than as a
+  // gap, and it makes the next unmatched slug visible instead of invisible.
+  if (!icon) {
+    const letter = slug.charAt(0).toUpperCase();
+    return (
+      <svg
+        aria-hidden="true"
+        className={cn(className)}
+        role="img"
+        viewBox="0 0 24 24"
+        xmlns="http://www.w3.org/2000/svg"
+        {...props}
+      >
+        <title>{slug.charAt(0).toUpperCase() + slug.slice(1)}</title>
+        <circle cx="12" cy="12" fill="none" r="10.5" stroke="currentColor" strokeOpacity="0.45" strokeWidth="1.5" />
+        <text
+          dominantBaseline="central"
+          fill="currentColor"
+          fontFamily="inherit"
+          fontSize="12"
+          fontWeight="600"
+          textAnchor="middle"
+          x="12"
+          y="12.5"
+        >
+          {letter}
+        </text>
+      </svg>
+    );
+  }
 
   return (
     <svg

@@ -145,7 +145,7 @@ export function SectionContent({
   const previousArrowRef = useRef<AnimatedIconHandle>(null);
   const nextArrowRef = useRef<AnimatedIconHandle>(null);
 
-  const projects = card.projects ?? [];
+  const projects = useMemo(() => card.projects ?? [], [card.projects]);
   const [activeCategory, setActiveCategory] = useState(ALL_PROJECTS);
   const categories = useMemo(
     () => [ALL_PROJECTS, ...Array.from(new Set(projects.map((p) => p.category)))],
@@ -359,7 +359,7 @@ export function SectionContent({
           </motion.header>
         )}
 
-        {/* PROJECTS — display hero with stats + a placeholder visual */}
+        {/* PROJECTS — display hero with stats + project collage visual */}
         {card.id === "projects" && (
           <motion.header
             variants={itemVariants}
@@ -387,9 +387,17 @@ export function SectionContent({
               </div>
             </div>
 
-            {/* Placeholder visual — swap for real product screenshots later */}
-            <div className="relative h-64 overflow-hidden rounded-[2rem] border border-white/10 bg-black/10 sm:h-80 lg:h-full lg:min-h-[320px]">
-              <Image src="/images/pro1.png" alt="" fill className="object-cover" />
+            <div className="relative min-h-[320px] overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/35 shadow-[0_32px_90px_-28px_rgba(14,165,233,0.55)] sm:min-h-[420px] lg:min-h-[520px]">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_26%_18%,rgba(125,211,252,0.22),transparent_34%),radial-gradient(circle_at_78%_76%,rgba(52,211,153,0.18),transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.42),rgba(2,6,23,0.74))]" />
+              <div className="absolute inset-x-8 bottom-10 h-20 rounded-full bg-sky-300/20 blur-3xl" />
+              <Image
+                src="/images/pro-hero.png"
+                alt="Collage of project interface cards and digital product screens"
+                fill
+                priority
+                sizes="(max-width: 1024px) calc(100vw - 2rem), 46vw"
+                className="object-contain p-5 drop-shadow-[0_30px_36px_rgba(0,0,0,0.38)] sm:p-8 lg:p-10"
+              />
             </div>
           </motion.header>
         )}
@@ -435,6 +443,7 @@ export function SectionContent({
                         src={project.image}
                         alt=""
                         fill
+                        sizes="(max-width: 640px) calc(100vw - 2rem), (max-width: 1024px) calc(50vw - 2rem), (max-width: 1536px) calc(33vw - 2rem), 25vw"
                         className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                       />
                       <span

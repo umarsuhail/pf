@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import { animate } from "framer-motion";
 import { POWER2_IN, POWER2_OUT, POWER3_OUT } from "../lib/easings";
 
@@ -71,6 +71,14 @@ type ParticleLogoProps = {
     active?: boolean;
 
     /**
+     * Inline box for the canvas. The caller owns the element's size (see
+     * the render comment below), and a box computed from the live viewport
+     * — as the end-of-flight mark's is — cannot be expressed as a static
+     * class, so it arrives here instead.
+     */
+    style?: CSSProperties;
+
+    /**
      * Fires on click, alongside (not instead of) the built-in shatter
      * flourish — the click handler already calls stopPropagation() to keep
      * the shatter from being cut off by an ancestor's own click handler, so
@@ -109,6 +117,7 @@ export default function ParticleLogo({
     size = 180,
     active,
     onActivate,
+    style,
 }: ParticleLogoProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     // Populated synchronously by the setup effect below, read by the
@@ -910,6 +919,7 @@ export default function ParticleLogo({
         <canvas
             ref={canvasRef}
             className={`block cursor-pointer ${className}`}
+            style={style}
         />
     );
 }

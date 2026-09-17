@@ -83,6 +83,19 @@ const PORTAL_WIDTH = "clamp(150px, 20vw, 320px)";
 // leave the headline squeezed into a sliver.
 const COMPACT_PORTAL_WIDTH = "clamp(96px, 30vh, 150px)";
 
+// --- Card-internal depth -------------------------------------------------
+// How far the copy and the portal stand off the card's own face, in the
+// card's local 3D space. This is what separates a billboard from a picture
+// of a billboard: as a card rotates past, the portal swings through a
+// visibly wider arc than the panel behind it, and the copy sits between the
+// two. Kept small — this is parallax on a surface, not a diorama — and
+// scaled down on phones, where the card is a third of the size and the same
+// offsets would read as the layers coming apart.
+const CARD_DEPTH = {
+  desktop: { copy: 22, portal: 58 },
+  mobile: { copy: 10, portal: 26 },
+} as const;
+
 // Spring used for the cards' own width/offset settle when the breakpoint
 // changes. There is deliberately no camera spring: see smoothScrollProgress.
 const PHYSICS = {
@@ -371,6 +384,7 @@ function BillboardCard({
   card,
   index,
   isMobile,
+  isStacked,
   mobileOffsetScale,
   smoothScrollProgress,
   revealStart,
@@ -379,6 +393,8 @@ function BillboardCard({
   card: FlightCard;
   index: number;
   isMobile: boolean;
+  /** Portrait phones only — see the flag's definition in MultiverseFlight. */
+  isStacked: boolean;
   mobileOffsetScale: number;
   smoothScrollProgress: MotionValue<number>;
   revealStart: number;
@@ -411,7 +427,16 @@ function BillboardCard({
     return () => window.removeEventListener("flight-autopilot-expand", onExpand as EventListener);
   }, [card.id]);
 
-  const alignmentClass = card.align === "left" ? "items-start text-left" : "items-end text-right";
+  // Stacked cards are only ~330px wide: ragged-left copy (items-end) throws
+  // every line's start edge around and costs real legibility at that
+  // measure, so the vertical layout reads flush left whichever side of the
+  // corridor the billboard hangs on. The left/right identity is still
+  // carried by the card's own lateral offset.
+  const alignmentClass = isStacked
+    ? "items-start text-left"
+    : card.align === "left"
+      ? "items-start text-left"
+      : "items-end text-right";
   const titleClass = "text-sky-50";
   const bodyClass = "text-slate-100/90";
   const panelClass = "border-white/20 shadow-[0_24px_90px_rgba(2,8,23,0.52)]";
@@ -425,6 +450,7 @@ function BillboardCard({
   // visitor sees with no scroll context to explain the tilt, so it faces the
   // camera square-on — the angled billboards only start once the flight does.
   const isEntry = index === 0;
+  const depth = isMobile ? CARD_DEPTH.mobile : CARD_DEPTH.desktop;
   const baseRotateY = isEntry ? 0 : card.align === "left" ? 10 : -10;
   const baseRotateX = isEntry ? 0 : 4;
 
@@ -458,6 +484,20 @@ function BillboardCard({
 
   const activeRotateY = useTransform(straightening, (v) => baseRotateY * Math.max(0, 1 - v * 1.5));
   const activeRotateX = useTransform(straightening, (v) => baseRotateX * Math.max(0, 1 - v * 2));
+
+  // Depth that opens as the card arrives. Held shallow while the billboard is
+  // still a shape in the distance and pushed past its resting offset as the
+  // card straightens to face the camera, so the portal reads as a window
+  // rising out of the panel on approach rather than a picture pasted at a
+  // fixed height. Both are motion values on layers that are already promoted,
+  // so the whole effect is a transform on an existing texture — it adds no
+  // layer, no repaint and no per-frame React work.
+  const portalDepth = useTransform(
+    straightening,
+    [0, 1],
+    [depth.portal * 0.45, depth.portal * 1.3],
+  );
+  const copyDepth = useTransform(straightening, [0, 1], [depth.copy * 0.45, depth.copy]);
 
   const activeReadabilityBoost = useTransform(straightening, [0, 1], [0, 1]);
   const effectiveOpacity = useTransform(() => Math.min(1, upcomingOpacity.get() + activeReadabilityBoost.get() * 0.38));
@@ -507,15 +547,45 @@ function BillboardCard({
         filter: cardFilter,
         scale: upcomingScale,
         background: cardGradient,
+        // The card is a real 3D surface: it is tilted and pushed down the
+        // corridor by the parent group, and its own contents sit at different
+        // depths *on* that surface (see CARD_DEPTH below), so the portal
+        // parallaxes against the copy as the billboard turns. That is the
+        // "sailing" the flight is built around.
+        //
+        // What makes it affordable is that every element actually placed in
+        // this 3D context declares its own `will-change: transform`. A 3D
+        // rendering context defeats the compositor's layer caching for any
+        // descendant it has to re-sort each frame; promoting the handful that
+        // genuinely live at a depth means those are cached textures the GPU
+        // re-projects, and nothing else in the subtree pays for the context.
+        // Without that promotion this same preserve-3d cost ~65% of the
+        // frame's rasterization.
         transformStyle: "preserve-3d",
         pointerEvents: cardPointerEvents,
+        // The flight is a scale animation, and scale is the one transform a
+        // compositor cannot fake: without this the card is not a layer of its
+        // own, so Chrome re-rasterizes the whole panel — gradient, border,
+        // rounded corners and that 90px-blur shadow — at every new scale on
+        // the way down the corridor. A trace of a wheel scroll was 4.5s of
+        // RasterTask against 1.1s of script. Declaring the transform up front
+        // promotes the card and locks its raster scale, so the panel is
+        // painted once and the GPU scales the texture.
+        willChange: "transform",
       }}
       initial={false}
       animate={{
         // Narrower than the desktop clamp so there is room either side for the
         // lateral offsets, but wide enough that the headline still gets a real
-        // measure once the portal takes its share.
-        width: isMobile ? "min(66vw, 500px)" : card.width,
+        // measure once the portal takes its share. Stacked cards no longer
+        // give a third of that width away to the portal, so they can afford
+        // to be wider — and need to be, since the headline now gets the full
+        // card measure rather than what is left beside the portal.
+        width: isStacked
+          ? "min(82vw, 400px)"
+          : isMobile
+            ? "min(66vw, 500px)"
+            : card.width,
         // Same left/right stagger as desktop, scaled down to fit the
         // narrower viewport instead of being zeroed out — mobileOffsetScale
         // is proportional to actual viewport width, so a landscape phone
@@ -544,14 +614,32 @@ function BillboardCard({
             ? { duration: 7 + index * 0.5, repeat: Infinity, ease: "easeInOut" }
             : { duration: 0.4, ease: "easeOut" }
         }
-        className={`flex w-full items-stretch ${isMobile ? "gap-3" : "gap-5 sm:gap-8"} ${
-          card.align === "right" ? "flex-row-reverse" : "flex-row"
+        // flex-col-reverse, not flex-col: the portal is last in the DOM (so
+        // the copy is what a screen reader and the page's own reading order
+        // reach first) but leads visually, which is what makes the stacked
+        // version read as the same billboard turned upright rather than as a
+        // block of text with a picture tacked underneath.
+        className={`flex w-full ${
+          isStacked
+            ? "flex-col-reverse items-stretch gap-3.5"
+            : `items-stretch ${isMobile ? "gap-3" : "gap-5 sm:gap-8"} ${
+                card.align === "right" ? "flex-row-reverse" : "flex-row"
+              }`
         }`}
+        // Carries the 3D context down to the copy/portal pair below, which
+        // is where the depth actually lives.
         style={{ transformStyle: "preserve-3d" }}
       >
         <motion.div
           className={`flex min-w-0 flex-1 flex-col ${alignmentClass}`}
-          style={{ opacity: useTransform(activeReadabilityBoost, [0, 1], [0.85, 1]) }}
+          style={{
+            opacity: useTransform(activeReadabilityBoost, [0, 1], [0.85, 1]),
+            // The copy sits just proud of the card's face — enough that it
+            // separates from the panel as the billboard turns, not so much
+            // that it reads as a floating label.
+            translateZ: copyDepth,
+            willChange: "transform",
+          }}
         >
           {/* Tailwind breakpoints are width-based, so they can't tell a 956px
              landscape phone from a laptop — the compact scale is driven off
@@ -569,9 +657,11 @@ function BillboardCard({
           </span>
           <h2
             className={`max-w-[22ch] font-semibold leading-tight ${
-              isMobile
-                ? "mt-2.5 text-lg"
-                : "mt-5 text-2xl sm:mt-6 sm:text-3xl lg:text-5xl"
+              isStacked
+                ? "mt-3 text-xl"
+                : isMobile
+                  ? "mt-2.5 text-lg"
+                  : "mt-5 text-2xl sm:mt-6 sm:text-3xl lg:text-5xl"
             } ${titleClass}`}
           >
             {card.id === "home" ? <Greeting /> : card.title}
@@ -582,15 +672,17 @@ function BillboardCard({
           {card.id === "home" ? (
             <ExpandableText
               className={`max-w-[46ch] ${isMobile ? "mt-2" : "mt-4 max-w-[38ch] sm:mt-5"}`}
-              collapsedHeight={isMobile ? "3.3em" : "4.5em"}
+              collapsedHeight={isStacked ? "4.6em" : isMobile ? "3.3em" : "4.5em"}
               forceExpanded={autoExpandHome}
               onExpandedChange={setIsHomeExpanded}
             >
               <p
                 className={`${
-                  isMobile
-                    ? "text-[11px] leading-[1.45]"
-                    : "text-sm leading-6 sm:text-base sm:leading-7 lg:text-xl"
+                  isStacked
+                    ? "text-xs leading-[1.55]"
+                    : isMobile
+                      ? "text-[11px] leading-[1.45]"
+                      : "text-sm leading-6 sm:text-base sm:leading-7 lg:text-xl"
                 } ${bodyClass}`}
               >
                 <NarratedText id={card.id} text={card.description} />
@@ -599,9 +691,11 @@ function BillboardCard({
           ) : card.id !== "resume" ? (
             <p
               className={`max-w-[46ch] ${
-                isMobile
-                  ? "mt-2 line-clamp-4 text-[11px] leading-[1.45]"
-                  : "mt-4 max-w-[38ch] text-sm leading-6 sm:mt-5 sm:text-base sm:leading-7 lg:text-xl"
+                isStacked
+                  ? "mt-2.5 line-clamp-4 text-xs leading-[1.55]"
+                  : isMobile
+                    ? "mt-2 line-clamp-4 text-[11px] leading-[1.45]"
+                    : "mt-4 max-w-[38ch] text-sm leading-6 sm:mt-5 sm:text-base sm:leading-7 lg:text-xl"
               } ${bodyClass}`}
             >
               <NarratedText id={card.id} text={card.description} />
@@ -655,9 +749,31 @@ function BillboardCard({
 
         <motion.div
           initial={false}
-          animate={{ width: isMobile ? COMPACT_PORTAL_WIDTH : PORTAL_WIDTH }}
+          animate={{
+            width: isStacked
+              ? "100%"
+              : isMobile
+                ? COMPACT_PORTAL_WIDTH
+                : PORTAL_WIDTH,
+          }}
           transition={PHYSICS.expansion}
-          className="relative block min-h-[min(16.25rem,42vh)] shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]"
+          style={{
+            // The portal stands furthest off the card face — it is the window
+            // the flight is aimed at, so it leads the turn.
+            translateZ: portalDepth,
+            willChange: "transform",
+          }}
+          // Turned on its side the portal becomes a letterbox across the top
+          // of the card: the tall min-height that gives it presence beside
+          // the copy would otherwise eat two thirds of a phone's screen and
+          // leave nothing for the copy it is meant to introduce. Height is
+          // capped in vh so the whole stacked card still clears a short
+          // portrait viewport.
+          className={`relative block shrink-0 transform-flat overflow-hidden rounded-2xl lg:rounded-3xl ${
+            isStacked
+              ? "h-[clamp(10rem,26vh,15rem)]"
+              : "min-h-[min(16.25rem,42vh)]"
+          }`}
         >
           <CardPortal
             index={index}
@@ -667,6 +783,7 @@ function BillboardCard({
             actionLabel={actionLabel}
             ariaLabel={`Fly to ${targetCard.eyebrow.replace(/^\d+\s*\/\s*/, "")}`}
             isExpanded={card.id === "home" && isHomeExpanded}
+            letterbox={isStacked}
           />
         </motion.div>
       </motion.div>
@@ -717,6 +834,13 @@ function SkillLayoverCluster({
     return stepped <= 0 ? "none" : `blur(${stepped}px)`;
   });
   const pointerEvents = useTransform(opacity, (o) => (o > 0.55 ? "auto" : "none"));
+  const [isAnimatingIcons, setIsAnimatingIcons] = useState(() => opacity.get() > 0.02);
+  useMotionValueEvent(opacity, "change", (value) => {
+    setIsAnimatingIcons((prev) => {
+      const next = value > 0.02;
+      return prev === next ? prev : next;
+    });
+  });
 
   // The travelling frame. Rather than lighting the whole cluster at once,
   // the scroll walks a single metal box across the technologies one at a
@@ -787,7 +911,11 @@ function SkillLayoverCluster({
   return (
     <motion.div
       style={{ opacity, scale, filter, pointerEvents }}
-      className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-4"
+      // z-0, not z-20: a positive z-index outranks the cards (which sit at
+      // z-auto) no matter where this lands in the DOM, which is what put the
+      // icons on top of the billboard. At the same level, source order
+      // decides — and this now renders before them.
+      className="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center gap-4"
     >
       <span
         className={`font-semibold uppercase tracking-[0.32em] text-sky-100/70 ${
@@ -845,10 +973,10 @@ function SkillLayoverCluster({
             className="relative flex flex-col items-center gap-1.5"
           >
             <motion.div
-              animate={{ y: [0, -6, 0] }}
+              animate={isAnimatingIcons ? { y: [0, -6, 0] } : { y: 0 }}
               transition={{
-                duration: 2.2 + (i % 5) * 0.25,
-                repeat: Infinity,
+                duration: isAnimatingIcons ? 2.2 + (i % 5) * 0.25 : 0.2,
+                repeat: isAnimatingIcons ? Infinity : 0,
                 ease: "easeInOut",
                 delay: i * 0.1,
               }}
@@ -880,25 +1008,27 @@ export default function MultiverseFlight() {
   // at every viewport — portrait phones included — with `mobileOffsetScale`
   // (derived from the actual viewport width below) keeping the left/right
   // card stagger from overflowing a narrow screen.
+  // Only *derived* viewport facts are held in state, never raw innerWidth /
+  // innerHeight. A mobile browser fires `resize` every time the URL bar
+  // slides away mid-scroll, and raw height in state turns each of those into
+  // a re-render of this entire component — seven billboards, seven portals,
+  // every space region — right in the middle of the scroll it is reacting
+  // to. Every value below is quantized or boolean, so React's own bail-out
+  // on unchanged primitives absorbs the resize storm and the tree only
+  // re-renders when something a human could actually see has changed.
   const [compact, setCompact] = useState(false);
-  const [viewportWidth, setViewportWidth] = useState(0);
-
-  useEffect(() => {
-    const onResize = () => {
-      setCompact(window.innerWidth < 1024);
-      setViewportWidth(window.innerWidth);
-    };
-    onResize();
-    window.addEventListener("resize", onResize);
-    // iOS Safari fires orientationchange before the resize metrics settle
-    window.addEventListener("orientationchange", onResize);
-    return () => {
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("orientationchange", onResize);
-    };
-  }, []);
-
-  const isMobile = compact;
+  // Height matters as much as width for the closing beat: the mark is a
+  // square, so on a landscape phone (844x390) a width-derived size overflows
+  // the viewport vertically and the signature under it is simply cut off.
+  // See `endMarkBox` below for how the URL bar is kept out of that sum.
+  const [endMarkBox, setEndMarkBox] = useState(0);
+  // A portrait phone is the one viewport where the side-by-side billboard
+  // (copy beside a tall portal) stops working: 66vw of 390px leaves the
+  // headline about 14 characters of measure. Those cards stack instead —
+  // portal on top, copy beneath — which is the same billboard, just turned
+  // through 90°. Landscape phones are short and wide and keep the original
+  // row layout, where stacking would push the copy straight off screen.
+  const [isStacked, setIsStacked] = useState(false);
   // The left/right card stagger (card.x) was tuned against a landscape
   // phone's wide viewport (~700-930px), where a flat 0.45 multiplier keeps
   // every card on screen. A portrait phone is much narrower (~375-430px),
@@ -907,11 +1037,74 @@ export default function MultiverseFlight() {
   // safely on screen at every size, landscape included (viewportWidth=900
   // recovers ~0.45, the original tuning). Clamped so it never vanishes
   // entirely (some stagger reads better than a dead-centered stack) or
-  // exceeds the original desktop-mobile feel.
-  const mobileOffsetScale =
-    viewportWidth > 0
-      ? Math.min(0.45, Math.max(0.16, (viewportWidth / 900) * 0.45))
-      : 0.45;
+  // exceeds the original desktop-mobile feel, and quantized to 0.005 so a
+  // one-pixel width report cannot re-render the flight.
+  const [mobileOffsetScale, setMobileOffsetScale] = useState(0.45);
+
+  useEffect(() => {
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      setCompact(width < 1024);
+      setIsStacked(width < 1024 && height > width);
+      setMobileOffsetScale(
+        Math.round(
+          Math.min(0.45, Math.max(0.16, (width / 900) * 0.45)) * 200,
+        ) / 200,
+      );
+
+      // --- Closing-beat sizing ------------------------------------------
+      // The mark used to take a fixed 250/340px with a `min(64vw, 460px)`
+      // box, both of which ignore viewport height — on a landscape phone
+      // that asked for a 460px square inside 390px of screen. Sized off the
+      // smaller of the two axes instead, so the whole closing composition
+      // (kicker, tagline, mark, signature) fits at any aspect ratio without
+      // being re-tuned per breakpoint.
+      //
+      // Height is rounded to 80px and the result again to 40px before it
+      // reaches state. The URL bar is worth ~60-100px of innerHeight and
+      // slides during scroll; without both steps that jitter would re-form
+      // the particle field (a changed `size` reseeds it) and re-render the
+      // flight, for a mark whose drawn size would move by under 20px.
+      const quantizedHeight = Math.round(height / 80) * 80;
+      const raw = Math.min(width * 0.72, quantizedHeight * 0.42, 460);
+      setEndMarkBox(Math.max(160, Math.round(raw / 40) * 40));
+    };
+
+    // Coalesced into one frame: iOS can fire resize several times per URL-bar
+    // transition, and only the settled metrics are worth reading.
+    const onResize = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(measure);
+    };
+
+    measure();
+    window.addEventListener("resize", onResize);
+    // iOS Safari fires orientationchange before the resize metrics settle
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, []);
+
+  const isMobile = compact;
+  // `endMarkBox` is 0 until the first measure lands (there is no window to
+  // read during SSR); the breakpoint guess stands in for that one render.
+  const markBox = endMarkBox || (isMobile ? 240 : 440);
+  // Ink diameter inside that box. Mobile runs denser-to-the-edge (there is
+  // less room to spend on breathing space) — these ratios reproduce the old
+  // fixed pairs at their original viewports.
+  const endMarkSize = Math.round(markBox * (isMobile ? 0.88 : 0.76));
+  // Point count follows area, so a small mark is not over-packed and a large
+  // one does not thin out into the sparse ring this started as.
+  const endParticleCount = Math.round(
+    Math.min(840, Math.max(240, (endMarkSize * endMarkSize) / 138)),
+  );
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -1009,11 +1202,10 @@ export default function MultiverseFlight() {
   // stretch after the tagline first appears rather than sharing its timing.
   const [showEndLogo, setShowEndLogo] = useState(false);
   useEffect(() => {
-    if (!isEndParticleActive) {
-      setShowEndLogo(false);
-      return;
-    }
-    const timeout = window.setTimeout(() => setShowEndLogo(true), 1100);
+    const timeout = window.setTimeout(
+      () => setShowEndLogo(isEndParticleActive),
+      isEndParticleActive ? 1100 : 0,
+    );
     return () => window.clearTimeout(timeout);
   }, [isEndParticleActive]);
 
@@ -1638,7 +1830,11 @@ export default function MultiverseFlight() {
            Unmounted outright when dismissed (not merely transparent) so the
            particle canvas inside stops existing rather than idling. */}
         <motion.div
-          className={`absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center ${
+          // px-5 rather than px-6 buys the tagline two more characters of
+          // measure on a 320px phone; the bottom padding keeps the signature
+          // clear of the "Thank you for flying" hint pinned at bottom-10 on
+          // the layer below, which short screens would otherwise overlap.
+          className={`absolute inset-0 z-10 flex flex-col items-center justify-center px-5 pb-20 pt-10 text-center sm:px-6 sm:pb-24 sm:pt-14 ${
             isEndParticleActive ? "pointer-events-auto" : "pointer-events-none"
           }`}
           initial={false}
@@ -1657,7 +1853,7 @@ export default function MultiverseFlight() {
              the mark at any aspect ratio. */}
           <motion.div
             aria-hidden="true"
-            className="pointer-events-none absolute left-1/2 top-1/2 h-[min(86vh,760px)] w-[min(86vh,760px)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,_rgba(56,189,248,0.16)_0%,_rgba(14,165,233,0.07)_38%,_transparent_68%)]"
+            className="pointer-events-none absolute left-1/2 top-1/2 h-[min(86vh,130vw,760px)] w-[min(86vh,130vw,760px)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,_rgba(56,189,248,0.16)_0%,_rgba(14,165,233,0.07)_38%,_transparent_68%)]"
             initial={false}
             animate={
               showEndLogo
@@ -1706,11 +1902,15 @@ export default function MultiverseFlight() {
               initial={false}
               animate={{ opacity: showEndLogo ? 1 : 0, y: showEndLogo ? 0 : -6 }}
               transition={{ duration: 0.7, delay: showEndLogo ? 0.25 : 0, ease: "easeOut" }}
-              className="mb-4 text-[9px] font-semibold uppercase tracking-[0.5em] text-sky-200/45 sm:text-[10px]"
+              className="mb-3 text-[9px] font-semibold uppercase tracking-[0.34em] text-sky-200/45 sm:mb-4 sm:tracking-[0.5em] lg:text-[10px]"
             >
               End of transmission
             </motion.span>
-            <p className="text-lg font-semibold uppercase leading-[1.35] tracking-[0.18em] text-sky-50 drop-shadow-[0_4px_20px_rgba(2,8,23,0.65)] sm:text-2xl lg:text-[2rem]">
+            {/* Sized in vw below the sm breakpoint so the two lines hold
+               their shape on a 320px phone instead of wrapping into four —
+               tracking is part of that budget, so it tightens with the type
+               rather than staying at the desktop 0.18em. */}
+            <p className="text-[clamp(0.9rem,4.6vw,1.35rem)] font-semibold uppercase leading-[1.35] tracking-[0.1em] text-sky-50 drop-shadow-[0_4px_20px_rgba(2,8,23,0.65)] sm:text-2xl sm:tracking-[0.18em] lg:text-[2rem]">
               I BUILD. YOU IMAGINE.
               <br />
               TOGETHER, WE CREATE.
@@ -1724,19 +1924,31 @@ export default function MultiverseFlight() {
           {/* The mark is drawn larger and denser than before. It previously
              read as a sparse ring of debris rather than a logo: 560 points
              spread over a 280px sample is below the density where the glyph
-             shapes close up. This canvas is now genuinely ~420px (the sizing
-             bug that stretched it full-screen is fixed) and the draw loop no
+             shapes close up. This canvas is a real, bounded box now (the
+             sizing bug that stretched it full-screen is fixed) and the draw
+             loop no
              longer does per-particle save/rotate or shadow blur, so it can
              carry roughly double the points for a fraction of the old cost —
              measured at a full 60fps with the canvas contributing ~nothing.
              shrink-0 keeps the flex column from stretching or squashing it. */}
+          {/* Box and ink are both derived from the live viewport (see
+             endMarkBox) rather than from breakpoint guesses, so the square
+             mark can never outgrow a short screen and push the signature
+             off the bottom. The negative margin is proportional for the
+             same reason — a flat -24px eats a third of a 160px mark. */}
           <ParticleLogo
             src="/images/us2.png"
-            size={isMobile ? 250 : 340}
-            particleCount={isMobile ? 490 : 840}
-            disperseStrength={isMobile ? 260 : 360}
+            size={endMarkSize}
+            particleCount={endParticleCount}
+            disperseStrength={Math.round(endMarkSize * 1.06)}
             active={showEndLogo}
-            className="-my-4 h-[min(64vw,460px)] w-[min(64vw,460px)] shrink-0 sm:-my-6"
+            className="shrink-0"
+            style={{
+              width: markBox,
+              height: markBox,
+              marginTop: -markBox * 0.05,
+              marginBottom: -markBox * 0.05,
+            }}
           />
           {/* Closing signature. It used to blink — a full fade to zero and
              back on a loop — which read as the name being unsure whether it
@@ -1752,9 +1964,13 @@ export default function MultiverseFlight() {
             transition={{ duration: 0.8, delay: showEndLogo ? 0.9 : 0, ease: "easeOut" }}
             className="relative z-10 flex flex-col items-center"
           >
+            {/* The name is set on one nowrap line, so its width is the
+               constraint, not its height — vw below sm keeps it inside a
+               narrow phone's gutters instead of being clipped at both
+               ends. */}
             <SignatureName
               active={showEndLogo}
-              className="text-4xl text-sky-100/90 sm:text-5xl lg:text-6xl"
+              className="text-[clamp(1.75rem,9vw,2.25rem)] text-sky-100/90 sm:text-5xl lg:text-6xl"
             />
             {/* A hairline that fades out at both ends, so the signature has
                a base to sit on instead of floating. Sized in ch units to
@@ -1766,6 +1982,26 @@ export default function MultiverseFlight() {
           </motion.div>
         </motion.div>
 
+        {/* Outside the 3D corridor group on purpose — see SkillLayoverCluster
+           — but deliberately *before* the cards in the DOM. The cluster and
+           the Skills billboard share the middle of the screen, and their
+           windows overlap at the edges (the first layover starts rising
+           while the card is still departing). Painted after the cards it
+           read as a row of icons sitting inside the card's own portal
+           window; painted before them the card is simply opaque in front of
+           it, so the icons are only ever seen in the space around and behind
+           the billboard — which is where the pass-through is meant to
+           happen. Both are below the z-[5]/z-[6]/z-10 end-of-flight layers
+           either way. */}
+        {SKILL_LAYOVERS.map((layover) => (
+          <SkillLayoverCluster
+            key={layover.group.name}
+            layover={layover}
+            isMobile={isMobile}
+            smoothScrollProgress={smoothScrollProgress}
+          />
+        ))}
+
         <motion.div
           style={{ translateZ: zCamera, transformStyle: "preserve-3d" }}
           className="absolute inset-0 flex items-center justify-center"
@@ -1776,6 +2012,7 @@ export default function MultiverseFlight() {
               card={card}
               index={index}
               isMobile={isMobile}
+              isStacked={isStacked}
               mobileOffsetScale={mobileOffsetScale}
               smoothScrollProgress={smoothScrollProgress}
               revealStart={getRevealWindow(index).start}
@@ -1783,16 +2020,6 @@ export default function MultiverseFlight() {
             />
           ))}
         </motion.div>
-
-        {/* Outside the 3D corridor group on purpose — see SkillLayoverCluster. */}
-        {SKILL_LAYOVERS.map((layover) => (
-          <SkillLayoverCluster
-            key={layover.group.name}
-            layover={layover}
-            isMobile={isMobile}
-            smoothScrollProgress={smoothScrollProgress}
-          />
-        ))}
 
         {/* The loop's veil. Sits above everything so it can cover the instant
            scroll is reset to the top (see runLoop). It only needs to mask a

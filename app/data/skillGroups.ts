@@ -10,16 +10,24 @@ export type SkillGroup = { name: SkillGroupName; blurb: string; items: SkillGrou
 
 // `icon` keys into the self-hosted BrandIcon registry (app/components/icons/
 // brand-icon.tsx) — no icon-library runtime dependency.
+// ORDER IS SIGNIFICANT — the first pattern that matches wins (see the
+// `.find()` below), so anything whose name *contains* a more generic
+// technology's name has to be listed before that generic one. "Tailwind CSS"
+// matching /\bcss3?\b/ and rendering with the CSS3 logo is exactly the bug
+// this ordering prevents; the generic single-word patterns are grouped at the
+// end of each section for that reason.
 const SKILL_META: { pattern: RegExp; icon: string; group: SkillGroupName }[] = [
+  // Compound names first — each of these contains a generic term below.
+  { pattern: /\btailwind\b/i, icon: "tailwindcss", group: "Frontend Development" },
+  { pattern: /material[-\s]?ui/i, icon: "mui", group: "Frontend Development" },
   { pattern: /\breact\b/i, icon: "react", group: "Frontend Development" },
   { pattern: /\bnext(\.js)?\b/i, icon: "nextjs", group: "Frontend Development" },
   { pattern: /\btypescript\b/i, icon: "typescript", group: "Frontend Development" },
   { pattern: /\bjavascript\b/i, icon: "javascript", group: "Frontend Development" },
   { pattern: /\bhtml5?\b/i, icon: "html5", group: "Frontend Development" },
   { pattern: /\bcss3?\b/i, icon: "css3", group: "Frontend Development" },
-  { pattern: /\btailwind\b/i, icon: "tailwindcss", group: "Frontend Development" },
   { pattern: /\bredux\b/i, icon: "redux", group: "Frontend Development" },
-  { pattern: /material-ui/i, icon: "mui", group: "Frontend Development" },
+  { pattern: /\bzustand\b/i, icon: "zustand", group: "Frontend Development" },
   { pattern: /\bfigma\b/i, icon: "figma", group: "UI/UX Design" },
   { pattern: /photoshop/i, icon: "photoshop", group: "UI/UX Design" },
   { pattern: /illustrator/i, icon: "illustrator", group: "UI/UX Design" },
