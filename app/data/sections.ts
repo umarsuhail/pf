@@ -81,7 +81,7 @@ export const cards: FlightCard[] = [
       "Node.js — Intermediate",
       "MongoDB — Intermediate",
       "Git — Intermediate",
-      "Jenkins — Intermediate",
+      // "Jenkins — Intermediate",
       "Docker — Intermediate",
     ],
     cta: "Skill Details",

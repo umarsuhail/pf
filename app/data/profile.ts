@@ -14,7 +14,7 @@ export const skills = [
   { name: "Node.js", level: "Intermediate" },
   { name: "Material-UI", level: "Expert" },
   { name: "Git", level: "Intermediate" },
-  { name: "Jenkins", level: "Intermediate" },
+  // { name: "Jenkins", level: "Intermediate" },
 ];
 
 export const projects = [
@@ -102,7 +102,7 @@ export const experiences = [
       "Collaborated with cross-functional teams to deliver projects on tight deadlines",
       "Integrated RESTful APIs and third-party services into frontend applications",
     ],
-    technologies: ["React", "JavaScript", "Redux", "Jenkins", "REST APIs"],
+    technologies: ["React", "JavaScript", "Redux", "Node JS", "Mongo DB"],
   },
   {
     title: "UI Developer",

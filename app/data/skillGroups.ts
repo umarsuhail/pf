@@ -28,7 +28,7 @@ const SKILL_META: { pattern: RegExp; icon: string; group: SkillGroupName }[] = [
   { pattern: /\bnode(\.js)?\b/i, icon: "nodejs", group: "Backend & Tooling" },
   { pattern: /mongodb/i, icon: "mongodb", group: "Backend & Tooling" },
   { pattern: /\bgit\b/i, icon: "git", group: "Backend & Tooling" },
-  { pattern: /\bjenkins\b/i, icon: "jenkins", group: "Backend & Tooling" },
+  // { pattern: /\bjenkins\b/i, icon: "jenkins", group: "Backend & Tooling" },
   { pattern: /\bdocker\b/i, icon: "docker", group: "Backend & Tooling" },
 ];
 

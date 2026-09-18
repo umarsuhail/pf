@@ -1057,10 +1057,11 @@ export default function MultiverseFlight() {
     setIsWrapping(true);
 
     // Veil in, jump underneath it, then veil out. The jump is deliberately
-    // instant ("auto") — a smooth scroll would animate the whole flight
-    // backwards in fast-forward behind the veil.
+    // "instant" — a smooth scroll would animate the whole flight backwards in
+    // fast-forward behind the veil. (Not "auto": that defers to the CSS
+    // scroll-behavior, which globals.css sets to smooth.)
     window.setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: "auto" });
+      window.scrollTo({ top: 0, behavior: "instant" });
       pull.set(0);
       smoothPull.jump(0);
     }, 260);
@@ -1401,7 +1402,7 @@ export default function MultiverseFlight() {
       // Always departs from the beginning — a tour that starts halfway is not
       // a tour. The camera spring is snapped along with the scroll so the
       // flight doesn't replay itself in fast-forward on the way back to 0.
-      window.scrollTo({ top: toScrollTop(0), behavior: "auto" });
+      window.scrollTo({ top: toScrollTop(0), behavior: "instant" });
       smoothScrollProgress.jump(0);
 
       let index = 0;
@@ -1438,7 +1439,7 @@ export default function MultiverseFlight() {
       // matches currentProgress (0) before the first leg begins easing.
       let holdFrames = 6;
       const holdAtStart = (now: number) => {
-        window.scrollTo({ top: toScrollTop(0), behavior: "auto" });
+        window.scrollTo({ top: toScrollTop(0), behavior: "instant" });
         if (--holdFrames > 0) {
           raf = requestAnimationFrame(holdAtStart);
           return;
@@ -1481,7 +1482,13 @@ export default function MultiverseFlight() {
         const p = from + (legs[index].target - from) * eased;
         currentProgress = p;
         refreshScrollGeometryIfNeeded();
-        window.scrollTo({ top: toScrollTop(p), behavior: "auto" });
+        // "instant", never "auto": "auto" defers to globals.css's
+        // `scroll-behavior: smooth`, which turned every per-frame write into
+        // a fresh smooth scroll trailing behind `p`. Its scroll events then
+        // wrote that trailing position back into scrollYProgress over the
+        // jump(p) below — the camera yanked back toward the previous card
+        // and, once a leg ended, glided forward again as the scroll caught up.
+        window.scrollTo({ top: toScrollTop(p), behavior: "instant" });
         // window.scrollTo doesn't move the camera directly — every card's
         // transforms read smoothScrollProgress, which normally only updates
         // when the browser fires a scroll event off that call. Those events

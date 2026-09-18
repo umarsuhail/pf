@@ -59,7 +59,7 @@ function scrollToProgress(p: number) {
   const doc = document.documentElement;
   const max = doc.scrollHeight - window.innerHeight;
   if (max <= 0) return;
-  window.scrollTo({ top: max * clamp(p, 0, 1), behavior: "auto" });
+  window.scrollTo({ top: max * clamp(p, 0, 1), behavior: "instant" });
 }
 
 export default function RouteMap() {

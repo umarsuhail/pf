@@ -41,7 +41,7 @@ function scrollToProgress(p: number) {
   const doc = document.documentElement;
   const max = doc.scrollHeight - window.innerHeight;
   if (max <= 0) return;
-  window.scrollTo({ top: max * clamp01(p), behavior: "auto" });
+  window.scrollTo({ top: max * clamp01(p), behavior: "instant" });
 }
 
 function polarToCartesian(cx: number, cy: number, r: number, deg: number) {
