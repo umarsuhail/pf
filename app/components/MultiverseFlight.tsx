@@ -10,6 +10,7 @@ import {
   type MotionValue,
 } from "framer-motion";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CardPortal } from "./CardPortal";
 import { CardIcon } from "./icons/card-icon";
@@ -19,8 +20,13 @@ import ExpandableText from "./ExpandableText";
 import NarrationHighlights from "./NarrationHighlights";
 import NarratedText from "./NarratedText";
 import { NARRATION_DURATION } from "../data/narration";
-import SpaceParticles from "./SpaceParticles";
 import ParticleLogo from "./HeroLogo";
+
+// Three.js-backed and only visible in the closing beat at the very end of a
+// long scroll — split into its own chunk (ssr:false, no fallback needed
+// since nothing is on screen for it yet) so the WebGL bundle isn't part of
+// what the flight has to load before the very first scroll frame can run.
+const SpaceParticles = dynamic(() => import("./SpaceParticles"), { ssr: false });
 import { getSkillGroups } from "../data/skillGroups";
 import Greeting from "./Greeting";
 import SignatureName from "./SignatureName";
@@ -48,22 +54,28 @@ const nextCardProgress = sectionProgressStops[skillsCardIndex + 1] ?? skillsStop
 // still revealing. Keep their whole fade window after the card's completed
 // reveal, with a small pause so the card reads clearly first.
 const skillsCardReadyProgress = getRevealWindow(skillsCardIndex).end;
-const SKILL_LAYOVER_SPAN = 0.045;
+// Each group gets a full, unhurried look — no rush to the next card until
+// the last group's own fade-out has finished — so the span/hold/sweep below
+// are set as large as the Skills → Projects transit can fit without any two
+// groups' clusters overlapping (they share the same on-screen slot, so any
+// overlap would read as one group bleeding into the next).
+const SKILL_LAYOVER_SPAN = 0.042;
 // Fraction of the span held at full opacity/sharpness around the peak,
 // rather than the cluster being sharp for a single instant and immediately
 // fading back out again.
-const SKILL_LAYOVER_HOLD = 0.4;
-// How much of a layover's fade window the travelling frame sweeps across.
-// Less than the whole of it on purpose — see the sweep itself below.
-const HIGHLIGHT_SWEEP = 0.62;
+const SKILL_LAYOVER_HOLD = 0.55;
+// How much of a layover's fade window the travelling frame sweeps across —
+// most of it, so scrolling through a group's full item row takes most of
+// that group's own dwell instead of racing through it.
+const HIGHLIGHT_SWEEP = 0.85;
 
 type Slot = { x: number; y: number; w: number; h: number };
-const skillLayoverStart = Math.max(
-  skillsStopProgress + (nextCardProgress - skillsStopProgress) * 0.28,
-  skillsCardReadyProgress + SKILL_LAYOVER_SPAN + 0.01,
-);
-const skillLayoverEnd =
-  skillsStopProgress + (nextCardProgress - skillsStopProgress) * 0.76;
+// Bounded so the first group only starts fading in once the Skills card has
+// fully finished revealing, and the last group has completely faded out
+// again before the camera actually arrives at the Projects stop — the next
+// card only appears once the whole skill list has had its turn.
+const skillLayoverStart = skillsCardReadyProgress + SKILL_LAYOVER_SPAN + 0.01;
+const skillLayoverEnd = nextCardProgress - SKILL_LAYOVER_SPAN - 0.02;
 
 const SKILL_LAYOVERS = getSkillGroups(cards[skillsCardIndex]?.details ?? []).map(
   (group, i, arr) => {
@@ -78,10 +90,6 @@ const SKILL_LAYOVERS = getSkillGroups(cards[skillsCardIndex]?.details ?? []).map
 );
 
 const PORTAL_WIDTH = "clamp(150px, 20vw, 320px)";
-// Landscape phones are short, so the portal is sized off viewport *height*
-// there — a width-based clamp would hand it 190px of a 440px-tall screen and
-// leave the headline squeezed into a sliver.
-const COMPACT_PORTAL_WIDTH = "clamp(96px, 30vh, 150px)";
 
 // Spring used for the cards' own width/offset settle when the breakpoint
 // changes. There is deliberately no camera spring: see smoothScrollProgress.
@@ -411,7 +419,7 @@ function BillboardCard({
     return () => window.removeEventListener("flight-autopilot-expand", onExpand as EventListener);
   }, [card.id]);
 
-  const alignmentClass = card.align === "left" ? "items-start text-left" : "items-end text-right";
+  const alignmentClass = isMobile || card.align === "left" ? "items-start text-left" : "items-end text-right";
   const titleClass = "text-sky-50";
   const bodyClass = "text-slate-100/90";
   const panelClass = "border-white/20 shadow-[0_24px_90px_rgba(2,8,23,0.52)]";
@@ -512,17 +520,9 @@ function BillboardCard({
       }}
       initial={false}
       animate={{
-        // Narrower than the desktop clamp so there is room either side for the
-        // lateral offsets, but wide enough that the headline still gets a real
-        // measure once the portal takes its share.
-        width: isMobile ? "min(66vw, 500px)" : card.width,
-        // Same left/right stagger as desktop, scaled down to fit the
-        // narrower viewport instead of being zeroed out — mobileOffsetScale
-        // is proportional to actual viewport width, so a landscape phone
-        // (wide) keeps close to the original stagger while a narrow
-        // portrait phone gets a much smaller one, keeping the card on
-        // screen instead of clipping off its edges.
-        translateX: isMobile ? card.x * mobileOffsetScale : card.x,
+        // Mobile cards use the available width, with only a small stagger.
+        width: isMobile ? "min(88vw, 500px)" : card.width,
+        translateX: isMobile ? card.x * Math.min(mobileOffsetScale, 0.035) : card.x,
       }}
       transition={PHYSICS.expansion}
       className={`absolute flex rounded-3xl border sm:rounded-4xl ${
@@ -535,17 +535,17 @@ function BillboardCard({
 
       <motion.div
         animate={
-          isBobbing
+          !isMobile && isBobbing
             ? { y: [0, -12, 0, 12, 0], opacity: [0.7, 1, 0.85, 1, 0.7] }
             : { y: 0, opacity: 1 }
         }
         transition={
-          isBobbing
+          !isMobile && isBobbing
             ? { duration: 7 + index * 0.5, repeat: Infinity, ease: "easeInOut" }
             : { duration: 0.4, ease: "easeOut" }
         }
-        className={`flex w-full items-stretch ${isMobile ? "gap-3" : "gap-5 sm:gap-8"} ${
-          card.align === "right" ? "flex-row-reverse" : "flex-row"
+        className={`flex w-full items-stretch ${isMobile ? "gap-4" : "gap-5 sm:gap-8"} ${
+          isMobile ? "flex-col-reverse" : card.align === "right" ? "flex-row-reverse" : "flex-row"
         }`}
         style={{ transformStyle: "preserve-3d" }}
       >
@@ -579,17 +579,20 @@ function BillboardCard({
           {/* Home carries the full narrated bio (all four paragraphs) — too
              long for a billboard card to show outright, so it collapses to a
              short preview with a "Read more" that grows the card in place. */}
-          {card.id === "home" ? (
+          {card.id === "home" || isMobile ? (
             <ExpandableText
               className={`max-w-[46ch] ${isMobile ? "mt-2" : "mt-4 max-w-[38ch] sm:mt-5"}`}
-              collapsedHeight={isMobile ? "3.3em" : "4.5em"}
+              collapsedHeight="4.5em"
+              expandedHeight={isMobile ? "min(28dvh, 240px)" : "640px"}
+              scrollExpanded={isMobile}
+              toggleClassName={isMobile ? "min-h-11 text-[11px]" : ""}
               forceExpanded={autoExpandHome}
               onExpandedChange={setIsHomeExpanded}
             >
               <p
                 className={`${
                   isMobile
-                    ? "text-[11px] leading-[1.45]"
+                    ? "text-sm leading-6"
                     : "text-sm leading-6 sm:text-base sm:leading-7 lg:text-xl"
                 } ${bodyClass}`}
               >
@@ -617,7 +620,7 @@ function BillboardCard({
                 onMouseEnter={() => pdfDownloadRef.current?.startAnimation()}
                 onMouseLeave={() => pdfDownloadRef.current?.stopAnimation()}
                 className={`inline-flex items-center gap-2 rounded-full border font-semibold transition duration-300 ${
-                  isMobile ? "px-4 py-1.5 text-[11px]" : "px-6 py-3 text-sm hover:-translate-y-1"
+                  isMobile ? "min-h-11 px-4 py-3 text-xs" : "px-6 py-3 text-sm hover:-translate-y-1"
                 } ${buttonClass}`}
               >
                 <DownloadIcon ref={pdfDownloadRef} size={isMobile ? 12 : 16} aria-hidden="true" />
@@ -629,7 +632,7 @@ function BillboardCard({
                 onMouseEnter={() => texDownloadRef.current?.startAnimation()}
                 onMouseLeave={() => texDownloadRef.current?.stopAnimation()}
                 className={`inline-flex items-center gap-2 rounded-full border font-semibold transition duration-300 ${
-                  isMobile ? "px-4 py-1.5 text-[11px]" : "px-6 py-3 text-sm hover:-translate-y-1"
+                  isMobile ? "min-h-11 px-4 py-3 text-xs" : "px-6 py-3 text-sm hover:-translate-y-1"
                 } ${buttonClass}`}
               >
                 <DownloadIcon ref={texDownloadRef} size={isMobile ? 12 : 16} aria-hidden="true" />
@@ -643,7 +646,7 @@ function BillboardCard({
               href={`/${card.id}`}
               className={`inline-block rounded-full border font-semibold transition duration-300 ${
                 isMobile
-                  ? "mt-3 px-4 py-1.5 text-[11px]"
+                  ? "mt-2 min-h-11 px-5 py-3 text-xs"
                   : "mt-6 px-6 py-3 text-sm hover:-translate-y-1 sm:mt-8"
               } ${buttonClass}`}
             >
@@ -655,11 +658,12 @@ function BillboardCard({
 
         <motion.div
           initial={false}
-          animate={{ width: isMobile ? COMPACT_PORTAL_WIDTH : PORTAL_WIDTH }}
+          animate={{ width: isMobile ? "100%" : PORTAL_WIDTH }}
           transition={PHYSICS.expansion}
-          className="relative block min-h-[min(16.25rem,42vh)] shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]"
+          className={`relative block ${isMobile ? "h-28" : "min-h-[min(16.25rem,42vh)]"} shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]`}
         >
           <CardPortal
+            isMobile={isMobile}
             index={index}
             scrollYProgress={smoothScrollProgress}
             align={card.align}

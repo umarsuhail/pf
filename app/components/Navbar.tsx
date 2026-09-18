@@ -356,7 +356,7 @@ export default function NeumorphicNavbar() {
           onClick={() => handleNavigate("home")}
         >
           <Image
-            src="/images/us.png"
+            src="/images/us2.png"
             alt="Umar Suhail"
             width={150}
             height={128}
@@ -410,7 +410,7 @@ export default function NeumorphicNavbar() {
               <div
                 ref={progressBarRef}
                 className="absolute bottom-0 left-0 w-full rounded-full bg-[linear-gradient(180deg,#2f78bc_0%,#124677_100%)] transition-[height] duration-500"
-                style={{ height: `${Math.max(6, journeyProgressRef.current * 100)}%` }}
+                style={{ height: "6%" }}
               />
             </div>
           )}

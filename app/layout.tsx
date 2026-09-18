@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { SerwistProvider } from "@serwist/turbopack/react";
 import "./globals.css";
 import PageLoader from "./components/PageLoader";
 import ChromeBeforeMain from "./components/ChromeBeforeMain";
@@ -115,11 +116,20 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Umar Suhail",
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: "#05263f",
 };
 
 const jsonLd = {
@@ -162,10 +172,12 @@ export default function RootLayout({
       <body
         className={`${marvel.variable} ${signatureFontVars} relative min-h-screen antialiased`}
       >
-        <PageLoader />
-        <ChromeBeforeMain />
-        <main className="relative z-10">{children}</main>
-        <ChromeAfterMain />
+        <SerwistProvider swUrl="/serwist/sw.js">
+          <PageLoader />
+          <ChromeBeforeMain />
+          <main className="relative z-10">{children}</main>
+          <ChromeAfterMain />
+        </SerwistProvider>
       </body>
     </html>
   );

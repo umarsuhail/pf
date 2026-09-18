@@ -27,6 +27,7 @@ import SignatureName from "./SignatureName";
 const power3Out = (t: number) => 1 - Math.pow(1 - t, 4);
 
 interface CardPortalProps {
+  isMobile?: boolean;
   index: number;
   scrollYProgress: MotionValue<number>;
   align?: "left" | "right";
@@ -91,15 +92,33 @@ const atmospheres: { overlay: string; motif: MotifType; accent: string }[] = [
   },
 ];
 
-// Non-entry cards that have a real hero image, keyed by card index (1-based
-// after the entry/earth card at index 0); indices without an entry fall back
-// to the drawn PortalMotif below.
-const imageSrcByIndex: Record<number, string> = {
-  1: "/a3.svg",
-  2: "/a4.svg",
-  3: "/a5.svg",
-  4: "/a6.svg",
-  5: "/a7.svg",
+// Non-entry cards share one hero graphic (a3.svg) and are told apart with a
+// per-card gradient tint layered on top via mix-blend-mode, rather than each
+// card shipping its own SVG asset.
+const HERO_IMAGE_SRC = "/a3.svg";
+const heroImageIndices = new Set([1, 2, 3, 4, 5]);
+
+const heroTintByIndex: Record<number, { gradient: string; blendMode: "color" | "hue" }> = {
+  1: {
+    gradient: "linear-gradient(135deg, #34d399 0%, #059669 55%, #022c22 100%)",
+    blendMode: "color",
+  },
+  2: {
+    gradient: "linear-gradient(200deg, #60a5fa 0%, #1d4ed8 55%, #0b1d4d 100%)",
+    blendMode: "color",
+  },
+  3: {
+    gradient: "radial-gradient(circle at 30% 20%, #fbbf24 0%, #b45309 55%, #2a1502 100%)",
+    blendMode: "color",
+  },
+  4: {
+    gradient: "linear-gradient(160deg, #94a3b8 0%, #334155 55%, #0b0f19 100%)",
+    blendMode: "hue",
+  },
+  5: {
+    gradient: "radial-gradient(circle at 70% 80%, #7dd3fc 0%, #0369a1 55%, #041c33 100%)",
+    blendMode: "color",
+  },
 };
 
 function PortalMotif({ motif, accent }: { motif: MotifType; accent: string }) {
@@ -216,6 +235,7 @@ export function CardPortal({
   actionLabel,
   ariaLabel,
   isExpanded = false,
+  isMobile = false,
 }: CardPortalProps) {
   const arrowRef = useRef<AnimatedIconHandle>(null);
   const hasEnteredRef = useRef(false);
@@ -536,7 +556,7 @@ export function CardPortal({
           {/* Space backdrop filling the window, carrying this section's portal color */}
           <Space tint={atmosphere.accent} active={isNear} />
 
-          {isEntry && (
+          {isEntry && !isMobile && (
             // Whole group lifted 14px: the mark reads better sitting slightly
             // above the portal's optical centre.
             <div className="absolute inset-0 -translate-y-3.5">
@@ -616,7 +636,7 @@ export function CardPortal({
                  this slot now only ever shows the astronaut once the bio
                  expands, and shows nothing the rest of the time. */}
               <AnimatePresence>
-                {isExpanded && (
+                {isExpanded && !isMobile && (
                   <motion.div
                     key="astronaut"
                     // Appears already in place, at the zoomed-in end of the
@@ -635,7 +655,7 @@ export function CardPortal({
                     className="absolute inset-0"
                   >
                     <Image
-                      src="/SVG/astr.svg"
+                      src="/astr.svg"
                       alt=""
                       fill
                       sizes="(min-width: 600px) 30vw, 40vh"
@@ -648,18 +668,28 @@ export function CardPortal({
             </motion.div>
           ) : (
             <motion.div
-              className="absolute inset-0"
+              className={isMobile ? "absolute left-2 top-1/2 h-16 w-16 -translate-y-1/2 opacity-45" : "absolute inset-0"}
               style={{ opacity: motifOpacity, scale: motifScale, willChange: "opacity, transform" }}
             >
-              {imageSrcByIndex[index] ? (
+              {heroImageIndices.has(index) ? (
                 <motion.div className="absolute inset-0" style={{ rotate: spinRotate }}>
                   <Image
-                    src={imageSrcByIndex[index]}
+                    src={HERO_IMAGE_SRC}
                     alt=""
                     fill
                     sizes="(min-width: 1024px) 30vw, 30vh"
                     className="object-contain"
                   />
+                  {heroTintByIndex[index] && (
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        background: heroTintByIndex[index].gradient,
+                        mixBlendMode: heroTintByIndex[index].blendMode,
+                      }}
+                      aria-hidden="true"
+                    />
+                  )}
                 </motion.div>
               ) : (
                 <PortalMotif motif={atmosphere.motif} accent={atmosphere.accent} />
@@ -723,13 +753,20 @@ export function CardPortal({
         </svg>
       )}
 
+      {isMobile && isEntry && (
+        <div className="pointer-events-none absolute inset-0 grid grid-cols-[64px_minmax(0,1fr)_64px] items-center gap-1 px-3">
+          <Image src="/images/us.png" alt="" width={64} height={64} className="h-16 w-16 object-contain" aria-hidden="true" />
+          <SignatureName active={isNear} className="justify-self-center text-[18px] text-sky-100" />
+        </div>
+      )}
+
       {/* Action label — faint baseline (touch), brightens on hover-capable pointer hover */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center opacity-70 transition-opacity duration-300 group-hover:opacity-100">
+      <div className={`pointer-events-none absolute flex justify-center transition-opacity duration-300 group-hover:opacity-100 ${isMobile ? "right-3 top-1/2 -translate-y-1/2" : "inset-x-0 bottom-4 opacity-70"}`}>
         {/* Solid-ish plate, not backdrop-blur: a backdrop filter here would
            sit inside a 3D-transformed card over a scene that repaints every
            scroll frame, forcing a re-blur of its backdrop each time — six
            cards' worth. The darker background reads the same. */}
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/55 px-4 py-2 text-xs font-medium text-sky-50">
+        <span className={`inline-flex items-center rounded-full border border-white/25 bg-black/55 text-xs font-medium text-sky-50 ${isMobile ? "min-h-11 gap-1 px-2" : "gap-2 px-4 py-2"}`}>
           <ArrowUpRightIcon ref={arrowRef} size={14} aria-hidden="true" />
           {actionLabel}
         </span>

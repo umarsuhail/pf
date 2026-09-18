@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cacheLife } from "next/cache";
 import { cardGradients, cards } from "../data/sections";
 import { SectionContent } from "./SectionContent";
 
@@ -20,12 +21,16 @@ export async function generateMetadata({
 }: {
   params: Promise<{ section: string }>;
 }): Promise<Metadata> {
+  "use cache";
+  cacheLife("max");
+
   const { section } = await params;
   const card = findSection(section);
   if (!card) return {};
 
   return {
-    title: `${card.title} | Umar Suhail`,
+    // The root layout's title template already appends "| Umar Suhail".
+    title: card.title,
     description: card.description,
     alternates: { canonical: `/${card.id}` },
     openGraph: {
@@ -42,6 +47,9 @@ export default async function SectionPage({
 }: {
   params: Promise<{ section: string }>;
 }) {
+  "use cache";
+  cacheLife("max");
+
   const { section } = await params;
   const card = findSection(section);
   if (!card) notFound();

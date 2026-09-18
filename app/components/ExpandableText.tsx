@@ -14,9 +14,11 @@ export default function ExpandableText({
   toggleClassName = "",
   className = "",
   forceExpanded = false,
+  scrollExpanded = false,
   onExpandedChange,
 }: {
   children: ReactNode;
+  scrollExpanded?: boolean;
   collapsedHeight?: string;
   expandedHeight?: string;
   toggleClassName?: string;
@@ -51,7 +53,7 @@ export default function ExpandableText({
   return (
     <div className={className}>
       <div
-        className="relative overflow-hidden transition-[max-height] duration-500 ease-in-out"
+        className={`relative transition-[max-height] duration-500 ease-in-out ${expanded && scrollExpanded ? "overflow-y-auto overscroll-contain" : "overflow-hidden"}`}
         style={{ maxHeight: expanded ? expandedHeight : collapsedHeight }}
       >
         {children}
