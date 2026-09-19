@@ -13,10 +13,6 @@ import { useEffect, useState } from "react";
 // name visibly jumps size on every swap instead of simply changing hand.
 // Each value normalises that face's width to the set's mean (~310px), so the
 // signature holds one footprint while the handwriting changes underneath it.
-// Exported because the Greeting draws from the same pool. It inherited the
-// slot the deleted TwinkleStar face used to fill, and sharing one set of
-// hands is what ties the flight's opening line to the name that closes it.
-// One list, so adding or removing a face changes both.
 export const SIGNATURE_FACES = [
   { varName: "--font-sign-stylescript", scale: 1.24, tracking: "0.01em" },
   { varName: "--font-sign-leckerli", scale: 0.88, tracking: "0em" },

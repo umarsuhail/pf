@@ -15,6 +15,10 @@ import { primeTicks, playTick, registerForUnlock } from "../lib/tick-sound";
 // ticks — looped and pitched up with speed instead of firing overlapping
 // one-shots.
 const TICK_DISTANCE = 45; // px of scroll per tick
+// Do not make the very first nudge noisy. Trackpads, touchscreens and mouse
+// wheels all produce tiny exploratory moves, so the dial only comes alive
+// after the visitor has deliberately travelled through the page.
+const SCROLL_ARM_DISTANCE = 96;
 const STOP_DELAY = 150; // ms of no input before the dial is considered stopped
 const FAST_VELOCITY = 1.6; // px/ms threshold to switch to the multi-tick burst
 const BURST_VOLUME = 0.4;
@@ -44,6 +48,8 @@ export default function ScrollSound() {
     registerForUnlock(burst);
 
     let accumulated = 0;
+    let distanceBeforeArming = 0;
+    let isArmed = false;
     let lastTime = 0;
     let smoothedVelocity = 0;
     let lastTouchY: number | null = null;
@@ -57,18 +63,35 @@ export default function ScrollSound() {
     const stopAll = () => {
       accumulated = 0;
       smoothedVelocity = 0;
+      lastTime = 0;
       stopBurst();
     };
 
     const handleMove = (deltaY: number) => {
+      let distance = Math.abs(deltaY);
+      if (distance === 0) return;
+
+      // Keep this arm state across pauses. The requirement is a meaningful
+      // amount of page travel before the first tick, not one uninterrupted
+      // gesture that happens to exceed the threshold.
+      if (!isArmed) {
+        distanceBeforeArming += distance;
+        if (distanceBeforeArming < SCROLL_ARM_DISTANCE) return;
+
+        isArmed = true;
+        distance = distanceBeforeArming - SCROLL_ARM_DISTANCE;
+        distanceBeforeArming = 0;
+        // Reaching the threshold itself stays silent; subsequent movement is
+        // what turns into the first discrete page.wav tick.
+        if (distance === 0) return;
+      }
+
       const now = performance.now();
       const dt = lastTime ? now - lastTime : 16;
       lastTime = now;
       window.clearTimeout(stopTimer);
       stopTimer = window.setTimeout(stopAll, STOP_DELAY);
 
-      const distance = Math.abs(deltaY);
-      if (distance === 0) return;
       const instantVelocity = distance / Math.max(dt, 1); // px per ms
       smoothedVelocity += (instantVelocity - smoothedVelocity) * VELOCITY_SMOOTHING;
       const velocity = smoothedVelocity;

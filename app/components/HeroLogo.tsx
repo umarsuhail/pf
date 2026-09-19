@@ -27,6 +27,13 @@ type Particle = {
     rotation: number;
     rotationSpeed: number;
 
+    // Discrete twinkle burst, in performance.now() milliseconds. Zero when
+    // the particle isn't mid-shimmer; only ever set by the shimmer
+    // scheduler in draw(), which keeps at most SHIMMER_SLOTS of them
+    // burning at a time.
+    shimmerStart: number;
+    shimmerEnd: number;
+
     // In-flight animate() controls for each tweened field, so a new tween
     // can stop the previous one first — the motion equivalent of GSAP's
     // `overwrite: true`.
@@ -107,6 +114,26 @@ function toneBand(tone: number) {
     if (tone > 0.35) return 1;
     return 0;
 }
+
+// Every particle already breathes on its own low-amplitude sine (see draw()),
+// which is the mark's ambient texture. On top of that, individual sparks
+// catch the light one at a time: a slow flare up to white-hot and back down.
+// Deliberately never more than two at once — the whole read of a twinkle is
+// that the eye is drawn to one point, and a field of them flaring together
+// collapses back into the uniform pulse the sine already provides.
+const SHIMMER_SLOTS = 2;
+// Flare duration and the pause a slot takes before claiming its next spark.
+// Both randomised per burst so the two slots drift out of step instead of
+// settling into a visible two-beat rhythm.
+const SHIMMER_DURATION_MIN = 620;
+const SHIMMER_DURATION_MAX = 1150;
+const SHIMMER_GAP_MIN = 260;
+const SHIMMER_GAP_MAX = 1400;
+// A spark has to be essentially fully formed before it can be picked, so
+// bursts never fire on particles still flying in or already dispersing.
+const SHIMMER_MIN_ALPHA = 0.6;
+// Peak size multiplier at the top of the flare.
+const SHIMMER_GROWTH = 1.4;
 
 export default function ParticleLogo({
     src = "/images/us.png",
@@ -456,6 +483,9 @@ export default function ParticleLogo({
 
                     rotation: random(0, Math.PI * 2),
                     rotationSpeed: random(-0.02, 0.02),
+
+                    shimmerStart: 0,
+                    shimmerEnd: 0,
                 });
             }
 
@@ -468,6 +498,55 @@ export default function ParticleLogo({
                     toneBand(a.tone) - toneBand(b.tone) ||
                     Number(a.isSpark) - Number(b.isSpark),
             );
+        };
+
+        // The twinkle scheduler's whole state: SHIMMER_SLOTS "torches", each
+        // holding at most one burning spark. A slot that isn't holding one is
+        // waiting out its gap, so the number of particles flaring at any
+        // instant can never exceed the slot count.
+        const shimmerSlots = Array.from({ length: SHIMMER_SLOTS }, (_, i) => ({
+            particle: null as Particle | null,
+            // Staggered first claims so the slots don't both light up on the
+            // very first formed frame.
+            nextAt: i * 520,
+        }));
+
+        // Called once per frame, not per particle: retires finished bursts and
+        // hands each free slot a new spark. Picking is a single random probe
+        // rather than a filtered scan — at ~10% sparks a probe usually lands,
+        // and when it doesn't the slot simply tries again a frame or two
+        // later, which costs nothing and keeps the pick unbiased.
+        const updateShimmer = (now: number) => {
+            for (const slot of shimmerSlots) {
+                const burning = slot.particle;
+                if (burning) {
+                    if (now < burning.shimmerEnd) continue;
+                    slot.particle = null;
+                    slot.nextAt = now + random(SHIMMER_GAP_MIN, SHIMMER_GAP_MAX);
+                    continue;
+                }
+
+                if (now < slot.nextAt) continue;
+
+                const candidate =
+                    particles[Math.floor(Math.random() * particles.length)];
+
+                if (
+                    !candidate ||
+                    !candidate.isSpark ||
+                    candidate.alpha < SHIMMER_MIN_ALPHA ||
+                    candidate.shimmerEnd > now
+                ) {
+                    // Missed — retry shortly rather than burning the whole gap.
+                    slot.nextAt = now + 80;
+                    continue;
+                }
+
+                candidate.shimmerStart = now;
+                candidate.shimmerEnd =
+                    now + random(SHIMMER_DURATION_MIN, SHIMMER_DURATION_MAX);
+                slot.particle = candidate;
+            }
         };
 
         // True once the dormant branch below has wiped the canvas, so it
@@ -527,6 +606,7 @@ export default function ParticleLogo({
              */
             const mouse = mouseRef.current;
             const frameTime = performance.now();
+            updateShimmer(frameTime);
             // Tracks the last colour band written to the context so the batch
             // below only reassigns fillStyle when the band actually changes.
             let currentBand = -1;
@@ -580,7 +660,23 @@ export default function ParticleLogo({
                 // sparks, which are large enough to read it.
                 const shimmer =
                     0.78 + Math.sin(frameTime * 0.002 + particle.twinkle) * 0.22;
-                ctx.globalAlpha = particle.alpha * shimmer;
+
+                // The scheduler's flare, on top of the ambient sine: a half
+                // sine over the burst's own span, so it rises to a peak and
+                // falls back to nothing with no seam at either end. For all
+                // but the one or two burning sparks this is a single compare.
+                let burst = 0;
+                if (particle.shimmerEnd > frameTime) {
+                    const span = particle.shimmerEnd - particle.shimmerStart;
+                    const t = (frameTime - particle.shimmerStart) / span;
+                    burst = Math.sin(Math.PI * Math.min(Math.max(t, 0), 1));
+                }
+
+                // Flaring lifts the particle the rest of the way to fully
+                // opaque rather than adding to it, so the burst can't clip
+                // against globalAlpha's ceiling and flatten at its peak.
+                ctx.globalAlpha =
+                    particle.alpha * (shimmer + burst * (1 - shimmer));
 
                 const band = toneBand(particle.tone);
                 if (band !== currentBand) {
@@ -590,10 +686,22 @@ export default function ParticleLogo({
                     ctx.fillStyle = TONE_COLORS[band];
                 }
 
+                if (burst > 0) {
+                    // A flaring spark burns white regardless of its own band.
+                    // Invalidating currentBand rather than restoring it lets
+                    // the next particle reassign its own colour — two extra
+                    // fillStyle writes per frame at most, since only the
+                    // slot-held sparks ever reach this.
+                    ctx.fillStyle = TONE_COLORS[2];
+                    currentBand = -1;
+                }
+
+                const flare = 1 + burst * SHIMMER_GROWTH;
+
                 if (particle.isSpark) {
                     particle.rotation += particle.rotationSpeed;
-                    const arm = particle.size * 2.1;
-                    const thickness = particle.size * 0.76;
+                    const arm = particle.size * 2.1 * flare;
+                    const thickness = particle.size * 0.76 * flare;
                     // An axis-aligned cross with a faint wider core instead of
                     // ctx.shadowBlur. Shadow blur is a native per-call blur
                     // pass; at ~10% of the particles and two rects each it was
@@ -602,11 +710,14 @@ export default function ParticleLogo({
                     // The extra translucent square reads as the same bloom.
                     ctx.fillRect(particle.x - thickness / 2, particle.y - arm, thickness, arm * 2);
                     ctx.fillRect(particle.x - arm, particle.y - thickness / 2, arm * 2, thickness);
-                    ctx.globalAlpha = particle.alpha * shimmer * 0.28;
-                    const halo = particle.size * 2.6;
+                    ctx.globalAlpha =
+                        particle.alpha *
+                        (shimmer + burst * (1 - shimmer)) *
+                        (0.28 + burst * 0.22);
+                    const halo = particle.size * 2.6 * flare;
                     ctx.fillRect(particle.x - halo / 2, particle.y - halo / 2, halo, halo);
                 } else {
-                    const edge = particle.size * 1.35;
+                    const edge = particle.size * 1.35 * flare;
                     ctx.fillRect(particle.x - edge / 2, particle.y - edge / 2, edge, edge);
                 }
             });

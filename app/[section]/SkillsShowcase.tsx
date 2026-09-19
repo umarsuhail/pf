@@ -49,13 +49,13 @@ export function SkillsShowcase({
             </div>
             <p className="mt-2 text-sm text-slate-300/60">{group.blurb}</p>
 
-            <div className="mt-8 flex flex-wrap gap-x-10 gap-y-8">
+            <div className="mt-8 grid gap-x-6 gap-y-7 sm:grid-cols-2 xl:grid-cols-3">
               {group.items.map((item, idx) => (
                 <motion.div
                   key={item.label}
                   variants={itemVariants}
                   whileHover={{ y: -6 }}
-                  className="group flex w-20 flex-col items-center gap-2.5 text-center"
+                  className="group flex items-start gap-4 rounded-2xl border border-white/5 bg-white/[0.03] p-4 transition-colors hover:border-white/10 hover:bg-white/[0.06]"
                 >
                   <motion.div
                     animate={{ y: [0, -7, 0] }}
@@ -66,21 +66,25 @@ export function SkillsShowcase({
                       delay: idx * 0.12,
                     }}
                     whileHover={{ scale: 1.2 }}
+                    className="shrink-0"
                   >
-                    <BrandIcon slug={item.icon} className="h-10 w-10 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)] sm:h-12 sm:w-12" />
+                    <BrandIcon slug={item.icon} className="h-10 w-10 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)] sm:h-11 sm:w-11" />
                   </motion.div>
-                  <span className="text-xs font-medium text-slate-100/85 sm:text-sm">
-                    {item.label}
-                  </span>
-                  {item.level && (
-                    <span
-                      className={`text-[10px] font-semibold uppercase tracking-widest ${
-                        LEVEL_STYLES[item.level] ?? "text-slate-400/70"
-                      }`}
-                    >
-                      {item.level}
-                    </span>
-                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                      <span className="text-sm font-medium text-slate-100/90">{item.label}</span>
+                      {item.level && (
+                        <span
+                          className={`text-[10px] font-semibold uppercase tracking-widest ${
+                            LEVEL_STYLES[item.level] ?? "text-slate-400/70"
+                          }`}
+                        >
+                          {item.level}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1.5 text-xs leading-relaxed text-slate-300/70">{item.usage}</p>
+                  </div>
                 </motion.div>
               ))}
             </div>

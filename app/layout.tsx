@@ -93,6 +93,22 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Umar Suhail", url: "https://umar.website" }],
   creator: "Umar Suhail",
+  applicationName: "Umar Suhail",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Umar Suhail",
+  },
+  icons: {
+    icon: [
+      { url: "/pwa-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/pwa-icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
   alternates: {
     canonical: "https://umar.website",
   },
@@ -120,6 +136,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: "#020617",
+  viewportFit: "cover",
 };
 
 const jsonLd = {
@@ -146,6 +164,16 @@ const jsonLd = {
   ],
 };
 
+const pwaRegistrationScript = `
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker
+        .register("/sw.js", { scope: "/", updateViaCache: "none" })
+        .catch(function () {});
+    }, { once: true });
+  }
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -157,6 +185,9 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+        <script
+          dangerouslySetInnerHTML={{ __html: pwaRegistrationScript }}
         />
       </head>
       <body

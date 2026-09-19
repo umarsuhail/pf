@@ -294,6 +294,9 @@ export default function CockpitTray() {
   // Declared first since playNextSpan's own fallback (no more spans left,
   // or the browser refused the asset) skips straight here.
   const handOverToMain = useCallback(() => {
+    // The intro has ended even if the looping track cannot start. Emitting
+    // this before main.play() keeps the autopilot tied to intro.wav itself.
+    emitNarration(NARRATION_SPANS.length, 0, 0, false);
     const main = mainRef.current;
     if (!main || !main.paused) return;
 
@@ -304,7 +307,6 @@ export default function CockpitTray() {
         setTrack("main");
         levelsRef.current = { intro: 0, main: TARGET_VOLUME };
         runRamp();
-        emitNarration(NARRATION_SPANS.length, 0, 0, false);
       })
       .catch(() => setTrack(null));
   }, [runRamp]);

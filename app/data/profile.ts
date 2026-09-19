@@ -14,7 +14,6 @@ export const skills = [
   { name: "Node.js", level: "Intermediate" },
   { name: "Material-UI", level: "Expert" },
   { name: "Git", level: "Intermediate" },
-  { name: "Jenkins", level: "Intermediate" },
 ];
 
 export const projects = [

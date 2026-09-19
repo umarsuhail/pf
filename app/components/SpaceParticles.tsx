@@ -123,6 +123,7 @@ export default function SpaceParticles() {
     const rotation = { x: 0, y: 0 };
     let scrollVelocity = 0;
     let lastScrollY = window.scrollY;
+    let isAutopilotRunning = false;
     const getBlueProgress = (y: number) => {
       const start = window.innerHeight * PHASE_SCROLL_SCREENS;
       const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
@@ -145,17 +146,42 @@ export default function SpaceParticles() {
       lastActivity = performance.now();
     };
 
+    // Gains cut roughly 40%: this warp is driven by raw wheel/scroll deltas
+    // while the camera itself now glides on a soft spring, so at the old
+    // gains a fast flick rocketed the starfield past a camera that was still
+    // easing — the two read as different speeds in the same shot. Slower
+    // input response keeps the field travelling with the camera.
     const handleWheel = (e: WheelEvent) => {
-      scrollVelocity += e.deltaY * 0.001;
+      if (isAutopilotRunning) return;
+      scrollVelocity += e.deltaY * 0.0006;
       lastActivity = performance.now();
     };
 
     const handleScroll = () => {
       const currentY = window.scrollY;
-      scrollVelocity += (currentY - lastScrollY) * 0.006;
+      const deltaY = currentY - lastScrollY;
       lastScrollY = currentY;
+      if (isAutopilotRunning) {
+        scrollVelocity = 0;
+        return;
+      }
+      scrollVelocity += deltaY * 0.0035;
       blueProgress = getBlueProgress(currentY);
       lastActivity = performance.now();
+    };
+
+    const handleAutopilotState = (event: Event) => {
+      const running = Boolean((event as CustomEvent<{ running?: boolean }>).detail?.running);
+      isAutopilotRunning = running;
+      scrollVelocity = 0;
+      lastScrollY = window.scrollY;
+      if (!running) blueProgress = getBlueProgress(lastScrollY);
+    };
+
+    const handleAutopilotLaunch = () => {
+      isAutopilotRunning = true;
+      scrollVelocity = 0;
+      lastScrollY = window.scrollY;
     };
 
     // renderer.setSize() reallocates the WebGL drawing buffer — the most
@@ -183,6 +209,8 @@ export default function SpaceParticles() {
     window.addEventListener("wheel", handleWheel, { passive: true });
     window.addEventListener("scroll", handleScroll, { passive: true });
     window.addEventListener("resize", handleResize);
+    window.addEventListener("flight-autopilot-state", handleAutopilotState as EventListener);
+    window.addEventListener("flight-autopilot-launch", handleAutopilotLaunch);
 
     let rafId: number;
     const posAttr = geometry.getAttribute("position") as BufferAttribute;
@@ -202,6 +230,7 @@ export default function SpaceParticles() {
     };
 
     let frameCount = 0;
+    let lastParticleFrame = 0;
 
     const animate = (time: number) => {
       rafId = requestAnimationFrame(animate);
@@ -212,6 +241,14 @@ export default function SpaceParticles() {
       // indistinguishable at 20fps and the other two frames cost nothing.
       if (time - lastActivity > 2000 && frameCount % 3 !== 0) return;
 
+      // The renderer deliberately idles at 20fps after input settles. Use
+      // elapsed time rather than a per-frame increment so the ambient field
+      // keeps the same slow pace during autoplay narration and on phones.
+      const elapsedSeconds = lastParticleFrame
+        ? Math.min((time - lastParticleFrame) / 1000, 0.08)
+        : 0;
+      lastParticleFrame = time;
+
       addParticlesGradually();
 
       rotation.x += (mouse.y * 0.08 - rotation.x) * 0.04;
@@ -219,9 +256,12 @@ export default function SpaceParticles() {
       field.rotation.x = rotation.x;
       field.rotation.y = rotation.y;
 
-      // Particles drift forward only in response to scroll/wheel input
-      scrollVelocity *= 0.9;
-      const warp = MathUtils.clamp(scrollVelocity, -2, 2);
+      // Manual input adds a stronger warp on top of the ambient drift below.
+      // Decays a little faster and tops out a little lower than it used to
+      // (+-2 -> +-1.1): the ceiling is what a hard flick actually hits, so it,
+      // not the gain, is what set how violent fast scrolling looked.
+      scrollVelocity *= 0.87;
+      const warp = MathUtils.clamp(scrollVelocity, -1.1, 1.1);
       const t = time * 0.001;
 
       const blueMix = Math.min(blueProgress / 0.72, 1);
@@ -240,12 +280,16 @@ export default function SpaceParticles() {
       // Slow whole-field drift keeps the stars alive without per-particle math
       field.rotation.z = t * 0.004;
 
-      // Only rewrite positions while scroll warp is actually moving the field
-      if (Math.abs(warp) > 0.001) {
+      // Manual scrolling supplies the flight warp. A quieter, time-based
+      // drift remains underneath it at all times, with a touch more presence
+      // during the narration-driven autoplay so space never freezes there.
+      const ambientStep = (isAutopilotRunning ? 0.46 : 0.14) * elapsedSeconds;
+      const particleStep = warp + ambientStep;
+      if (Math.abs(particleStep) > 0.0001) {
         for (let i = 0; i < currentParticleCount; i++) {
           const base = i * 3 + 2;
           let z = posArray[base];
-          z += warp * speeds[i];
+          z += particleStep * speeds[i];
           if (z > CAMERA_Z - 3) z -= FIELD_DEPTH;
           else if (z < CAMERA_Z - FIELD_DEPTH - 3) z += FIELD_DEPTH;
           posArray[base] = z;
@@ -263,6 +307,8 @@ export default function SpaceParticles() {
       window.removeEventListener("wheel", handleWheel);
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleResize);
+      window.removeEventListener("flight-autopilot-state", handleAutopilotState as EventListener);
+      window.removeEventListener("flight-autopilot-launch", handleAutopilotLaunch);
       renderer.dispose();
       geometry.dispose();
       material.map?.dispose();
@@ -278,4 +324,3 @@ export default function SpaceParticles() {
     />
   );
 }
-

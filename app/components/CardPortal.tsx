@@ -8,13 +8,13 @@ import {
   motion,
   useMotionTemplate,
   useMotionValue,
+  useTransform,
   type MotionValue,
 } from "framer-motion";
 import {
   POWER1_IN,
   POWER2_IN,
   POWER2_OUT,
-  POWER3_OUT,
 } from "../lib/easings";
 import { ArrowUpRightIcon } from "./icons/arrow-up-right";
 import type { AnimatedIconHandle } from "./icons/card-icon";
@@ -103,7 +103,22 @@ const atmospheres: { overlay: string; motif: MotifType; accent: string }[] = [
 // per card, is both what actually ships and the more coherent idea: the
 // flight passes through one universe seen five ways, not five unrelated
 // pictures.
-const PORTAL_ILLUSTRATION = "/images/a3.svg";
+// a3-planet.svg is a3.svg with its 21 sparkle polygons stripped out. The
+// artwork ships four-point stars scattered across the frame, which landed on
+// top of Space's real, drifting starfield as a second, static, differently
+// shaped set of stars — the flat squares that made the portal read as clipart.
+// The planet and its rings are untouched; a3.svg is kept as the original.
+const PORTAL_ILLUSTRATION = "/images/a3-planet.svg";
+
+// Where the planet's centre sits inside the artwork's box (its viewBox is
+// 370.4x261.6 and the globe is left of centre). Everything that has to agree
+// with the planet rather than with the frame — the halo, the spin origin, the
+// mask — is anchored here.
+const ILLUSTRATION_FOCUS = "44% 47%";
+
+// Dissolves the artwork's rectangle into the starfield: fully opaque across
+// the globe, gone well before the frame edge.
+const ILLUSTRATION_MASK = `radial-gradient(circle at ${ILLUSTRATION_FOCUS}, #000 44%, transparent 82%)`;
 
 // a3.svg ships in a coral/plum palette with a saturation-weighted dominant
 // hue of ~0°. Each non-entry card rotates that onto its own atmosphere
@@ -299,6 +314,16 @@ export function CardPortal({
   // Click-to-activate "warp" flourish (visualRef's zoom, entry's flash).
   const visualScale = useMotionValue(1);
   const flashOpacity = useMotionValue(0);
+  // The astronaut has a deliberate, directional dolly motion while the Home
+  // card is expanded: forward progress moves it away; reversing toward Home
+  // brings it back in. It is derived directly from scroll, so it never loops
+  // or changes direction on its own.
+  const astronautDollyScale = useTransform(
+    scrollYProgress,
+    [0, 0.09, 0.2],
+    [1, 0.86, 0.66],
+  );
+  const astronautDollyY = useTransform(scrollYProgress, [0, 0.2], ["0%", "-7%"]);
 
   useEffect(() => {
     const currentStop = sectionProgressStops[index] ?? 0;
@@ -549,34 +574,28 @@ export function CardPortal({
           style={{ scale: visualScale }}
           className="relative h-full w-full transform-flat"
         >
-          {/* Dolly-zoom "camera" for the astronaut reveal: this wraps the
-             whole backdrop (Space, tone overlay, the astronaut itself) and
-             pushes in and out on an endless loop once the bio expands,
-             while the astronaut's own layer below counter-scales the other
-             way in sync — net effect, the backdrop reads as the camera
-             breathing closer and further while the astronaut recedes and
-             returns within it, instead of both simply growing together. */}
-          <motion.div
-            className="absolute inset-0"
-            animate={
-              isEntry && isExpanded
-                ? { scale: [1, 1.18, 1] }
-                : { scale: 1 }
-            }
-            transition={
-              isEntry && isExpanded
-                ? { duration: 5.6, ease: POWER3_OUT, repeat: Infinity }
-                : { duration: 1.4, ease: POWER3_OUT }
-            }
-            style={{ transformOrigin: "50% 65%" }}
-          >
+          <div className="absolute inset-0">
           {/* Space backdrop filling the window, carrying this section's portal color */}
           <Space tint={atmosphere.accent} active={isNear} />
 
           {isEntry && (
             // Whole group lifted 14px: the mark reads better sitting slightly
-            // above the portal's optical centre.
-            <div className="absolute inset-0 -translate-y-3.5">
+            // above the portal's optical centre. Expanded, it climbs a good
+            // deal further — the astronaut flies in from the bottom of this
+            // same window and was landing across the mark, and the signature
+            // swaps to the mark's top edge at the same moment, so the pair
+            // needs the headroom. The letterbox portal is a third the height,
+            // so it gets a proportionally smaller lift rather than the same
+            // pixels, which would walk the mark straight out of frame.
+            <div
+              className={`absolute inset-0 transition-transform duration-700 ease-out ${
+                isExpanded
+                  ? letterbox
+                    ? "-translate-y-6"
+                    : "-translate-y-12 sm:-translate-y-16"
+                  : "-translate-y-3.5"
+              }`}
+            >
               <div className="absolute inset-0 flex items-center justify-center">
                 {/* This wrapper is sized by the mark itself and is the
                    signature's positioning context. The card is what stretches
@@ -593,9 +612,19 @@ export function CardPortal({
                     width={300}
                     height={300}
                     sizes=" 30vw, 40vh"
-                    className={`object-cover opacity-55 mix-blend-screen ${
-                      letterbox ? "max-h-[min(8rem,13vh)] px-4 py-1" : "px-8 py-2"
-                    }`}
+                    // Answers a hover anywhere on the billboard (the card
+                    // owns `group/card`): the mark comes up out of the
+                    // starfield and leans a little closer. Opacity and
+                    // transform only — no filter — so the hover is pure
+                    // compositing and never re-rasterizes the card layer the
+                    // flight works so hard to keep cached.
+                    className={`object-cover mix-blend-screen transition-[opacity,transform] duration-500 ease-out group-hover/card:opacity-80 motion-safe:group-hover/card:scale-[1.06] ${
+                      // Dimmer once the bio is open: the astronaut becomes the
+                      // subject of the window at that point and the mark is
+                      // what it is flying in front of. Hover still lifts both
+                      // back to the same 80%.
+                      isExpanded ? "opacity-40" : "opacity-55"
+                    } ${letterbox ? "max-h-[min(8rem,13vh)] px-4 py-1" : "px-8 py-2"}`}
                     aria-hidden="true"
                   />
 
@@ -662,29 +691,42 @@ export function CardPortal({
                 {isExpanded && (
                   <motion.div
                     key="astronaut"
-                    // Appears already in place, at the zoomed-in end of the
-                    // dolly-zoom range — no fly-in — and immediately joins
-                    // the backdrop's endless push/pull, scaling the opposite
-                    // way in sync (see the backdrop's own loop above): as
-                    // the backdrop pushes in, the astronaut recedes, and as
-                    // the backdrop eases back out, the astronaut returns.
-                    initial={{ opacity: 0, scale: 1.1 }}
-                    animate={{ opacity: 1, scale: [1.1, 0.62, 1.1] }}
+                    // Expansion starts close and settles outward. The nested
+                    // layer below continues the same dolly direction only
+                    // while the visitor moves forward through the flight.
+                    initial={{ opacity: 0, scale: 1.22, y: "0.35em" }}
+                    animate={{ opacity: 1, scale: 1, y: "0em" }}
                     exit={{ opacity: 0 }}
                     transition={{
-                      opacity: { duration: 0.6, ease: POWER2_OUT },
-                      scale: { duration: 5.6, ease: POWER3_OUT, repeat: Infinity },
+                      opacity: { duration: 0.45, ease: POWER2_OUT },
+                      scale: { duration: 0.82, ease: POWER2_OUT },
+                      y: { duration: 0.82, ease: POWER2_OUT },
                     }}
                     className="absolute inset-0"
                   >
-                    <Image
-                      src="/SVG/astr.svg"
-                      alt=""
-                      fill
-                      sizes="(min-width: 600px) 30vw, 40vh"
-                      className="object-contain   p-8 object-bottom"
-                      aria-hidden="true"
-                    />
+                    <motion.div
+                      className="absolute inset-0"
+                      style={{
+                        scale: astronautDollyScale,
+                        y: astronautDollyY,
+                        transformOrigin: "50% 72%",
+                        willChange: "transform",
+                      }}
+                    >
+                      <Image
+                        src="/astr.svg"
+                        alt=""
+                        fill
+                        sizes="(min-width: 600px) 24vw, 32vh"
+                        // Drifts up and grows very slightly on hover, as if
+                        // pushing off toward the visitor. Slower than the
+                        // mark's own response (700ms vs 500ms) so the two
+                        // read as one gesture with the astronaut trailing it
+                        // rather than as two things twitching together.
+                        className="object-contain object-bottom p-10 transition-transform duration-700 ease-out sm:p-12 motion-safe:group-hover/card:-translate-y-2 motion-safe:group-hover/card:scale-[1.04]"
+                        aria-hidden="true"
+                      />
+                    </motion.div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -692,25 +734,71 @@ export function CardPortal({
           ) : (
             <motion.div
               className="absolute inset-0"
-              style={{ opacity: motifOpacity, scale: motifScale, willChange: "opacity, transform" }}
+              style={{
+                opacity: motifOpacity,
+                scale: motifScale,
+                willChange: "opacity, transform",
+                // Screen rather than normal: the artwork is pastel fills on a
+                // transparent ground, and laid over the starfield opaquely it
+                // read as a sticker pasted on the window. Screening it lets
+                // the stars carry through the planet and makes its light the
+                // same light as the space around it. It has to live on THIS
+                // element, not on a child: this one already carries an
+                // animated opacity, which isolates its subtree, so a child's
+                // blend mode would have nothing but transparency to blend
+                // against and would silently render as normal.
+                ...(illustrationFilterByIndex[index]
+                  ? { mixBlendMode: "screen" as const }
+                  : null),
+              }}
             >
               {illustrationFilterByIndex[index] ? (
-                <motion.div className="absolute inset-0" style={{ rotate: spinRotate }}>
-                  <Image
-                    src={PORTAL_ILLUSTRATION}
-                    alt=""
-                    fill
-                    sizes="(min-width: 1024px) 30vw, 30vh"
-                    className="object-contain"
-                    style={{ filter: illustrationFilterByIndex[index] }}
+                <>
+                  {/* Ambient halo in this section's accent, centred on the
+                     planet. Faint and tight on purpose — wide or strong, it
+                     hazes the whole portal to flat blue and the deep-space
+                     falloff disappears. */}
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background: `radial-gradient(circle at ${ILLUSTRATION_FOCUS}, ${atmosphere.accent}38 0%, ${atmosphere.accent}14 26%, transparent 46%)`,
+                    }}
                   />
-                </motion.div>
+                  <motion.div
+                    // Inset from the frame so the rings can't be sliced by the
+                    // portal's edge, and masked to a soft circle around the
+                    // planet so the artwork's bounding box dissolves into the
+                    // starfield instead of ending on a hard rectangle.
+                    className="absolute inset-[14%]"
+                    style={{
+                      rotate: spinRotate,
+                      // The spin used to swing the whole frame, so the
+                      // off-centre planet orbited the portal and clipped its
+                      // edges. Pinning the origin to the planet turns the same
+                      // scroll-driven rotation into the globe turning in place.
+                      // The mask is radially symmetric about this same point,
+                      // so it stays put while the art rotates under it.
+                      transformOrigin: ILLUSTRATION_FOCUS,
+                      maskImage: ILLUSTRATION_MASK,
+                      WebkitMaskImage: ILLUSTRATION_MASK,
+                    }}
+                  >
+                    <Image
+                      src={PORTAL_ILLUSTRATION}
+                      alt=""
+                      fill
+                      sizes="(min-width: 1024px) 30vw, 30vh"
+                      className="object-contain opacity-[0.88]"
+                      style={{ filter: illustrationFilterByIndex[index] }}
+                    />
+                  </motion.div>
+                </>
               ) : (
                 <PortalMotif motif={atmosphere.motif} accent={atmosphere.accent} />
               )}
             </motion.div>
           )}
-          </motion.div>
+          </div>
         </motion.div>
 
         {/* 3. Punch-through flash layer - inside mask but outside the scaling container so it doesn't scale strangely */}
