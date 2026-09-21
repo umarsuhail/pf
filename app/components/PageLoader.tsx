@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 // The opening film is also useful loading time: the app renders underneath
 // this overlay, and the reveal waits for both the film and window load.
 const EXIT_DURATION_MS = 700;
+const END_FRAME_HOLD_MS = 2000;
 const RADIUS = 26;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 // Sweeps from sky-blue to violet as progress climbs, instead of a fixed accent
@@ -45,6 +46,7 @@ export default function PageLoader() {
       }
 
       let settled = false;
+      let endHoldTimeout = 0;
       const onTimeUpdate = () => {
         if (!Number.isFinite(video.duration) || video.duration <= 0) return;
         videoRatio = Math.min(1, video.currentTime / video.duration);
@@ -58,14 +60,20 @@ export default function PageLoader() {
         detachVideo();
         resolve();
       };
+      const onEnded = () => {
+        videoRatio = 1;
+        updateProgress();
+        endHoldTimeout = window.setTimeout(settle, END_FRAME_HOLD_MS);
+      };
       detachVideo = () => {
+        window.clearTimeout(endHoldTimeout);
         video.removeEventListener("timeupdate", onTimeUpdate);
-        video.removeEventListener("ended", settle);
+        video.removeEventListener("ended", onEnded);
         video.removeEventListener("error", settle);
       };
 
       video.addEventListener("timeupdate", onTimeUpdate);
-      video.addEventListener("ended", settle, { once: true });
+      video.addEventListener("ended", onEnded, { once: true });
       video.addEventListener("error", settle, { once: true });
       video.currentTime = 0;
       void video.play().catch(settle);

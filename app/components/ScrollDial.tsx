@@ -128,6 +128,9 @@ const KNURLS_COMPACT = buildKnurls(24);
 // Same 1024px line MultiverseFlight uses for `isMobile`, so the dial and the
 // scene it reports on never disagree about which layout they are in.
 const COMPACT_QUERY = "(max-width: 1023px)";
+const MIN_DIAL_SCALE = 1;
+const COMPACT_MAX_DIAL_SCALE = 2.25;
+const DESKTOP_MAX_DIAL_SCALE = 1.7;
 
 export default function ScrollDial() {
   const pathname = usePathname();
@@ -136,6 +139,8 @@ export default function ScrollDial() {
   );
   const [activeId, setActiveId] = useState(() => getActiveId(readProgress()));
   const [dragging, setDragging] = useState(false);
+  const [pinching, setPinching] = useState(false);
+  const [dialScale, setDialScale] = useState(1);
   const [isVisible, setIsVisible] = useState(true);
 
   // Everything the scroll broadcast touches lives in refs and is written
@@ -149,10 +154,37 @@ export default function ScrollDial() {
   const lastDetentRef = useRef(0);
   // Whether the drag in progress came from a finger — see detentFeedback.
   const isTouchDragRef = useRef(false);
+  const pointersRef = useRef(
+    new Map<number, { x: number; y: number; type: string }>(),
+  );
+  const pinchingRef = useRef(false);
+  const pinchStartDistanceRef = useRef(0);
+  const pinchStartScaleRef = useRef(1);
+  const dialScaleRef = useRef(1);
 
   const rootRef = useRef<SVGSVGElement>(null);
   const bezelRef = useRef<SVGGElement>(null);
   const arcRef = useRef<SVGPathElement>(null);
+
+  const maxDialScale = compact
+    ? COMPACT_MAX_DIAL_SCALE
+    : DESKTOP_MAX_DIAL_SCALE;
+
+  const applyScaleVisual = useCallback((scale: number) => {
+    dialScaleRef.current = scale;
+    if (rootRef.current) {
+      rootRef.current.style.transform = `scale(${scale})`;
+    }
+  }, []);
+
+  const commitScale = useCallback(
+    (scale: number) => {
+      const next = Math.min(maxDialScale, Math.max(MIN_DIAL_SCALE, scale));
+      applyScaleVisual(next);
+      setDialScale(next);
+    },
+    [applyScaleVisual, maxDialScale],
+  );
 
   const applyVisual = useCallback((p: number) => {
     progressRef.current = p;
@@ -216,6 +248,12 @@ export default function ScrollDial() {
     applyVisual(readProgress());
   }, [applyVisual]);
 
+  // If an orientation/breakpoint change lowers the allowed maximum, settle
+  // the dial back inside the new viewport-safe range.
+  useEffect(() => {
+    commitScale(dialScaleRef.current);
+  }, [commitScale]);
+
   // One detent's worth of feedback: the click the ring makes, plus the haptic
   // on hardware that has one. Fired from the crossing, not from a timer, so it
   // tracks how fast the ring is actually turning.
@@ -255,8 +293,28 @@ export default function ScrollDial() {
     return Math.atan2(dx, -dy) * (180 / Math.PI);
   };
 
-  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
+    pointersRef.current.set(e.pointerId, {
+      x: e.clientX,
+      y: e.clientY,
+      type: e.pointerType,
+    });
+
+    const touchPoints = [...pointersRef.current.values()].filter(
+      (pointer) => pointer.type === "touch",
+    );
+    if (touchPoints.length >= 2) {
+      const [a, b] = touchPoints;
+      pinchingRef.current = true;
+      setPinching(true);
+      draggingRef.current = false;
+      setDragging(false);
+      pinchStartDistanceRef.current = Math.hypot(b.x - a.x, b.y - a.y);
+      pinchStartScaleRef.current = dialScaleRef.current;
+      return;
+    }
+
     draggingRef.current = true;
     setDragging(true);
     lastAngleRef.current = pointerAngle(e.clientX, e.clientY);
@@ -264,7 +322,35 @@ export default function ScrollDial() {
     isTouchDragRef.current = e.pointerType === "touch";
   };
 
-  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const pointer = pointersRef.current.get(e.pointerId);
+    if (pointer) {
+      pointersRef.current.set(e.pointerId, {
+        x: e.clientX,
+        y: e.clientY,
+        type: pointer.type,
+      });
+    }
+
+    if (pinchingRef.current) {
+      const touchPoints = [...pointersRef.current.values()].filter(
+        (item) => item.type === "touch",
+      );
+      if (touchPoints.length < 2) return;
+      const [a, b] = touchPoints;
+      const distance = Math.hypot(b.x - a.x, b.y - a.y);
+      const startDistance = Math.max(1, pinchStartDistanceRef.current);
+      const next = Math.min(
+        maxDialScale,
+        Math.max(
+          MIN_DIAL_SCALE,
+          pinchStartScaleRef.current * (distance / startDistance),
+        ),
+      );
+      applyScaleVisual(next);
+      return;
+    }
+
     if (!draggingRef.current) return;
     const angle = pointerAngle(e.clientX, e.clientY);
 
@@ -299,6 +385,23 @@ export default function ScrollDial() {
     }
   }, [commit]);
 
+  const onPointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    pointersRef.current.delete(e.pointerId);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+
+    if (pinchingRef.current) {
+      if (pointersRef.current.size < 2) {
+        pinchingRef.current = false;
+        setPinching(false);
+        commitScale(dialScaleRef.current);
+      }
+      return;
+    }
+    endDrag();
+  };
+
   const step = (detents: number) =>
     commit(progressRef.current + detents * DETENT_PROGRESS);
 
@@ -321,11 +424,23 @@ export default function ScrollDial() {
       PageUp: () => toSection(-1),
       Home: () => commit(0, "smooth"),
       End: () => commit(1, "smooth"),
+      "+": () => commitScale(dialScaleRef.current + 0.15),
+      "=": () => commitScale(dialScaleRef.current + 0.15),
+      "-": () => commitScale(dialScaleRef.current - 0.15),
+      "0": () => commitScale(1),
     };
     const action = keys[e.key];
     if (!action) return;
     e.preventDefault();
     action();
+  };
+
+  const onWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    // Desktop trackpads expose pinch as ctrl+wheel. Restricting the resize to
+    // that modifier keeps ordinary wheel scrolling available to the flight.
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    commitScale(dialScaleRef.current - e.deltaY * 0.004);
   };
 
   // The dial reads the flight's section stops, which only exist on "/".
@@ -383,27 +498,39 @@ export default function ScrollDial() {
           {activeLabel}
         </span>
       </div>
-      <svg
-        ref={rootRef}
-        role="slider"
-        tabIndex={0}
-        aria-label="Flight position — turn to travel"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={0}
-        aria-valuetext={`${activeLabel}, page ${pageNumber} of ${pageTotal}`}
-        width={size}
-        height={size}
-        viewBox="0 0 120 120"
-        className={`touch-none select-none rounded-full outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
-          dragging ? "cursor-grabbing" : "cursor-grab"
-        }`}
+      <div
+        className="-m-5 touch-none p-5"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        onKeyDown={onKeyDown}
+        onPointerUp={onPointerEnd}
+        onPointerCancel={onPointerEnd}
+        onWheel={onWheel}
       >
+        <svg
+          ref={rootRef}
+          role="slider"
+          tabIndex={0}
+          aria-label="Flight position — turn to travel, pinch to resize"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={0}
+          aria-valuetext={`${activeLabel}, page ${pageNumber} of ${pageTotal}`}
+          width={size}
+          height={size}
+          viewBox="0 0 120 120"
+          className={`touch-none select-none rounded-full outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+            dragging ? "cursor-grabbing" : pinching ? "cursor-zoom-in" : "cursor-grab"
+          }`}
+          style={{
+            transform: `scale(${dialScale})`,
+            transformOrigin: compact ? "bottom center" : "center right",
+            transition: pinching
+              ? "none"
+              : "transform 220ms cubic-bezier(0.22,1,0.36,1)",
+            willChange: pinching ? "transform" : undefined,
+          }}
+          onKeyDown={onKeyDown}
+        >
         <defs>
           {/* Brushed steel. A linear ramp with repeated light/dark stops is
              what sells a machined ring at this size — a single gradient reads
@@ -600,7 +727,8 @@ export default function ScrollDial() {
         {/* Outside the rotating group on purpose: a bezel is only legible
            against something that does not move with it. */}
         <polygon points="60,13 63,7 57,7" fill="#e2f2ff" opacity="0.9" />
-      </svg>
+        </svg>
+      </div>
     </div>
   );
 }
