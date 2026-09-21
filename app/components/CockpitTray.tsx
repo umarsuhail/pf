@@ -355,6 +355,30 @@ export default function CockpitTray() {
     playNextSpanRef.current = playNextSpan;
   });
 
+  // "Skip intro", from SkipIntroPrompt. The autopilot's home leg waits on
+  // intro.wav finishing rather than on a clock, and handOverToMain emits
+  // exactly the narration-complete event it is waiting for — so ending the
+  // narration here is all it takes to release the tour. Nothing needs to
+  // reach into the autopilot's legs.
+  const skipIntro = useCallback(() => {
+    const narration = narrationRef.current;
+    if (narration) {
+      narration.pause();
+      narration.currentTime = 0;
+    }
+    // Past the last span, so nothing queued can restart the narration behind
+    // the hand-over.
+    spanIndexRef.current = NARRATION_SPANS.length;
+    levelsRef.current = { intro: 0, main: TARGET_VOLUME };
+    handOverToMain();
+  }, [handOverToMain]);
+
+  useEffect(() => {
+    const onSkip = () => skipIntro();
+    window.addEventListener("flight-skip-intro", onSkip);
+    return () => window.removeEventListener("flight-skip-intro", onSkip);
+  }, [skipIntro]);
+
   const onNarrationEnded = useCallback(() => {
     spanIndexRef.current += 1;
     if (spanIndexRef.current >= NARRATION_SPANS.length) {
