@@ -93,6 +93,11 @@ const FLIGHT_VELOCITY_SPRING = {
   mass: 0.24,
 } as const;
 
+// Camera velocity below which there is no motion blur at all. Reading a card,
+// nudging the wheel, and the camera spring settling all sit under this, which
+// is the point: a still scene should be sharp.
+const FLIGHT_BLUR_FLOOR = 0.055;
+
 const FLIGHT_STREAK_BACKGROUND =
   "repeating-conic-gradient(from 0deg at 50% 50%, transparent 0deg 2deg, rgba(186,230,253,0.22) 2.35deg 2.62deg, transparent 3.15deg 8deg), radial-gradient(ellipse at 50% 50%, rgba(56,189,248,0.22) 0%, transparent 64%)";
 
@@ -994,24 +999,37 @@ export default function MultiverseFlight() {
   // while the ship is moving, then fades away without a flash or pull-back.
   const cameraVelocity = useVelocity(smoothScrollProgress);
   const smoothCameraVelocity = useSpring(cameraVelocity, FLIGHT_VELOCITY_SPRING);
+  // Real motion blur is a function of how far the scene moved during one
+  // exposure, so below a genuine speed there is none of it at all. The old
+  // curve had no floor and a x7 gain, which saturated at a camera velocity of
+  // ~0.14 — a gentle wheel nudge. The smear was therefore present essentially
+  // whenever the page was not perfectly still, which is what made it read as
+  // an effect laid over the scene rather than as speed.
+  //
+  // FLIGHT_BLUR_FLOOR is the deadband: drift below it and the corridor is
+  // sharp. Past it the ramp is gentler, so intensity keeps climbing with
+  // actual speed instead of pinning at the top the moment it engages.
   const forwardFlightIntensity = useTransform(smoothCameraVelocity, (velocity) =>
-    Math.min(1, Math.max(0, velocity) * 7),
+    Math.min(1, Math.max(0, Math.max(0, velocity) - FLIGHT_BLUR_FLOOR) * 3.4),
   );
-  // The motion-blur layer, pulled well back. Intensity still saturates on any
-  // quick scroll, so the effect's strength is set here rather than by the
-  // velocity curve: peak opacity 0.22 -> 0.10, peak blur 3.5px -> 1.4px, and a
-  // shallower zoom/drift. What's left is a suggestion of forward flow instead
-  // of a smear over the whole corridor.
+  // Peaks come down with it: opacity 0.10 -> 0.065, blur 1.4px -> 0.85px, and
+  // a shallower zoom and drift. Combined with the deadband above, the corridor
+  // is sharp at reading speed and only smears when the flight is genuinely
+  // moving.
   const flightStreakOpacity = useTransform(
     forwardFlightIntensity,
-    [0, 0.12, 1],
-    [0, 0.02, 0.1],
+    [0, 0.25, 1],
+    [0, 0.012, 0.065],
   );
-  const flightStreakScale = useTransform(forwardFlightIntensity, [0, 1], [1.03, 1.09]);
-  const flightStreakY = useTransform(forwardFlightIntensity, [0, 1], ["0%", "-3.5%"]);
+  const flightStreakScale = useTransform(forwardFlightIntensity, [0, 1], [1.02, 1.05]);
+  const flightStreakY = useTransform(forwardFlightIntensity, [0, 1], ["0%", "-2%"]);
+  // Still always a blur() string, never "none". Toggling a filter on and off
+  // makes the compositor create and destroy the layer's buffer; holding one
+  // filter that happens to reach 0px costs a cheap no-op blur instead, and the
+  // layer is culled by its own opacity long before that matters.
   const flightStreakBlur = useTransform(
     forwardFlightIntensity,
-    (value) => `blur(${(value * 1.4).toFixed(2)}px)`,
+    (value) => `blur(${(value * 0.85).toFixed(2)}px)`,
   );
 
   const zCamera = useTransform(smoothScrollProgress, [0, 1], [0, isMobile ? 7800 : 8400]);

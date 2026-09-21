@@ -25,6 +25,12 @@ const TRAY_SPRING = {
   mass: 0.8,
 } as const;
 
+// The console is physically attached to the latch below it, so opening has
+// to animate layout height. A transform-only entrance makes the latch jump
+// to its final position before the panel catches up.
+const CONSOLE_OPEN = { duration: 0.42, ease: [0.22, 1, 0.36, 1] } as const;
+const CONSOLE_CLOSE = { duration: 0.24, ease: [0.4, 0, 1, 1] } as const;
+
 // The soundtrack is a two-act programme, not a loop. intro.wav is the
 // narration with its own background music already mixed in (see
 // data/narration.ts — still played through the "span" machinery below in
@@ -511,6 +517,14 @@ export default function CockpitTray() {
   const navigate = (id: string) => {
     setActiveId(id);
     setIsOpen(false);
+
+    // Only the multiverse route owns the scroll-event listener. From a
+    // standalone section, these controls perform real route navigation.
+    if (pathname !== "/") {
+      router.push(id === "home" ? "/" : `/${id}`);
+      return;
+    }
+
     window.dispatchEvent(
       new CustomEvent("navigate-flight-section", { detail: { id } }),
     );
@@ -547,6 +561,15 @@ export default function CockpitTray() {
   const toggleChat = () => {
     window.dispatchEvent(new CustomEvent("toggle-holochat"));
   };
+
+  // On the flight this follows the live camera state. A standalone route has
+  // no camera broadcaster, so derive the highlight directly from its URL
+  // without a route-change effect and its extra render.
+  const routeId = pathname.split("/").filter(Boolean)[0];
+  const visibleActiveId =
+    pathname === "/" || !stops.some((stop) => stop.id === routeId)
+      ? activeId
+      : routeId;
 
   return (
     <div
@@ -601,25 +624,34 @@ export default function CockpitTray() {
 
         {/* Centre column: the console, with the latch hanging beneath it */}
         <div className="col-start-2 flex flex-col items-center">
-          <AnimatePresence initial={false}>
-            {isOpen && (
+          {/* Animate the real occupied height so the latch remains attached
+              throughout both directions. `inert` keeps the always-mounted
+              controls out of focus and hit-testing while collapsed. */}
+          <motion.div
+            initial={false}
+            animate={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
+            transition={isOpen ? CONSOLE_OPEN : CONSOLE_CLOSE}
+            className="grid w-[min(94vw,880px)]"
+          >
+            <div className="min-h-0 overflow-hidden">
               <motion.nav
-                key="console"
                 aria-label="Cockpit section tray"
-                initial={{ y: "-100%", rotateX: -55, opacity: 0 }}
-                animate={{ y: 0, rotateX: 0, opacity: 1 }}
-                exit={{
-                  y: "-100%",
-                  rotateX: -55,
-                  opacity: 0,
-                  transition: { ...TRAY_SPRING, delay: 0.1 },
+                aria-hidden={!isOpen}
+                inert={!isOpen}
+                initial={false}
+                animate={{
+                  y: isOpen ? 0 : -12,
+                  opacity: isOpen ? 1 : 0,
+                  scale: isOpen ? 1 : 0.985,
                 }}
-                transition={TRAY_SPRING}
-                style={{ transformOrigin: "top center", perspective: 900 }}
-                className={`pointer-events-auto w-[min(94vw,880px)] rounded-b-3xl border-t-0 px-3 pb-4 pt-4 sm:px-5 ${METAL_SURFACE}`}
+                transition={isOpen ? CONSOLE_OPEN : CONSOLE_CLOSE}
+                style={{ transformOrigin: "top center" }}
+                className={`w-full rounded-b-3xl border-t-0 px-3 pb-4 pt-4 sm:px-5 ${
+                  isOpen ? "pointer-events-auto" : "pointer-events-none"
+                } ${METAL_SURFACE}`}
               >
                 <BrushedGrain />
-                <Sheen delay={0.45} />
+                <Sheen delay={0.45} active={isOpen} />
                 <Rivets className="inset-x-4 top-2.5" />
 
                 {/* Console header strip */}
@@ -634,8 +666,8 @@ export default function CockpitTray() {
                 </div>
 
                 <div className="relative z-10 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-                  {stops.map((stop, i) => {
-                    const isActive = activeId === stop.id;
+                  {stops.map((stop) => {
+                    const isActive = visibleActiveId === stop.id;
                     return (
                       <motion.button
                         key={stop.id}
@@ -644,9 +676,8 @@ export default function CockpitTray() {
                         onMouseEnter={() => stopIconRefs.current[stop.id]?.startAnimation()}
                         onMouseLeave={() => stopIconRefs.current[stop.id]?.stopAnimation()}
                         aria-current={isActive ? "page" : undefined}
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.04 + i * 0.03, duration: 0.25 }}
+                        whileTap={{ scale: 0.97 }}
+                        transition={{ duration: 0.14 }}
                         className={`group relative flex flex-col items-start gap-1 overflow-hidden rounded-lg border px-2.5 py-2 text-left transition-colors ${
                           isActive
                             ? "border-sky-300/50 bg-sky-400/15 shadow-[inset_0_0_18px_rgba(125,211,252,0.28),inset_0_1px_0_rgba(255,255,255,0.25)]"
@@ -794,8 +825,8 @@ export default function CockpitTray() {
 
                 <Rivets className="inset-x-4 bottom-2.5" />
               </motion.nav>
-            )}
-          </AnimatePresence>
+            </div>
+          </motion.div>
 
           {/* The latch — always visible, hangs just under the console. Closed,
              it's floating free against the page, so it gets the notch ears;
@@ -845,25 +876,28 @@ export default function CockpitTray() {
               </svg>
             </button>
 
-            <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
+            {pathname === "/" && (
+              <>
+                <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
 
-            {/* Journey rail (RouteMap) show/hide — a separate mounted
-               sibling, toggled purely over the event bus (see toggleSidenav
-               above). */}
-            <button
-              type="button"
-              onClick={toggleSidenav}
-              aria-pressed={isSidenavVisible}
-              aria-label={isSidenavVisible ? "Hide journey rail" : "Show journey rail"}
-              className={`relative z-10 flex h-5 w-5 items-center justify-center rounded-full transition-colors ${
-                isSidenavVisible ? "text-sky-200" : "text-slate-500 hover:text-sky-200"
-              }`}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
-                <line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" strokeWidth="1.6" />
-              </svg>
-            </button>
+                {/* The journey dial only exists on the multiverse route. On
+                    detail pages this control did nothing, so it is omitted. */}
+                <button
+                  type="button"
+                  onClick={toggleSidenav}
+                  aria-pressed={isSidenavVisible}
+                  aria-label={isSidenavVisible ? "Hide journey dial" : "Show journey dial"}
+                  className={`relative z-10 flex h-5 w-5 items-center justify-center rounded-full transition-colors ${
+                    isSidenavVisible ? "text-sky-200" : "text-slate-500 hover:text-sky-200"
+                  }`}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                    <line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" strokeWidth="1.6" />
+                  </svg>
+                </button>
+              </>
+            )}
 
             <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
 
@@ -885,8 +919,11 @@ export default function CockpitTray() {
                 src="/images/us2.png"
                 alt=""
                 fill
-                sizes="100vw"
-                className="absolute inset-0"
+                // The button is a fixed h-5 w-5 (20px) at every breakpoint.
+                // "100vw" had Next picking a candidate sized for the whole
+                // viewport and painting it into a 20px circle.
+                sizes="20px"
+                className="absolute inset-0 object-cover"
               />
             </button>
 

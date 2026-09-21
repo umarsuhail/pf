@@ -20,7 +20,15 @@ const CockpitTray = dynamic(() => import("./CockpitTray"), { ssr: false });
 const AutopilotStartToast = dynamic(() => import("./AutopilotStartToast"), {
   ssr: false,
 });
-const RouteMap = dynamic(() => import("./RouteMap"), { ssr: false });
+// The bezel dial, which is the journey navigator now. It replaces the
+// right-edge rail (RouteMap) rather than sitting beside it: the two were two
+// readouts of one scroll position competing for the same edge, and the rail
+// was the one you could not also travel with. RouteMap.tsx is left on disk but
+// no longer mounted.
+//
+// It had never actually reached the page — the only file rendering it was
+// AppChrome.tsx, which nothing imports.
+const ScrollDial = dynamic(() => import("./ScrollDial"), { ssr: false });
 
 export default function ChromeBeforeMain() {
   return (
@@ -28,7 +36,7 @@ export default function ChromeBeforeMain() {
       <ScrollSound />
       <CockpitTray />
       <AutopilotStartToast />
-      <RouteMap />
+      <ScrollDial />
     </>
   );
 }

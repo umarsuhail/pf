@@ -609,16 +609,33 @@ export function CardPortal({
                   <Image
                     src="/images/us.png"
                     alt=""
+                    // The file is 1659x1408 — a 1.178:1 mark, not a square.
+                    // Declaring it 300x300 gave the layout box a 1:1 aspect
+                    // that the artwork does not have, and `object-cover` then
+                    // resolved that mismatch by cropping. Whenever the box
+                    // ends up wider than 1.178:1 — which is every stacked /
+                    // letterbox portal, i.e. every phone — cover scales the
+                    // image to fill the width and the overflow comes off the
+                    // top and bottom, taking the glyph's head and feet with
+                    // it. 300x255 is the file's own ratio, so the box is now
+                    // the shape of the art it holds.
                     width={300}
-                    height={300}
-                    sizes=" 30vw, 40vh"
+                    height={255}
+                    sizes="(min-width: 1024px) 30vw, 60vw"
                     // Answers a hover anywhere on the billboard (the card
                     // owns `group/card`): the mark comes up out of the
                     // starfield and leans a little closer. Opacity and
                     // transform only — no filter — so the hover is pure
                     // compositing and never re-rasterizes the card layer the
                     // flight works so hard to keep cached.
-                    className={`object-cover mix-blend-screen transition-[opacity,transform] duration-500 ease-out group-hover/card:opacity-80 motion-safe:group-hover/card:scale-[1.06] ${
+                    // `object-contain`, never `cover`: this is a brand mark,
+                    // so the failure mode when the box and the art disagree
+                    // has to be empty space, not a cropped logo. The portal's
+                    // box is driven by the card's own layout and the
+                    // max-height below, so it cannot be guaranteed to match
+                    // the art's ratio at every size — contain makes that
+                    // harmless.
+                    className={`h-auto w-auto object-contain mix-blend-screen transition-[opacity,transform] duration-500 ease-out group-hover/card:opacity-80 motion-safe:group-hover/card:scale-[1.06] ${
                       // Dimmer once the bio is open: the astronaut becomes the
                       // subject of the window at that point and the mark is
                       // what it is flying in front of. Hover still lifts both
