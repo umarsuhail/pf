@@ -27,6 +27,7 @@ import { getSkillGroups } from "../data/skillGroups";
 import CallbackForm from "../components/CallbackForm";
 import NarratedText from "../components/NarratedText";
 import HandwritingText from "../components/TypoGraphyHand";
+import { ProjectStackShowcase } from "./ProjectStackShowcase";
 import { SkillsShowcase } from "./SkillsShowcase";
 
 const RESUME_PDF_URL = "/umar-suhail-resume-2026.pdf";
@@ -75,7 +76,6 @@ function Eyebrow({ card }: { card: FlightCard }) {
     </span>
   );
 }
-
 function GlowOverlay() {
   return (
     <div className="pointer-events-none absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-white/5 blur-3xl" />
@@ -145,7 +145,7 @@ export function SectionContent({
   const previousArrowRef = useRef<AnimatedIconHandle>(null);
   const nextArrowRef = useRef<AnimatedIconHandle>(null);
 
-  const projects = card.projects ?? [];
+  const projects = useMemo(() => card.projects ?? [], [card.projects]);
   const [activeCategory, setActiveCategory] = useState(ALL_PROJECTS);
   const categories = useMemo(
     () => [ALL_PROJECTS, ...Array.from(new Set(projects.map((p) => p.category)))],
@@ -359,7 +359,7 @@ export function SectionContent({
           </motion.header>
         )}
 
-        {/* PROJECTS — display hero with stats + a placeholder visual */}
+        {/* PROJECTS — display hero with stats + project collage visual */}
         {card.id === "projects" && (
           <motion.header
             variants={itemVariants}
@@ -387,10 +387,7 @@ export function SectionContent({
               </div>
             </div>
 
-            {/* Placeholder visual — swap for real product screenshots later */}
-            <div className="relative h-64 overflow-hidden rounded-[2rem] border border-white/10 bg-black/10 sm:h-80 lg:h-full lg:min-h-[320px]">
-              <Image src="/images/pro1.png" alt="" fill className="object-cover" />
-            </div>
+            <ProjectStackShowcase projects={projects} />
           </motion.header>
         )}
 
@@ -435,6 +432,7 @@ export function SectionContent({
                         src={project.image}
                         alt=""
                         fill
+                        sizes="(max-width: 640px) calc(100vw - 2rem), (max-width: 1024px) calc(50vw - 2rem), (max-width: 1536px) calc(33vw - 2rem), 25vw"
                         className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                       />
                       <span

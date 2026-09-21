@@ -2,27 +2,24 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Umar Suhail | Frontend Engineer",
+    name: "Umar Suhail Portfolio",
     short_name: "Umar Suhail",
     description:
-      "Umar Suhail is a Lead Frontend Engineer and Application Developer in Abu Dhabi, UAE, building React, Next.js, TypeScript, and UI/UX-focused applications.",
+      "The interactive portfolio of Umar Suhail, Lead Frontend Engineer and Application Developer.",
     start_url: "/",
+    scope: "/",
     display: "standalone",
-    background_color: "#05263f",
-    theme_color: "#05263f",
+    background_color: "#020617",
+    theme_color: "#020617",
     icons: [
       {
-        src: "/icon-192x192.png",
+        src: "/pwa-icon-192.png",
         sizes: "192x192",
         type: "image/png",
+        purpose: "any",
       },
       {
-        src: "/icon-512x512.png",
-        sizes: "512x512",
-        type: "image/png",
-      },
-      {
-        src: "/icon-maskable-512x512.png",
+        src: "/pwa-icon-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",

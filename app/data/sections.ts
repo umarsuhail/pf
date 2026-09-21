@@ -81,7 +81,6 @@ export const cards: FlightCard[] = [
       "Node.js — Intermediate",
       "MongoDB — Intermediate",
       "Git — Intermediate",
-      // "Jenkins — Intermediate",
       "Docker — Intermediate",
     ],
     cta: "Skill Details",
@@ -170,7 +169,7 @@ export const cards: FlightCard[] = [
     description:
       "A track record of delivering impactful frontend solutions across biometric systems, MLM platforms, enterprise web apps, and reusable UI component libraries.",
     details: [
-      "Emirates Face Recognition, Application Developer, Feb 2025 - Present, Abu Dhabi: AI-powered face recognition systems and enterprise dashboards",
+      "Emirates Face Recognition, Application Developer, Nov 2024 - Present, Abu Dhabi: AI-powered face recognition systems and enterprise dashboards",
       "EFR: scalable React and Next.js applications, real-time biometric monitoring, modern UI/UX, computer vision integrations",
       "Epixel Solutions, Development Team Lead, Nov 2022 - May 2024, Kochi: led MLM software and enterprise frontend delivery",
       "Epixel: improved code quality by 40%, mentored developers, set coding standards, delivered React and Next.js solutions",
@@ -187,7 +186,7 @@ export const cards: FlightCard[] = [
       {
         company: "Emirates Face Recognition",
         role: "Application Developer",
-        period: "Feb 2025 – Present",
+        period: "Nov 2024 – Present",
         location: "Abu Dhabi",
         summary:
           "AI-powered face recognition systems and enterprise dashboards. Scalable React and Next.js applications, real-time biometric monitoring, modern UI/UX, computer vision integrations.",

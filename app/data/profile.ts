@@ -14,7 +14,6 @@ export const skills = [
   { name: "Node.js", level: "Intermediate" },
   { name: "Material-UI", level: "Expert" },
   { name: "Git", level: "Intermediate" },
-  // { name: "Jenkins", level: "Intermediate" },
 ];
 
 export const projects = [
@@ -63,7 +62,7 @@ export const experiences = [
     title: "Application Developer",
     company: "Emirates Face Recognition",
     location: "Abu Dhabi, United Arab Emirates",
-    period: "Feb 2025 - Present",
+    period: "Nov 2024 - Present",
     description:
       "Building AI-powered face recognition systems and enterprise dashboards for biometric solutions.",
     achievements: [

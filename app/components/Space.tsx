@@ -6,6 +6,9 @@ const BACKGROUND = "#020617"; // matches --background in globals.css
 const STARS_PER_PIXEL = 1 / 3800;
 const MAX_DPR = 1.5;
 const TINTED_STAR_CHANCE = 0.18;
+// Fraction of the canvas box a resize has to move before the star field is
+// rebuilt rather than scaled. See resize() for why this is not zero.
+const RESIZE_TOLERANCE = 0.1;
 
 type Star = {
   x: number;
@@ -42,7 +45,10 @@ export default function Space({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const activeRef = useRef(active);
-  activeRef.current = active;
+
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -101,10 +107,41 @@ export default function Space({
       ctx.globalAlpha = 1;
     };
 
+    // True once the canvas has been given a real backing store, so the first
+    // call always applies even if the box measures the same as the initial
+    // zeroes.
+    let sized = false;
+
     const resize = () => {
-      width = canvas.clientWidth;
-      height = canvas.clientHeight;
-      dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+      const nextWidth = canvas.clientWidth;
+      const nextHeight = canvas.clientHeight;
+      const nextDpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+
+      // Writing canvas.width/height reallocates the backing store, clears it
+      // and forces a reseed of the whole star field — and this runs once per
+      // portal, so seven of them at a time. A phone fires `resize` every time
+      // the URL bar slides during a scroll, so that storm lands squarely on
+      // the frames that can least afford it.
+      //
+      // The tolerance is what keeps it off the main thread. The portal's box
+      // is partly sized in vh, so a URL-bar slide can nudge it by a few
+      // percent; the canvas holds its existing bitmap and is scaled to the
+      // new box by the compositor instead, which for a field of soft round
+      // dots with no hard edges is not a visible difference. A real resize —
+      // rotation, a desktop window drag — clears the threshold and reseeds
+      // properly, and dpr is compared exactly because dragging a window to a
+      // second monitor genuinely does need a new backing store.
+      const settled =
+        sized &&
+        nextDpr === dpr &&
+        Math.abs(nextWidth - width) <= width * RESIZE_TOLERANCE &&
+        Math.abs(nextHeight - height) <= height * RESIZE_TOLERANCE;
+      if (settled) return;
+      sized = true;
+
+      width = nextWidth;
+      height = nextHeight;
+      dpr = nextDpr;
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

@@ -1,12 +1,13 @@
 "use client";
 
 import {
+  AnimatePresence,
   motion,
   useMotionValue,
-  useMotionValueEvent,
   useScroll,
   useSpring,
   useTransform,
+  useVelocity,
   type MotionValue,
 } from "framer-motion";
 import Link from "next/link";
@@ -15,23 +16,13 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CardPortal } from "./CardPortal";
 import { CardIcon } from "./icons/card-icon";
 import { DownloadIcon, type DownloadIconHandle } from "./icons/download";
-import { BrandIcon } from "./icons/brand-icon";
 import ExpandableText from "./ExpandableText";
-import NarrationHighlights from "./NarrationHighlights";
 import NarratedText from "./NarratedText";
-import { NARRATION_DURATION } from "../data/narration";
+import { NARRATION_SPANS, narrationSegments } from "../data/narration";
+import SpaceParticles from "./SpaceParticles";
 import ParticleLogo from "./HeroLogo";
-
-// Three.js-backed and only visible in the closing beat at the very end of a
-// long scroll — split into its own chunk (ssr:false, no fallback needed
-// since nothing is on screen for it yet) so the WebGL bundle isn't part of
-// what the flight has to load before the very first scroll frame can run.
-const SpaceParticles = dynamic(() => import("./SpaceParticles"), { ssr: false });
-import { getSkillGroups } from "../data/skillGroups";
-import Greeting from "./Greeting";
 import SignatureName from "./SignatureName";
 import { POWER3_OUT } from "../lib/easings";
-import { playTick } from "../lib/tick-sound";
 
 import {
   cardGradients,
@@ -42,60 +33,77 @@ import {
 
 const sectionProgressStops = cards.map((card) => sectionProgressMap[card.id]);
 
-// The "Skills" billboard stays a normal flight stop, but the camera's transit
-// from it to "Projects" is used as a chance to glimpse all three skill
-// groups up close — brief, frameless pass-throughs (no border, no portal,
-// nothing to click) rather than full stops of their own. All of them appear
-// after the Skills stop, spaced through the Skills → Projects transit.
-const skillsCardIndex = cards.findIndex((c) => c.id === "skills");
-const skillsStopProgress = sectionProgressStops[skillsCardIndex] ?? 0;
-const nextCardProgress = sectionProgressStops[skillsCardIndex + 1] ?? skillsStopProgress;
-// The icon layovers must not compete with the Skills billboard while it is
-// still revealing. Keep their whole fade window after the card's completed
-// reveal, with a small pause so the card reads clearly first.
-const skillsCardReadyProgress = getRevealWindow(skillsCardIndex).end;
-// Each group gets a full, unhurried look — no rush to the next card until
-// the last group's own fade-out has finished — so the span/hold/sweep below
-// are set as large as the Skills → Projects transit can fit without any two
-// groups' clusters overlapping (they share the same on-screen slot, so any
-// overlap would read as one group bleeding into the next).
-const SKILL_LAYOVER_SPAN = 0.042;
-// Fraction of the span held at full opacity/sharpness around the peak,
-// rather than the cluster being sharp for a single instant and immediately
-// fading back out again.
-const SKILL_LAYOVER_HOLD = 0.55;
-// How much of a layover's fade window the travelling frame sweeps across —
-// most of it, so scrolling through a group's full item row takes most of
-// that group's own dwell instead of racing through it.
-const HIGHLIGHT_SWEEP = 0.85;
+const HOME_HEADLINE_PHRASES = [
+  "reliable apps",
+  "modern products",
+  "fast interfaces",
+  "scalable systems",
+  "clear experiences",
+] as const;
 
-type Slot = { x: number; y: number; w: number; h: number };
-// Bounded so the first group only starts fading in once the Skills card has
-// fully finished revealing, and the last group has completely faded out
-// again before the camera actually arrives at the Projects stop — the next
-// card only appears once the whole skill list has had its turn.
-const skillLayoverStart = skillsCardReadyProgress + SKILL_LAYOVER_SPAN + 0.01;
-const skillLayoverEnd = nextCardProgress - SKILL_LAYOVER_SPAN - 0.02;
-
-const SKILL_LAYOVERS = getSkillGroups(cards[skillsCardIndex]?.details ?? []).map(
-  (group, i, arr) => {
-    // Space the layovers through the Skills → Projects transit, beginning
-    // only after the Skills billboard is fully rendered.
-    const t = i / Math.max(arr.length - 1, 1);
-    return {
-      group,
-      peak: skillLayoverStart + (skillLayoverEnd - skillLayoverStart) * t,
-    };
-  },
-);
+const HOME_HEADLINE_HOLD_MS = 2800;
 
 const PORTAL_WIDTH = "clamp(150px, 20vw, 320px)";
+// Compact viewports that still lay the card out side-by-side (landscape
+// phones and tablets — portrait phones stack instead and give the portal the
+// full width). The desktop clamp would eat most of that narrower card: it is
+// sized against a clamp(420px, 58vw, 900px) card, where it takes roughly a
+// third. These numbers keep the same share of the compact card's
+// min(66vw, 500px) so the headline beside it still gets a real measure.
+const COMPACT_PORTAL_WIDTH = "clamp(120px, 22vw, 180px)";
 
-// Spring used for the cards' own width/offset settle when the breakpoint
-// changes. There is deliberately no camera spring: see smoothScrollProgress.
+// --- Card-internal depth -------------------------------------------------
+// How far the copy and the portal stand off the card's own face, in the
+// card's local 3D space. This is what separates a billboard from a picture
+// of a billboard: as a card rotates past, the portal swings through a
+// visibly wider arc than the panel behind it, and the copy sits between the
+// two. Kept small — this is parallax on a surface, not a diorama — and
+// scaled down on phones, where the card is a third of the size and the same
+// offsets would read as the layers coming apart.
+const CARD_DEPTH = {
+  desktop: { copy: 22, portal: 58 },
+  mobile: { copy: 10, portal: 26 },
+} as const;
+
+// Springs used for a card's responsive settle and the camera's visual follow.
+// The camera values are deliberately overdamped: scroll settles cleanly with
+// no bobbing or rebound when input stops.
 const PHYSICS = {
   expansion: { type: "spring", stiffness: 180, damping: 22, mass: 0.9 },
 } as const;
+
+// Soft and heavily overdamped (zeta ~2.4). The document still scrolls
+// natively at whatever speed the visitor flicks it, but the camera refuses to
+// be flicked: it glides to wherever the scroll landed over about a second and
+// arrives without a trace of rebound. A one-section flick used to snap the
+// camera into place in 0.42s, which is what made fast scrolling read as
+// jumping between sections rather than travelling between them; the same
+// flick now takes ~1.15s, and slamming the whole page takes ~1.3s instead of
+// 0.6s. Peak camera speed roughly halves as a side effect, which is also what
+// takes most of the sting out of the speed trail below.
+const CAMERA_SPRING = {
+  stiffness: 120,
+  damping: 34,
+  mass: 0.42,
+  restDelta: 0.00005,
+} as const;
+
+// Softened to match: this smooths the *derivative* of the camera above, so a
+// stiff spring here would put the speed trail's fade back on the input's
+// timing rather than the camera's and undo the calm the camera spring buys.
+const FLIGHT_VELOCITY_SPRING = {
+  stiffness: 240,
+  damping: 40,
+  mass: 0.24,
+} as const;
+
+// Camera velocity below which there is no motion blur at all. Reading a card,
+// nudging the wheel, and the camera spring settling all sit under this, which
+// is the point: a still scene should be sharp.
+const FLIGHT_BLUR_FLOOR = 0.055;
+
+const FLIGHT_STREAK_BACKGROUND =
+  "repeating-conic-gradient(from 0deg at 50% 50%, transparent 0deg 2deg, rgba(186,230,253,0.22) 2.35deg 2.62deg, transparent 3.15deg 8deg), radial-gradient(ellipse at 50% 50%, rgba(56,189,248,0.22) 0%, transparent 64%)";
 
 // --- Space regions ------------------------------------------------------
 // The corridor passes through distinct volumes of space rather than fading
@@ -215,39 +223,35 @@ function SpaceRegionLayer({
   );
 }
 
-const NAV_ZOOM_FRACTION = 0.55;
+// A card's natural stop puts it almost on the CSS perspective camera. That
+// is useful as a pass-through moment while scrolling, but it is the wrong
+// place to hold an autoplay scene: copy gets cropped and the portal swallows
+// the viewport. Every navigation now lands just before that point in the
+// card's readable "slot", where the whole panel has room to breathe.
+const CARD_SLOT_LEAD = 0.048;
+const CARD_SLOT_MIN_APPROACH = 0.045;
 
-// Cards whose gap to the next card is tight (home, about, experience,
-// contact — all ~0.11-0.13 apart) clamp the zoom below to their own depart window's
-// exact start, with zero room to spare. That's fine for a quick scroll-past,
-// but the autopilot tour *holds* there for seconds — arriving with no
-// margin read as landing right on the lip of its own fade-out rather than
-// settling cleanly. This pulls the clamp back a hair so there's always a
-// sliver of steady, undimmed hold before the card would start to fade.
-const NAV_ARRIVAL_MARGIN = 0.01;
+function getCardSlotProgress(index: number) {
+  if (index <= 0) return 0;
+
+  const current = sectionProgressStops[index];
+  const previous = sectionProgressStops[index - 1];
+  const span = Math.max(current - previous, 0.08);
+  // Preserve a little arrival runway even for tightly packed cards, while
+  // keeping the physical distance to the camera consistent on wide gaps.
+  return Math.max(previous + span * 0.3, current - CARD_SLOT_LEAD);
+}
 
 function getNavTargetProgress(targetId: string) {
-  const base = sectionProgressMap[targetId];
   const index = cards.findIndex((c) => c.id === targetId);
-  if (base === undefined || index === -1) return base;
-  // Navigating should always land the same distance in front of the card's
-  // stop, so every section arrives at the same size. Taking that distance as
-  // a fraction of the card's *own* depart window made it collapse for the
-  // cards near the end of the track, whose windows are squeezed by having no
-  // room left before progress hits 1 — contact ended up landing barely past
-  // its stop, still small and mid-reveal. Only the clamp below is per-card:
-  // the zoom must never push a card into the fade that carries it past the
-  // camera, or navigating to it would show it already dissolving.
-  return Math.min(
-    base + NAV_ZOOM_PROGRESS,
-    getDepartWindow(index).start - NAV_ARRIVAL_MARGIN,
-  );
+  if (index === -1) return sectionProgressMap[targetId];
+  return getCardSlotProgress(index);
 }
 
 function getActiveSectionId(progress: number) {
   let activeId = cards[0]?.id ?? "home";
   for (let i = 0; i < cards.length; i++) {
-    const stop = sectionProgressMap[cards[i].id];
+    const stop = getCardSlotProgress(i);
     if (progress >= stop) activeId = cards[i].id;
   }
   return activeId;
@@ -261,22 +265,30 @@ function getRevealWindow(index: number) {
   const previous = sectionProgressStops[index - 1];
   const current = sectionProgressStops[index];
   const span = Math.max(current - previous, 0.08);
+  const slot = getCardSlotProgress(index);
   return {
-    start: Math.max(previous + span * 0.74, 0),
-    end: Math.min(current + span * 0.16, 1),
+    // Begin the handoff while the card is still at a comfortable depth, and
+    // have its sharp, full-scale state arrive exactly at the readable slot.
+    start: Math.max(
+      previous + span * 0.24,
+      slot - Math.max(span * 0.3, CARD_SLOT_MIN_APPROACH),
+      0,
+    ),
+    end: slot,
   };
 }
 
 function getFocusWindow(index: number) {
-  const current = sectionProgressStops[index];
   const previous = index > 0 ? sectionProgressStops[index - 1] : 0;
+  const current = sectionProgressStops[index];
   const next = index < sectionProgressStops.length - 1 ? sectionProgressStops[index + 1] : 1;
   const leftSpan = Math.max(current - previous, 0.08);
   const rightSpan = Math.max(next - current, 0.08);
+  const slot = getCardSlotProgress(index);
 
   return {
-    start: Math.max(current - leftSpan * 0.7, 0),
-    peak: current,
+    start: Math.max(previous, slot - leftSpan * 0.38),
+    peak: slot,
     end: Math.min(current + rightSpan * 0.65, 1),
   };
 }
@@ -297,32 +309,11 @@ const AUTOPILOT_SECTION_SECONDS = 10;
 const AUTOPILOT_HOLD = 3.5;
 const AUTOPILOT_TRAVEL = AUTOPILOT_SECTION_SECONDS - AUTOPILOT_HOLD;
 
-// The opening leg (home) runs on its own clock instead of the standard 10s
-// slot — it holds through the whole 43s intro narration with a slow,
-// continuously-drifting camera that travels the *entire* way to the next
-// card's own arrival point over that whole span, landing there exactly as
-// the narration hands off. Earlier this crept to a barely-there target and
-// then hopped the rest of the way in a single quick second right at the
-// handoff — reading as a sudden jump/zoom instead of one continuous motion.
-const AUTOPILOT_INTRO_HOLD = NARRATION_DURATION;
-const AUTOPILOT_INTRO_EXPAND_AT = 10;
-
 // The last real card (contact) and the tail beyond it (the earth/moon/end-
 // credits payoff) both get more time than the standard mid-tour hold —
 // they're the close of the tour, not a stop along the way.
 const AUTOPILOT_CONTACT_HOLD = 7;
 const AUTOPILOT_TAIL_HOLD = 8;
-
-// Each skill layover (frontend/UI/backend) gets a real, brief stop of its
-// own during the Skills → Projects transit, rather than just a fade the
-// camera happens to pass while travelling — a quick hop in, then a short
-// hold to actually register the cluster before moving to the next one.
-const AUTOPILOT_LAYOVER_TRAVEL = 1.4;
-const AUTOPILOT_LAYOVER_HOLD = 2.6;
-
-// Forward travel a "go to section" jump adds on top of the card's own stop,
-// in progress units — the fixed span's hang time scaled by the zoom fraction.
-const NAV_ZOOM_PROGRESS = DEPART_SPAN * 0.3 * NAV_ZOOM_FRACTION;
 
 // Progress by which the last billboard must be fully gone. Everything in the
 // closing sequence is timed against this: the black void reaches full
@@ -341,14 +332,9 @@ function getDepartWindow(index: number) {
   // keyframe). Shrink the span itself so `end` always lands under 1.
   //
   // Most cards sit far closer together (0.11-0.13 apart) than DEPART_SPAN
-  // (0.34) — that gap was sized for skills->projects, the one genuinely wide
-  // hop. Everywhere else, a departing card's own fade-out window ran well
-  // past the next card's arrival/nav-zoom point, so navigating (or the
-  // autopilot tour holding) on the next card caught the previous one still
-  // 60-70% opaque and blown up to its pass-through size — a giant blurred
-  // ghost hanging over the new card instead of a clean handoff. Cap the span
-  // by the gap to the next card too, so a departing card always finishes
-  // clearing before the next one is reached.
+  // (0.34). Each departure therefore has to clear before the next card's
+  // readable slot, or an autoplay hold would stack a blown-up outgoing panel
+  // over its newly framed replacement.
   const span = Math.min(DEPART_SPAN, (1 - current) / 0.85, (next - current) / 0.85);
   const start = Math.min(current + span * 0.3, 1);
   let end = Math.min(current + span * 0.85, 1);
@@ -362,6 +348,9 @@ function getDepartWindow(index: number) {
   // which is what LAST_CARD_CLEARED exists to pin down.
   if (index === sectionProgressStops.length - 1) {
     end = Math.min(end, LAST_CARD_CLEARED);
+  } else {
+    const nextSlot = getCardSlotProgress(index + 1);
+    end = Math.min(end, Math.max(start + 0.0005, nextSlot - 0.008));
   }
 
   return { start, end };
@@ -375,10 +364,64 @@ function toStrictlyIncreasing(values: number[]) {
   return out;
 }
 
+function RotatingHomeHeadline() {
+  const [phraseIndex, setPhraseIndex] = useState(0);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (mediaQuery.matches) return;
+
+    const interval = window.setInterval(() => {
+      setPhraseIndex((current) => (current + 1) % HOME_HEADLINE_PHRASES.length);
+    }, HOME_HEADLINE_HOLD_MS);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const phrase = HOME_HEADLINE_PHRASES[phraseIndex];
+
+  return (
+    <span className="block">
+      <span className="block">I build</span>
+      <span className="mt-1.5 flex min-h-[1.2em] items-start gap-2 sm:mt-2">
+        <span aria-hidden="true" className="mt-[0.42em] flex shrink-0 gap-1">
+          {HOME_HEADLINE_PHRASES.map((item, index) => (
+            <motion.span
+              key={item}
+              initial={false}
+              animate={{
+                opacity: index === phraseIndex ? 1 : 0.28,
+                scale: index === phraseIndex ? 1 : 0.65,
+              }}
+              transition={{ duration: 0.24, ease: "easeOut" }}
+              className="h-1.5 w-1.5 rounded-full bg-sky-200"
+            />
+          ))}
+        </span>
+        <span className="relative block h-[1.2em] min-w-0 flex-1 overflow-hidden leading-none">
+          <AnimatePresence initial={false} mode="wait">
+            <motion.em
+              key={phrase}
+              initial={{ opacity: 0, y: "0.46em" }}
+              animate={{ opacity: 1, y: "0em" }}
+              exit={{ opacity: 0, y: "-0.42em" }}
+              transition={{ duration: 0.34, ease: "easeOut" }}
+              className="absolute inset-x-0 top-0 block whitespace-nowrap font-normal italic text-sky-200"
+            >
+              {phrase}
+            </motion.em>
+          </AnimatePresence>
+        </span>
+      </span>
+    </span>
+  );
+}
+
 function BillboardCard({
   card,
   index,
   isMobile,
+  isStacked,
   mobileOffsetScale,
   smoothScrollProgress,
   revealStart,
@@ -387,6 +430,8 @@ function BillboardCard({
   card: FlightCard;
   index: number;
   isMobile: boolean;
+  /** Portrait phones only — see the flag's definition in MultiverseFlight. */
+  isStacked: boolean;
   mobileOffsetScale: number;
   smoothScrollProgress: MotionValue<number>;
   revealStart: number;
@@ -399,27 +444,94 @@ function BillboardCard({
   // scales things down (type, padding), and `mobileOffsetScale` — derived
   // from the actual viewport width rather than a flat constant — keeps the
   // left/right stagger from pushing a card off a narrow phone's edges.
-  // The autopilot tour opens the home card's full bio partway through its
-  // intro hold, rather than leaving it collapsed while the narration reads
-  // straight through it.
+  // The home bio opens exactly as its narration reaches "development", not
+  // on a separate timer that can drift from the audio.
   const pdfDownloadRef = useRef<DownloadIconHandle>(null);
   const texDownloadRef = useRef<DownloadIconHandle>(null);
   const [autoExpandHome, setAutoExpandHome] = useState(false);
+  const hasAutoExpandedHomeRef = useRef(false);
   // Tracks the bio's real expanded state (manual toggle included, not just
   // the one-way autopilot trigger) so the portal can swap its visual to
   // match — the astronaut only belongs on screen while the full bio reads.
   const [isHomeExpanded, setIsHomeExpanded] = useState(false);
   useEffect(() => {
     if (card.id !== "home") return;
-    const onExpand = (event: Event) => {
-      const id = (event as CustomEvent<{ id?: string }>).detail?.id;
-      if (id === "home") setAutoExpandHome(true);
-    };
-    window.addEventListener("flight-autopilot-expand", onExpand as EventListener);
-    return () => window.removeEventListener("flight-autopilot-expand", onExpand as EventListener);
-  }, [card.id]);
 
-  const alignmentClass = isMobile || card.align === "left" ? "items-start text-left" : "items-end text-right";
+    const words = card.description.trim().split(/\s+/);
+    const developmentWordIndex = words.findIndex(
+      (word) => word.replace(/[^a-z]/gi, "").toLowerCase() === "development",
+    );
+    if (developmentWordIndex < 0) return;
+
+    let wordOffset = 0;
+    let trigger:
+      | { spanIndex: number; wordIndex: number; words: number }
+      | undefined;
+    for (const segment of narrationSegments.home ?? []) {
+      if (developmentWordIndex < wordOffset + segment.words) {
+        trigger = {
+          spanIndex: segment.spanIndex,
+          wordIndex: developmentWordIndex - wordOffset,
+          words: segment.words,
+        };
+        break;
+      }
+      wordOffset += segment.words;
+    }
+    if (!trigger) return;
+
+    const onLaunch = () => {
+      hasAutoExpandedHomeRef.current = false;
+      setAutoExpandHome(false);
+    };
+    const onNarrationProgress = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          active?: boolean;
+          spanIndex?: number;
+          currentTime?: number;
+          duration?: number;
+        }>
+      ).detail;
+      if (
+        !detail?.active ||
+        detail.spanIndex !== trigger.spanIndex ||
+        hasAutoExpandedHomeRef.current
+      ) {
+        return;
+      }
+
+      const duration = detail.duration ?? 0;
+      if (duration <= 0) return;
+      const progress = Math.min(1, Math.max(0, (detail.currentTime ?? 0) / duration));
+      const currentWordIndex = Math.min(
+        trigger.words - 1,
+        Math.floor(progress * trigger.words),
+      );
+      if (currentWordIndex < trigger.wordIndex) return;
+
+      hasAutoExpandedHomeRef.current = true;
+      setAutoExpandHome(true);
+    };
+
+    window.addEventListener("flight-autopilot-launch", onLaunch);
+    window.addEventListener("narration-progress", onNarrationProgress as EventListener);
+    return () => {
+      window.removeEventListener("flight-autopilot-launch", onLaunch);
+      window.removeEventListener("narration-progress", onNarrationProgress as EventListener);
+    };
+  }, [card.description, card.id]);
+
+  // Stacked cards are only ~330px wide: ragged-left copy (items-end) throws
+  // every line's start edge around and costs real legibility at that
+  // measure, so the vertical layout reads flush left whichever side of the
+  // corridor the billboard hangs on. The left/right identity is still
+  // carried by the card's own lateral offset.
+  const alignmentClass = isStacked
+    ? "items-start text-left"
+    : card.align === "left"
+      ? "items-start text-left"
+      : "items-end text-right";
   const titleClass = "text-sky-50";
   const bodyClass = "text-slate-100/90";
   const panelClass = "border-white/20 shadow-[0_24px_90px_rgba(2,8,23,0.52)]";
@@ -433,6 +545,7 @@ function BillboardCard({
   // visitor sees with no scroll context to explain the tilt, so it faces the
   // camera square-on — the angled billboards only start once the flight does.
   const isEntry = index === 0;
+  const depth = isMobile ? CARD_DEPTH.mobile : CARD_DEPTH.desktop;
   const baseRotateY = isEntry ? 0 : card.align === "left" ? 10 : -10;
   const baseRotateX = isEntry ? 0 : 4;
 
@@ -467,6 +580,20 @@ function BillboardCard({
   const activeRotateY = useTransform(straightening, (v) => baseRotateY * Math.max(0, 1 - v * 1.5));
   const activeRotateX = useTransform(straightening, (v) => baseRotateX * Math.max(0, 1 - v * 2));
 
+  // Depth that opens as the card arrives. Held shallow while the billboard is
+  // still a shape in the distance and pushed past its resting offset as the
+  // card straightens to face the camera, so the portal reads as a window
+  // rising out of the panel on approach rather than a picture pasted at a
+  // fixed height. Both are motion values on layers that are already promoted,
+  // so the whole effect is a transform on an existing texture — it adds no
+  // layer, no repaint and no per-frame React work.
+  const portalDepth = useTransform(
+    straightening,
+    [0, 1],
+    [depth.portal * 0.45, depth.portal * 1.3],
+  );
+  const copyDepth = useTransform(straightening, [0, 1], [depth.copy * 0.45, depth.copy]);
+
   const activeReadabilityBoost = useTransform(straightening, [0, 1], [0, 1]);
   const effectiveOpacity = useTransform(() => Math.min(1, upcomingOpacity.get() + activeReadabilityBoost.get() * 0.38));
   // A continuously-animating blur() is one of the most expensive styles on
@@ -491,20 +618,6 @@ function BillboardCard({
     o > 0.55 ? "auto" : "none",
   );
 
-  // The gentle float/pulse below used to run its `repeat: Infinity` loop on
-  // every card for the whole session, even the ones sitting fully faded out
-  // elsewhere in the corridor — every one of those is still a live RAF-driven
-  // animation doing real interpolation work each frame for something nobody
-  // can see. Only the card(s) actually legible get the loop; the rest hold
-  // still until they fade back in.
-  const [isBobbing, setIsBobbing] = useState(() => effectiveOpacity.get() > 0.55);
-  useMotionValueEvent(effectiveOpacity, "change", (value) => {
-    setIsBobbing((prev) => {
-      const next = value > 0.55;
-      return prev === next ? prev : next;
-    });
-  });
-
   return (
     <motion.div
       style={{
@@ -515,43 +628,90 @@ function BillboardCard({
         filter: cardFilter,
         scale: upcomingScale,
         background: cardGradient,
+        // The card is a real 3D surface: it is tilted and pushed down the
+        // corridor by the parent group, and its own contents sit at different
+        // depths *on* that surface (see CARD_DEPTH below), so the portal
+        // parallaxes against the copy as the billboard turns. That is the
+        // "sailing" the flight is built around.
+        //
+        // What makes it affordable is that every element actually placed in
+        // this 3D context declares its own `will-change: transform`. A 3D
+        // rendering context defeats the compositor's layer caching for any
+        // descendant it has to re-sort each frame; promoting the handful that
+        // genuinely live at a depth means those are cached textures the GPU
+        // re-projects, and nothing else in the subtree pays for the context.
+        // Without that promotion this same preserve-3d cost ~65% of the
+        // frame's rasterization.
         transformStyle: "preserve-3d",
         pointerEvents: cardPointerEvents,
+        // The flight is a scale animation, and scale is the one transform a
+        // compositor cannot fake: without this the card is not a layer of its
+        // own, so Chrome re-rasterizes the whole panel — gradient, border,
+        // rounded corners and that 90px-blur shadow — at every new scale on
+        // the way down the corridor. A trace of a wheel scroll was 4.5s of
+        // RasterTask against 1.1s of script. Declaring the transform up front
+        // promotes the card and locks its raster scale, so the panel is
+        // painted once and the GPU scales the texture.
+        willChange: "transform",
       }}
       initial={false}
       animate={{
-        // Mobile cards use the available width, with only a small stagger.
-        width: isMobile ? "min(88vw, 500px)" : card.width,
-        translateX: isMobile ? card.x * Math.min(mobileOffsetScale, 0.035) : card.x,
+        // Narrower than the desktop clamp so there is room either side for the
+        // lateral offsets, but wide enough that the headline still gets a real
+        // measure once the portal takes its share. Stacked cards no longer
+        // give a third of that width away to the portal, so they can afford
+        // to be wider — and need to be, since the headline now gets the full
+        // card measure rather than what is left beside the portal.
+        width: isStacked
+          ? "min(82vw, 400px)"
+          : isMobile
+            ? "min(66vw, 500px)"
+            : card.width,
+        // Same left/right stagger as desktop, scaled down to fit the
+        // narrower viewport instead of being zeroed out — mobileOffsetScale
+        // is proportional to actual viewport width, so a landscape phone
+        // (wide) keeps close to the original stagger while a narrow
+        // portrait phone gets a much smaller one, keeping the card on
+        // screen instead of clipping off its edges.
+        translateX: isMobile ? card.x * mobileOffsetScale : card.x,
       }}
       transition={PHYSICS.expansion}
-      className={`absolute flex rounded-3xl border sm:rounded-4xl ${
+      // Named group so the portal's own artwork can answer a hover anywhere
+      // on the billboard, not just on the window it sits in (CardPortal
+      // already owns a plain `group` for its arrow). Cards that have faded
+      // out set pointerEvents: "none" above, so only the card actually in
+      // view can be hovered.
+      className={`group/card absolute flex rounded-3xl border sm:rounded-4xl ${
         isMobile ? "p-4" : "p-5 sm:p-8 lg:p-10"
       } ${panelClass}`}
     >
-      {/* Positioned relative to this stable outer box, not the inner content
-         wrapper's gentle float animation below, so it doesn't jitter. */}
-      {card.id === "home" && <NarrationHighlights />}
-
-      <motion.div
-        animate={
-          !isMobile && isBobbing
-            ? { y: [0, -12, 0, 12, 0], opacity: [0.7, 1, 0.85, 1, 0.7] }
-            : { y: 0, opacity: 1 }
-        }
-        transition={
-          !isMobile && isBobbing
-            ? { duration: 7 + index * 0.5, repeat: Infinity, ease: "easeInOut" }
-            : { duration: 0.4, ease: "easeOut" }
-        }
-        className={`flex w-full items-stretch ${isMobile ? "gap-4" : "gap-5 sm:gap-8"} ${
-          isMobile ? "flex-col-reverse" : card.align === "right" ? "flex-row-reverse" : "flex-row"
+      <div
+        // flex-col-reverse, not flex-col: the portal is last in the DOM (so
+        // the copy is what a screen reader and the page's own reading order
+        // reach first) but leads visually, which is what makes the stacked
+        // version read as the same billboard turned upright rather than as a
+        // block of text with a picture tacked underneath.
+        className={`flex w-full ${
+          isStacked
+            ? "flex-col-reverse items-stretch gap-3.5"
+            : `items-stretch ${isMobile ? "gap-3" : "gap-5 sm:gap-8"} ${
+                card.align === "right" ? "flex-row-reverse" : "flex-row"
+              }`
         }`}
+        // Carries the 3D context down to the copy/portal pair below, which
+        // is where the depth actually lives.
         style={{ transformStyle: "preserve-3d" }}
       >
         <motion.div
           className={`flex min-w-0 flex-1 flex-col ${alignmentClass}`}
-          style={{ opacity: useTransform(activeReadabilityBoost, [0, 1], [0.85, 1]) }}
+          style={{
+            opacity: useTransform(activeReadabilityBoost, [0, 1], [0.85, 1]),
+            // The copy sits just proud of the card's face — enough that it
+            // separates from the panel as the billboard turns, not so much
+            // that it reads as a floating label.
+            translateZ: copyDepth,
+            willChange: "transform",
+          }}
         >
           {/* Tailwind breakpoints are width-based, so they can't tell a 956px
              landscape phone from a laptop — the compact scale is driven off
@@ -568,32 +728,48 @@ function BillboardCard({
             {card.eyebrow}
           </span>
           <h2
-            className={`max-w-[22ch] font-semibold leading-tight ${
-              isMobile
-                ? "mt-2.5 text-lg"
-                : "mt-5 text-2xl sm:mt-6 sm:text-3xl lg:text-5xl"
+            className={`${card.id === "home" ? "w-full max-w-none tracking-normal" : "max-w-[22ch]"} font-semibold leading-tight ${
+              isStacked
+                ? card.id === "home"
+                  ? "mt-3 text-3xl"
+                  : "mt-3 text-xl"
+                : isMobile
+                  ? card.id === "home"
+                    ? "mt-3 text-2xl"
+                    : "mt-2.5 text-lg"
+                  : card.id === "home"
+                    ? "mt-5 text-4xl sm:mt-6 sm:text-5xl xl:text-6xl"
+                    : "mt-5 text-2xl sm:mt-6 sm:text-3xl lg:text-5xl"
             } ${titleClass}`}
           >
-            {card.id === "home" ? <Greeting /> : card.title}
+            {card.id === "home" ? <RotatingHomeHeadline /> : card.title}
           </h2>
+          {card.id === "home" && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-100/55 sm:mt-4 sm:text-xs">
+              <span>Frontend systems</span>
+              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-sky-200/75" />
+              <span>Product craft</span>
+              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-sky-200/75" />
+              <span>Performance</span>
+            </div>
+          )}
           {/* Home carries the full narrated bio (all four paragraphs) — too
              long for a billboard card to show outright, so it collapses to a
              short preview with a "Read more" that grows the card in place. */}
           {card.id === "home" || isMobile ? (
             <ExpandableText
               className={`max-w-[46ch] ${isMobile ? "mt-2" : "mt-4 max-w-[38ch] sm:mt-5"}`}
-              collapsedHeight="4.5em"
-              expandedHeight={isMobile ? "min(28dvh, 240px)" : "640px"}
-              scrollExpanded={isMobile}
-              toggleClassName={isMobile ? "min-h-11 text-[11px]" : ""}
+              collapsedHeight={isStacked ? "4.6em" : isMobile ? "3.3em" : "4.5em"}
               forceExpanded={autoExpandHome}
               onExpandedChange={setIsHomeExpanded}
             >
               <p
                 className={`${
-                  isMobile
-                    ? "text-sm leading-6"
-                    : "text-sm leading-6 sm:text-base sm:leading-7 lg:text-xl"
+                  isStacked
+                    ? "text-xs leading-[1.55]"
+                    : isMobile
+                      ? "text-[11px] leading-[1.45]"
+                      : "text-sm leading-6 sm:text-base sm:leading-7 lg:text-xl"
                 } ${bodyClass}`}
               >
                 <NarratedText id={card.id} text={card.description} />
@@ -602,9 +778,11 @@ function BillboardCard({
           ) : card.id !== "resume" ? (
             <p
               className={`max-w-[46ch] ${
-                isMobile
-                  ? "mt-2 line-clamp-4 text-[11px] leading-[1.45]"
-                  : "mt-4 max-w-[38ch] text-sm leading-6 sm:mt-5 sm:text-base sm:leading-7 lg:text-xl"
+                isStacked
+                  ? "mt-2.5 line-clamp-4 text-xs leading-[1.55]"
+                  : isMobile
+                    ? "mt-2 line-clamp-4 text-[11px] leading-[1.45]"
+                    : "mt-4 max-w-[38ch] text-sm leading-6 sm:mt-5 sm:text-base sm:leading-7 lg:text-xl"
               } ${bodyClass}`}
             >
               <NarratedText id={card.id} text={card.description} />
@@ -658,9 +836,31 @@ function BillboardCard({
 
         <motion.div
           initial={false}
-          animate={{ width: isMobile ? "100%" : PORTAL_WIDTH }}
+          animate={{
+            width: isStacked
+              ? "100%"
+              : isMobile
+                ? COMPACT_PORTAL_WIDTH
+                : PORTAL_WIDTH,
+          }}
           transition={PHYSICS.expansion}
-          className={`relative block ${isMobile ? "h-28" : "min-h-[min(16.25rem,42vh)]"} shrink-0 transform-flat overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)] lg:rounded-3xl lg:[clip-path:inset(0_round_1.5rem)]`}
+          style={{
+            // The portal stands furthest off the card face — it is the window
+            // the flight is aimed at, so it leads the turn.
+            translateZ: portalDepth,
+            willChange: "transform",
+          }}
+          // Turned on its side the portal becomes a letterbox across the top
+          // of the card: the tall min-height that gives it presence beside
+          // the copy would otherwise eat two thirds of a phone's screen and
+          // leave nothing for the copy it is meant to introduce. Height is
+          // capped in vh so the whole stacked card still clears a short
+          // portrait viewport.
+          className={`relative block shrink-0 transform-flat overflow-hidden rounded-2xl lg:rounded-3xl ${
+            isStacked
+              ? "h-[clamp(10rem,26vh,15rem)]"
+              : "min-h-[min(16.25rem,42vh)]"
+          }`}
         >
           <CardPortal
             isMobile={isMobile}
@@ -671,208 +871,9 @@ function BillboardCard({
             actionLabel={actionLabel}
             ariaLabel={`Fly to ${targetCard.eyebrow.replace(/^\d+\s*\/\s*/, "")}`}
             isExpanded={card.id === "home" && isHomeExpanded}
+            letterbox={isStacked}
           />
         </motion.div>
-      </motion.div>
-    </motion.div>
-  );
-}
-
-// A brief, frameless pass-through — no border, background, or portal to
-// click, just a label and a cluster of floating icons that fade in as the
-// camera nears its point in the transit and fade back out past it. Rendered
-// as a plain screen-space overlay (no translateZ/perspective), outside the
-// 3D corridor group, the same way the route-map's section pill stays crisp
-// no matter what the flying cards behind it are doing — so it never gets
-// caught in a departing card's perspective swell or tangled with the next
-// card's own reveal fade.
-function SkillLayoverCluster({
-  layover,
-  isMobile,
-  smoothScrollProgress,
-}: {
-  layover: (typeof SKILL_LAYOVERS)[number];
-  isMobile: boolean;
-  smoothScrollProgress: MotionValue<number>;
-}) {
-  const span = SKILL_LAYOVER_SPAN;
-  // A bare 3-point [peak-span, peak, peak+span] window is only sharp for a
-  // single instant — the moment scroll passes `peak` it's already fading
-  // back out, so at normal scroll speeds the cluster reads as blurring
-  // almost as soon as it arrives. Holding full opacity/sharpness across a
-  // small plateau around the peak gives it an actual dwell before the
-  // fade-out begins.
-  const hold = span * SKILL_LAYOVER_HOLD;
-  const stops = [
-    layover.peak - span,
-    layover.peak - hold,
-    layover.peak + hold,
-    layover.peak + span,
-  ];
-  const opacity = useTransform(smoothScrollProgress, stops, [0, 1, 1, 0]);
-  const scale = useTransform(smoothScrollProgress, stops, [0.9, 1, 1, 0.9]);
-  const blur = useTransform(smoothScrollProgress, stops, [8, 0, 0, 8]);
-  // Quantized to whole pixels, and "none" while sharp — same reasoning as
-  // the billboard cards' cardFilter: every fractional blur change forces a
-  // full layer re-raster, and this cluster fades through its blur window on
-  // every scroll frame of the Skills → Projects transit.
-  const filter = useTransform(blur, (b) => {
-    const stepped = Math.round(b);
-    return stepped <= 0 ? "none" : `blur(${stepped}px)`;
-  });
-  const pointerEvents = useTransform(opacity, (o) => (o > 0.55 ? "auto" : "none"));
-
-  // The travelling frame. Rather than lighting the whole cluster at once,
-  // the scroll walks a single metal box across the technologies one at a
-  // time, and each landing clicks with the same dial tick the scroll itself
-  // makes — so the pass-through reads as the camera actually inspecting the
-  // row rather than just drifting past it.
-  const items = layover.group.items;
-  const gridRef = useRef<HTMLDivElement>(null);
-  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [slots, setSlots] = useState<Slot[]>([]);
-  // `index` is where the frame is parked and `visible` is whether the sweep
-  // is running — two fields rather than one nullable index, so that when the
-  // sweep ends the frame fades out where it stopped instead of sliding back
-  // to the first item on its way out.
-  const [frame, setFrame] = useState({ index: 0, visible: false });
-  // The scroll handler compares against a ref, not the state it sets: it runs
-  // on every frame of a scroll and must not re-subscribe each time the index
-  // changes.
-  const sweptIndex = useRef(-1);
-
-  // Measured with offsetLeft/Top rather than getBoundingClientRect: the icons
-  // carry a looping bob and the cluster itself is scaled and blurred by the
-  // scroll, all of which a rect folds in. Offsets are pre-transform layout,
-  // so the frame sits still over an icon that is gently floating.
-  useEffect(() => {
-    const measure = () => {
-      setSlots(
-        itemRefs.current.map((el) =>
-          el
-            ? { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }
-            : { x: 0, y: 0, w: 0, h: 0 },
-        ),
-      );
-    };
-    measure();
-    // The labels set in a webfont and the row wraps, so the layout these
-    // offsets describe changes once when the font lands.
-    document.fonts?.ready.then(measure).catch(() => {});
-    const observer = new ResizeObserver(measure);
-    if (gridRef.current) observer.observe(gridRef.current);
-    return () => observer.disconnect();
-  }, [items.length, isMobile]);
-
-  useMotionValueEvent(smoothScrollProgress, "change", (progress) => {
-    // Short of the full fade window at both ends, so the first technology is
-    // framed only once the cluster has actually faded in and the last one is
-    // released before it fades back out.
-    const from = layover.peak - span * HIGHLIGHT_SWEEP;
-    const to = layover.peak + span * HIGHLIGHT_SWEEP;
-    const t = (progress - from) / (to - from);
-    const next =
-      t < 0 || t > 1 ? -1 : Math.min(items.length - 1, Math.floor(t * items.length));
-    if (next === sweptIndex.current) return;
-    sweptIndex.current = next;
-    if (next < 0) {
-      setFrame((f) => (f.visible ? { ...f, visible: false } : f));
-      return;
-    }
-    setFrame({ index: next, visible: true });
-    // A gentle rise across the row — same click, walking up a step per
-    // technology, so a sweep sounds like a sequence rather than a stutter.
-    playTick(0.94 + (next / Math.max(items.length - 1, 1)) * 0.3);
-  });
-
-  const slot = slots[frame.index];
-  const pad = isMobile ? 7 : 10;
-
-  return (
-    <motion.div
-      style={{ opacity, scale, filter, pointerEvents }}
-      className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-4"
-    >
-      <span
-        className={`font-semibold uppercase tracking-[0.32em] text-sky-100/70 ${
-          isMobile ? "text-[9px]" : "text-xs"
-        }`}
-      >
-        {layover.group.name}
-      </span>
-      <div
-        ref={gridRef}
-        className="relative flex flex-wrap items-start justify-center gap-x-6 gap-y-5"
-        style={{ maxWidth: isMobile ? 260 : 460 }}
-      >
-        {/* Drawn before the items, each of which is `relative` — so with all
-           of them at z-auto, paint order puts the icons and labels over the
-           frame. It is a box the technology sits inside, not a panel laid
-           across it. */}
-        {slot && (
-          <motion.div
-            aria-hidden="true"
-            className="pointer-events-none absolute left-0 top-0 rounded-2xl"
-            initial={false}
-            animate={{
-              opacity: frame.visible ? 1 : 0,
-              x: slot.x - pad,
-              y: slot.y - pad,
-              width: slot.w + pad * 2,
-              height: slot.h + pad * 2,
-            }}
-            transition={{
-              // Stiff enough to arrive with the tick rather than trailing it,
-              // damped enough not to ring on a fast scroll through the row.
-              type: "spring",
-              stiffness: 420,
-              damping: 34,
-              mass: 0.6,
-              opacity: { duration: 0.22, ease: "easeOut" },
-            }}
-            style={{
-              background:
-                "linear-gradient(155deg, rgba(248,250,252,0.18) 0%, rgba(148,163,184,0.07) 42%, rgba(15,23,42,0.12) 64%, rgba(226,232,240,0.15) 100%)",
-              border: "1px solid rgba(226,232,240,0.5)",
-              boxShadow:
-                "inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(2,8,23,0.55), 0 10px 28px rgba(2,8,23,0.5), 0 0 18px rgba(125,211,252,0.22)",
-            }}
-          />
-        )}
-
-        {layover.group.items.map((item, i) => (
-          <div
-            key={item.label}
-            ref={(el) => {
-              itemRefs.current[i] = el;
-            }}
-            className="relative flex flex-col items-center gap-1.5"
-          >
-            <motion.div
-              animate={{ y: [0, -6, 0] }}
-              transition={{
-                duration: 2.2 + (i % 5) * 0.25,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: i * 0.1,
-              }}
-            >
-              <BrandIcon
-                slug={item.icon}
-                className={`drop-shadow-[0_4px_14px_rgba(0,0,0,0.55)] ${
-                  isMobile ? "h-7 w-7" : "h-10 w-10 sm:h-12 sm:w-12"
-                }`}
-              />
-            </motion.div>
-            <span
-              className={`rounded bg-slate-950/70 px-1.5 py-0.5 text-slate-100/90 ${
-                isMobile ? "text-[9px]" : "text-[11px] sm:text-xs"
-              }`}
-            >
-              {item.label}
-            </span>
-          </div>
-        ))}
       </div>
     </motion.div>
   );
@@ -884,25 +885,27 @@ export default function MultiverseFlight() {
   // at every viewport — portrait phones included — with `mobileOffsetScale`
   // (derived from the actual viewport width below) keeping the left/right
   // card stagger from overflowing a narrow screen.
+  // Only *derived* viewport facts are held in state, never raw innerWidth /
+  // innerHeight. A mobile browser fires `resize` every time the URL bar
+  // slides away mid-scroll, and raw height in state turns each of those into
+  // a re-render of this entire component — seven billboards, seven portals,
+  // every space region — right in the middle of the scroll it is reacting
+  // to. Every value below is quantized or boolean, so React's own bail-out
+  // on unchanged primitives absorbs the resize storm and the tree only
+  // re-renders when something a human could actually see has changed.
   const [compact, setCompact] = useState(false);
-  const [viewportWidth, setViewportWidth] = useState(0);
-
-  useEffect(() => {
-    const onResize = () => {
-      setCompact(window.innerWidth < 1024);
-      setViewportWidth(window.innerWidth);
-    };
-    onResize();
-    window.addEventListener("resize", onResize);
-    // iOS Safari fires orientationchange before the resize metrics settle
-    window.addEventListener("orientationchange", onResize);
-    return () => {
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("orientationchange", onResize);
-    };
-  }, []);
-
-  const isMobile = compact;
+  // Height matters as much as width for the closing beat: the mark is a
+  // square, so on a landscape phone (844x390) a width-derived size overflows
+  // the viewport vertically and the signature under it is simply cut off.
+  // See `endMarkBox` below for how the URL bar is kept out of that sum.
+  const [endMarkBox, setEndMarkBox] = useState(0);
+  // A portrait phone is the one viewport where the side-by-side billboard
+  // (copy beside a tall portal) stops working: 66vw of 390px leaves the
+  // headline about 14 characters of measure. Those cards stack instead —
+  // portal on top, copy beneath — which is the same billboard, just turned
+  // through 90°. Landscape phones are short and wide and keep the original
+  // row layout, where stacking would push the copy straight off screen.
+  const [isStacked, setIsStacked] = useState(false);
   // The left/right card stagger (card.x) was tuned against a landscape
   // phone's wide viewport (~700-930px), where a flat 0.45 multiplier keeps
   // every card on screen. A portrait phone is much narrower (~375-430px),
@@ -911,32 +914,128 @@ export default function MultiverseFlight() {
   // safely on screen at every size, landscape included (viewportWidth=900
   // recovers ~0.45, the original tuning). Clamped so it never vanishes
   // entirely (some stagger reads better than a dead-centered stack) or
-  // exceeds the original desktop-mobile feel.
-  const mobileOffsetScale =
-    viewportWidth > 0
-      ? Math.min(0.45, Math.max(0.16, (viewportWidth / 900) * 0.45))
-      : 0.45;
+  // exceeds the original desktop-mobile feel, and quantized to 0.005 so a
+  // one-pixel width report cannot re-render the flight.
+  const [mobileOffsetScale, setMobileOffsetScale] = useState(0.45);
+
+  useEffect(() => {
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      setCompact(width < 1024);
+      setIsStacked(width < 1024 && height > width);
+      setMobileOffsetScale(
+        Math.round(
+          Math.min(0.45, Math.max(0.16, (width / 900) * 0.45)) * 200,
+        ) / 200,
+      );
+
+      // --- Closing-beat sizing ------------------------------------------
+      // The mark used to take a fixed 250/340px with a `min(64vw, 460px)`
+      // box, both of which ignore viewport height — on a landscape phone
+      // that asked for a 460px square inside 390px of screen. Sized off the
+      // smaller of the two axes instead, so the whole closing composition
+      // (kicker, tagline, mark, signature) fits at any aspect ratio without
+      // being re-tuned per breakpoint.
+      //
+      // Height is rounded to 80px and the result again to 40px before it
+      // reaches state. The URL bar is worth ~60-100px of innerHeight and
+      // slides during scroll; without both steps that jitter would re-form
+      // the particle field (a changed `size` reseeds it) and re-render the
+      // flight, for a mark whose drawn size would move by under 20px.
+      const quantizedHeight = Math.round(height / 80) * 80;
+      const raw = Math.min(width * 0.72, quantizedHeight * 0.42, 460);
+      setEndMarkBox(Math.max(160, Math.round(raw / 40) * 40));
+    };
+
+    // Coalesced into one frame: iOS can fire resize several times per URL-bar
+    // transition, and only the settled metrics are worth reading.
+    const onResize = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(measure);
+    };
+
+    measure();
+    window.addEventListener("resize", onResize);
+    // iOS Safari fires orientationchange before the resize metrics settle
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, []);
+
+  const isMobile = compact;
+  // `endMarkBox` is 0 until the first measure lands (there is no window to
+  // read during SSR); the breakpoint guess stands in for that one render.
+  const markBox = endMarkBox || (isMobile ? 240 : 440);
+  // Ink diameter inside that box. Mobile runs denser-to-the-edge (there is
+  // less room to spend on breathing space) — these ratios reproduce the old
+  // fixed pairs at their original viewports.
+  const endMarkSize = Math.round(markBox * (isMobile ? 0.88 : 0.76));
+  // Point count follows area, so a small mark is not over-packed and a large
+  // one does not thin out into the sparse ring this started as.
+  const endParticleCount = Math.round(
+    Math.min(840, Math.max(240, (endMarkSize * endMarkSize) / 138)),
+  );
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ["start start", "end end"],
   });
 
-  // The camera reads raw scroll position — no spring in between. A spring here
-  // is what made the flight feel floaty and detached: the wheel stops, the
-  // camera keeps coasting, and every re-tune only traded "laggy" for "twitchy"
-  // because the lag was structural, not a damping value. Scroll is already a
-  // smooth, continuous signal; the browser interpolates it natively and the
-  // transforms below are pure functions of it, so reading it directly is both
-  // 1:1 responsive and cheaper (no per-frame spring integration, and values
-  // stop changing the instant scrolling stops). This is the one knob that
-  // separated this from the reference implementation's feel.
+  // Keep document scrolling native, then give just the 3D camera a short,
+  // overdamped visual follow. That removes the hard step between wheel/touch
+  // updates without turning the whole page into an inertial scroller. It also
+  // means buttons, audio gating, route-map state, and browser accessibility
+  // retain the exact raw scroll position they already rely on.
   //
-  // It also removes the need for the old mount-time snap: with no spring to
-  // travel from 0, a restored scroll position (coming back from a section
-  // page) is simply correct on the first frame instead of replaying the
-  // whole flight in fast-forward while the spring caught up.
-  const smoothScrollProgress = scrollYProgress;
+  // Autoplay calls jump() on this value from its own rAF loop, so narration
+  // holds still land exactly on their readable card slots instead of easing
+  // into or beyond them.
+  const smoothScrollProgress = useSpring(scrollYProgress, CAMERA_SPRING);
+
+  // The visual velocity follows the camera rather than raw document input.
+  // It gives the space behind the cards a small, forward-only speed trail
+  // while the ship is moving, then fades away without a flash or pull-back.
+  const cameraVelocity = useVelocity(smoothScrollProgress);
+  const smoothCameraVelocity = useSpring(cameraVelocity, FLIGHT_VELOCITY_SPRING);
+  // Real motion blur is a function of how far the scene moved during one
+  // exposure, so below a genuine speed there is none of it at all. The old
+  // curve had no floor and a x7 gain, which saturated at a camera velocity of
+  // ~0.14 — a gentle wheel nudge. The smear was therefore present essentially
+  // whenever the page was not perfectly still, which is what made it read as
+  // an effect laid over the scene rather than as speed.
+  //
+  // FLIGHT_BLUR_FLOOR is the deadband: drift below it and the corridor is
+  // sharp. Past it the ramp is gentler, so intensity keeps climbing with
+  // actual speed instead of pinning at the top the moment it engages.
+  const forwardFlightIntensity = useTransform(smoothCameraVelocity, (velocity) =>
+    Math.min(1, Math.max(0, Math.max(0, velocity) - FLIGHT_BLUR_FLOOR) * 3.4),
+  );
+  // Peaks come down with it: opacity 0.10 -> 0.065, blur 1.4px -> 0.85px, and
+  // a shallower zoom and drift. Combined with the deadband above, the corridor
+  // is sharp at reading speed and only smears when the flight is genuinely
+  // moving.
+  const flightStreakOpacity = useTransform(
+    forwardFlightIntensity,
+    [0, 0.25, 1],
+    [0, 0.012, 0.065],
+  );
+  const flightStreakScale = useTransform(forwardFlightIntensity, [0, 1], [1.02, 1.05]);
+  const flightStreakY = useTransform(forwardFlightIntensity, [0, 1], ["0%", "-2%"]);
+  // Still always a blur() string, never "none". Toggling a filter on and off
+  // makes the compositor create and destroy the layer's buffer; holding one
+  // filter that happens to reach 0px costs a cheap no-op blur instead, and the
+  // layer is culled by its own opacity long before that matters.
+  const flightStreakBlur = useTransform(
+    forwardFlightIntensity,
+    (value) => `blur(${(value * 0.85).toFixed(2)}px)`,
+  );
 
   const zCamera = useTransform(smoothScrollProgress, [0, 1], [0, isMobile ? 7800 : 8400]);
 
@@ -961,12 +1060,14 @@ export default function MultiverseFlight() {
   // Creeping scale on the furthest plane so its edges never slide into view
   // as it translates, and so the void feels like it is opening up.
   const parallaxFarScale = useTransform(smoothScrollProgress, [0, 1], [1.05, 1.22]);
-  // Raw scrollYProgress, not the smoothed/overdamped camera spring — that
-  // spring approaches 1 asymptotically and can sit well below the 0.9
-  // threshold for a long time after the user has actually scrolled to the
-  // bottom, making the last stretch of scroll feel like it stopped doing
-  // anything.
-  const endEarthT = useTransform(scrollYProgress, [0.88, 1], [0, 1]);
+  // Follows the camera, not the document. This used to read raw scroll on the
+  // grounds that the camera's settling phase was too short to matter — at the
+  // softened CAMERA_SPRING above it is no longer short, and reading raw would
+  // arm the whole closing beat up to a second before the camera has finished
+  // flying there, dropping the mark on top of cards still clearing frame. The
+  // spring converges inside restDelta, so every threshold below is still
+  // reached at the document's end.
+  const endEarthT = useTransform(smoothScrollProgress, [0.88, 1], [0, 1]);
   const endEarthReveal = useTransform(endEarthT, [0, 0.35, 1], [0, 1, 1]);
   // The contact card — the last billboard — holds full opacity until 0.948
   // and only finishes clearing at 1.0 (that is getDepartWindow(5), squeezed
@@ -996,7 +1097,7 @@ export default function MultiverseFlight() {
   const [isEndParticleActive, setIsEndParticleActive] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = scrollYProgress.on("change", (value) => {
+    const unsubscribe = smoothScrollProgress.on("change", (value) => {
       setIsEndParticleActive((prev) => {
         if (!prev && value >= END_ARM) return true;
         if (prev && value < END_RELEASE) return false;
@@ -1004,7 +1105,7 @@ export default function MultiverseFlight() {
       });
     });
     return unsubscribe;
-  }, [scrollYProgress]);
+  }, [smoothScrollProgress]);
 
   // The closing beat plays as a sequence, not all at once: the tagline
   // zooms in centered first, then — once that's had a moment to read —
@@ -1013,11 +1114,10 @@ export default function MultiverseFlight() {
   // stretch after the tagline first appears rather than sharing its timing.
   const [showEndLogo, setShowEndLogo] = useState(false);
   useEffect(() => {
-    if (!isEndParticleActive) {
-      setShowEndLogo(false);
-      return;
-    }
-    const timeout = window.setTimeout(() => setShowEndLogo(true), 1100);
+    const timeout = window.setTimeout(
+      () => setShowEndLogo(isEndParticleActive),
+      isEndParticleActive ? 1100 : 0,
+    );
     return () => window.clearTimeout(timeout);
   }, [isEndParticleActive]);
 
@@ -1197,7 +1297,7 @@ export default function MultiverseFlight() {
   // (see z-[5] on the element), it also does the job of clearing the last
   // card away: it starts only once the contact card has been read (its stop
   // is 0.92) and is fully solid by 0.95, just as the closing beat arms.
-  const endVoidOpacity = useTransform(scrollYProgress, [0.915, 0.952], [0, 1]);
+  const endVoidOpacity = useTransform(smoothScrollProgress, [0.915, 0.952], [0, 1]);
   const hintOpacity = useTransform(() => {
     const revealed = endEarthT.get() > 0.75 ? 1 : 0;
     return revealed * Math.max(0, 1 - smoothPull.get() * 5);
@@ -1229,17 +1329,21 @@ export default function MultiverseFlight() {
   // it, then move on, and finish on the ending. The whole flight is already
   // a pure function of scroll position, so the tour drives nothing but
   // window.scrollY — every card, the camera and the route map follow for
-  // free. Any real input from the user (wheel, touch, key) hands control
-  // straight back.
+  // free. Any real input from the user (wheel, touch, key) pauses the tour
+  // and hands control back without discarding its resumable position.
   useEffect(() => {
     let raf = 0;
     let timer = 0;
     let detach: (() => void) | undefined;
+    let introNarrationComplete = false;
+    let lifecycle: "idle" | "running" | "paused" = "idle";
+    let pauseFlight: (() => void) | undefined;
+    let resumeFlight: (() => void) | undefined;
 
-    const emit = (running: boolean, index: number) =>
+    const emit = (running: boolean, index: number, paused = false) =>
       window.dispatchEvent(
         new CustomEvent("flight-autopilot-state", {
-          detail: { running, index, total: cards.length },
+          detail: { running, paused, index, total: cards.length },
         }),
       );
 
@@ -1252,21 +1356,26 @@ export default function MultiverseFlight() {
       detach = undefined;
     };
 
-    const stop = () => {
-      const wasRunning = raf !== 0 || timer !== 0;
+    const finish = () => {
+      const hadSession = lifecycle !== "idle";
       halt();
-      if (wasRunning) emit(false, -1);
+      lifecycle = "idle";
+      pauseFlight = undefined;
+      resumeFlight = undefined;
+      if (hadSession) emit(false, -1);
     };
+
+    const pause = () => pauseFlight?.();
 
     const armHandback = () => {
       const opts = { passive: true } as const;
-      window.addEventListener("wheel", stop, opts);
-      window.addEventListener("touchstart", stop, opts);
-      window.addEventListener("keydown", stop);
+      window.addEventListener("wheel", pause, opts);
+      window.addEventListener("touchstart", pause, opts);
+      window.addEventListener("keydown", pause);
       detach = () => {
-        window.removeEventListener("wheel", stop);
-        window.removeEventListener("touchstart", stop);
-        window.removeEventListener("keydown", stop);
+        window.removeEventListener("wheel", pause);
+        window.removeEventListener("touchstart", pause);
+        window.removeEventListener("keydown", pause);
       };
     };
 
@@ -1275,20 +1384,24 @@ export default function MultiverseFlight() {
     const ease = (t: number) =>
       t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 
+    const onNarrationProgress = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{ active?: boolean; spanIndex?: number }>
+      ).detail;
+      if (!detail?.active && detail?.spanIndex === NARRATION_SPANS.length) {
+        introNarrationComplete = true;
+      }
+    };
+
     const runFlight = () => {
       const container = containerRef.current;
       if (!container) return;
+      introNarrationComplete = false;
 
-      // Mutable, not a one-time snapshot: a mobile browser's dynamic
-      // toolbar showing/hiding mid-tour changes window.innerHeight, which
-      // silently stales this conversion — the tour keeps interpolating the
-      // right *progress*, but the pixel target it converts that to drifts
-      // from what the viewport actually needs. Nothing corrects it during a
-      // multi-second dwell (see currentProgress below), so the drift shows
-      // up all at once as a visible pull-back the moment the next leg's
-      // first scrollTo lands on the newly-correct conversion. Checked every
-      // frame in tick() instead of trusting this initial read (see
-      // refreshScrollGeometryIfNeeded below for how that check stays cheap).
+      // Mutable, not a one-time snapshot: a mobile browser's dynamic toolbar
+      // can change the pixel conversion during a dwell. The held progress is
+      // reasserted below before every departure so the camera never pulls
+      // back to correct a stale scroll position.
       let containerTop = window.scrollY + container.getBoundingClientRect().top;
       let scrollable = container.offsetHeight - window.innerHeight;
       if (scrollable <= 0) return;
@@ -1317,49 +1430,39 @@ export default function MultiverseFlight() {
 
       const toScrollTop = (p: number) => containerTop + scrollable * p;
 
-      // One leg per stop the tour actually parks on: the intro's continuous
-      // drift into Skills, each remaining card in turn (with the three skill
-      // layovers inserted as their own brief stops between Skills and
-      // Projects), then the tail of the track so the tour ends on the
-      // closing shot rather than on the last card. `cardIndex` is what gets
-      // reported to the UI (route highlighting, the CockpitTray leg label) —
-      // the layover legs reuse Skills' own index so they read as glances
-      // within that section rather than section changes of their own.
+      // One leg per section plus the closing tail. Home's departure is gated
+      // by the actual intro.wav completion event, not a nominal duration.
       type Leg = {
         target: number;
         travelMs: number;
         linear: boolean;
         holdMs: number;
         cardIndex: number;
+        waitForNarration?: boolean;
       };
 
       const legs: Leg[] = [];
 
       cards.forEach((card, i) => {
+        // The same readable slot used by manual navigation keeps autoplay
+        // holds framed and legible instead of parking on the pass-through.
         const target = getNavTargetProgress(card.id) ?? 0;
 
         if (i === 0) {
-          // Parks on home, completely still, for the whole narration except
-          // its final AUTOPILOT_TRAVEL seconds, then eases into skills' own
-          // arrival point over that last stretch — not a hop (a full,
-          // cubic-eased leg, same shape every other card gets), and not
-          // moving at all until the narration has actually finished. This
-          // used to be one continuous slow drift toward skills across the
-          // *entire* narration instead — camera motion competing with the
-          // narration for attention the whole time it read.
+          // Home stays put until intro.wav has actually ended. The next leg
+          // then makes the normal camera flight to Skills.
           const next = cards[1] ? getNavTargetProgress(cards[1].id) ?? target : target;
-          const introTravelMs = AUTOPILOT_TRAVEL * 1000;
-          const introHoldMs = Math.max(AUTOPILOT_INTRO_HOLD * 1000 - introTravelMs, 0);
           legs.push({
             target: 0,
             travelMs: 1,
             linear: true,
-            holdMs: introHoldMs,
+            holdMs: 1,
             cardIndex: i,
+            waitForNarration: true,
           });
           legs.push({
             target: next,
-            travelMs: introTravelMs,
+            travelMs: AUTOPILOT_TRAVEL * 1000,
             linear: false,
             holdMs: 0,
             cardIndex: i,
@@ -1378,17 +1481,6 @@ export default function MultiverseFlight() {
           cardIndex: i,
         });
 
-        if (card.id === "skills") {
-          SKILL_LAYOVERS.forEach((layover) => {
-            legs.push({
-              target: layover.peak,
-              travelMs: AUTOPILOT_LAYOVER_TRAVEL * 1000,
-              linear: false,
-              holdMs: AUTOPILOT_LAYOVER_HOLD * 1000,
-              cardIndex: i,
-            });
-          });
-        }
       });
 
       legs.push({
@@ -1407,28 +1499,30 @@ export default function MultiverseFlight() {
 
       let index = 0;
       let from = 0;
-      let legStart = 0;
       let legMs = 0;
       let dwellUntil = 0;
-      let introExpandFired = false;
-      // The tour's own record of where it left the camera — updated every
-      // frame below alongside the writes to window.scrollTo/smoothScroll-
-      // Progress, so it's always exactly `legs[index]` by the time a leg
-      // completes. Re-deriving `from` via progressNow() (raw window.scrollY)
-      // at each leg boundary instead left it exposed to the dwell: the tour
-      // never re-asserts scroll position while holding, so anything that
-      // nudges the page during those seconds — the browser's own scroll
-      // anchoring compensating for a layout shift is the likely culprit —
-      // went uncorrected, and the next leg then started from that drifted
-      // spot with `smoothScrollProgress.jump` snapping straight to it: a
-      // visible jitter with a pull-back right as the next section began.
+      let dwellRemaining = 0;
+      let travelElapsed = 0;
+      let phaseStarted = 0;
+      let phase: "starting" | "travel" | "dwell" = "starting";
+      // Authoritative camera progress. Dwell states keep the document pinned
+      // to this value so the next leg continues from the visible frame.
       let currentProgress = 0;
+
+      const holdCurrentProgress = () => {
+        refreshScrollGeometryIfNeeded();
+        const targetScrollTop = toScrollTop(currentProgress);
+        if (Math.abs(window.scrollY - targetScrollTop) <= 1) return;
+        window.scrollTo({ top: targetScrollTop, behavior: "auto" });
+        smoothScrollProgress.jump(currentProgress);
+      };
 
       const beginLeg = (now: number) => {
         from = currentProgress;
         legMs = legs[index].travelMs;
-        legStart = now;
-        if (index === 0) introExpandFired = false;
+        travelElapsed = 0;
+        phaseStarted = now;
+        phase = "travel";
         if (legs[index].cardIndex < cards.length) emit(true, legs[index].cardIndex);
       };
 
@@ -1452,32 +1546,21 @@ export default function MultiverseFlight() {
       const tick = (now: number) => {
         raf = requestAnimationFrame(tick);
 
-        if (dwellUntil) {
+        if (phase === "dwell") {
+          holdCurrentProgress();
           if (now < dwellUntil) return;
+          if (legs[index].waitForNarration && !introNarrationComplete) return;
           dwellUntil = 0;
+          dwellRemaining = 0;
           index += 1;
           if (index >= legs.length) {
-            stop();
+            finish();
             return;
           }
           beginLeg(now);
         }
 
-        // The home card opens itself partway through the intro hold rather
-        // than staying collapsed while the narration reads straight through
-        // its full bio.
-        if (
-          index === 0 &&
-          !introExpandFired &&
-          now - legStart >= AUTOPILOT_INTRO_EXPAND_AT * 1000
-        ) {
-          introExpandFired = true;
-          window.dispatchEvent(
-            new CustomEvent("flight-autopilot-expand", { detail: { id: "home" } }),
-          );
-        }
-
-        const t = Math.min(1, (now - legStart) / legMs);
+        const t = Math.min(1, (travelElapsed + now - phaseStarted) / legMs);
         const eased = legs[index].linear ? t : ease(t);
         const p = from + (legs[index].target - from) * eased;
         currentProgress = p;
@@ -1504,23 +1587,82 @@ export default function MultiverseFlight() {
         smoothScrollProgress.jump(p);
 
         if (t >= 1) {
-          dwellUntil = now + legs[index].holdMs;
+          travelElapsed = legMs;
+          dwellRemaining = legs[index].holdMs;
+          dwellUntil = now + dwellRemaining;
+          phase = "dwell";
         }
       };
 
+      pauseFlight = () => {
+        if (lifecycle !== "running") return;
+        const now = performance.now();
+        if (phase === "travel") {
+          travelElapsed = Math.min(
+            legMs,
+            travelElapsed + Math.max(0, now - phaseStarted),
+          );
+        } else if (phase === "dwell") {
+          dwellRemaining = Math.max(0, dwellUntil - now);
+        }
+
+        halt();
+        lifecycle = "paused";
+        const cardIndex = Math.min(
+          legs[index]?.cardIndex ?? 0,
+          cards.length - 1,
+        );
+        emit(false, cardIndex, true);
+      };
+
+      resumeFlight = () => {
+        if (lifecycle !== "paused") return;
+        lifecycle = "running";
+        armHandback();
+        const now = performance.now();
+        const cardIndex = Math.min(
+          legs[index]?.cardIndex ?? 0,
+          cards.length - 1,
+        );
+        emit(true, cardIndex);
+
+        if (phase === "starting") {
+          raf = requestAnimationFrame(holdAtStart);
+          return;
+        }
+        if (phase === "dwell") {
+          dwellUntil = now + dwellRemaining;
+        } else {
+          phaseStarted = now;
+        }
+        raf = requestAnimationFrame(tick);
+      };
+
+      lifecycle = "running";
       raf = requestAnimationFrame(holdAtStart);
     };
 
     const onCommand = (event: Event) => {
-      const action = (event as CustomEvent<{ action?: "start" | "stop" }>)
-        .detail?.action;
+      const action = (
+        event as CustomEvent<{
+          action?: "start" | "pause" | "resume" | "stop";
+        }>
+      ).detail?.action;
 
+      if (action === "pause") {
+        pause();
+        return;
+      }
+      if (action === "resume") {
+        resumeFlight?.();
+        return;
+      }
       if (action === "stop") {
-        stop();
+        finish();
         return;
       }
 
-      halt();
+      finish();
       armHandback();
       // The "Let's go" toast (mounted globally, listening for this) fires
       // right here — before the reset-to-beginning below — so the
@@ -1531,6 +1673,7 @@ export default function MultiverseFlight() {
     };
 
     window.addEventListener("flight-autopilot", onCommand as EventListener);
+    window.addEventListener("narration-progress", onNarrationProgress as EventListener);
 
     // Engaging autopilot from a section detail page navigates here first
     // (the flight only lives on "/"), leaving a flag behind for this mount to
@@ -1542,15 +1685,21 @@ export default function MultiverseFlight() {
 
     return () => {
       window.removeEventListener("flight-autopilot", onCommand as EventListener);
-      // stop(), not halt() — unmounting mid-tour (e.g. a card's own "Next"
+      window.removeEventListener("narration-progress", onNarrationProgress as EventListener);
+      // finish(), not halt() — unmounting mid-tour (e.g. a card's own "Next"
       // link navigating away) must still tell CockpitTray the tour ended, or
-      // its Disengage button is left pointing at a listener that's gone.
-      stop();
+      // its transport button is left pointing at a listener that's gone.
+      finish();
     };
   }, [smoothScrollProgress]);
 
   useEffect(() => {
-    const unsubscribe = scrollYProgress.on("change", (value) => {
+    // Broadcast the camera's progress rather than the document's: the route
+    // map and dial are readouts of where the flight *is*, and off raw scroll
+    // they would light the next section while the camera is still a second of
+    // travel away from it. It also keeps them correct under autopilot, which
+    // drives smoothScrollProgress directly on its own rAF clock.
+    const unsubscribe = smoothScrollProgress.on("change", (value) => {
       const progress = Math.min(1, Math.max(0, value));
       window.dispatchEvent(
         new CustomEvent("flight-progress-update", {
@@ -1559,7 +1708,7 @@ export default function MultiverseFlight() {
       );
     });
     return () => unsubscribe();
-  }, [scrollYProgress]);
+  }, [smoothScrollProgress]);
 
   return (
     // Taller track = more scrolling for the same camera distance, i.e. a
@@ -1596,7 +1745,23 @@ export default function MultiverseFlight() {
           className="absolute -inset-y-1/4 inset-x-0 bg-[radial-gradient(circle_at_50%_55%,_rgba(56,189,248,0.22)_0%,_rgba(79,70,229,0.14)_38%,_transparent_62%)]"
           style={{ opacity: deepGlowOpacity, y: parallaxNear }}
         />
-        
+
+        {/* A lightweight speed-trail layer, deliberately behind the particle
+           field and every card. The blur never touches text, portals, or the
+           route map; it only gives the surrounding space some forward flow. */}
+        <motion.div
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-[14%] transform-gpu mix-blend-screen"
+          style={{
+            opacity: flightStreakOpacity,
+            scale: flightStreakScale,
+            y: flightStreakY,
+            filter: flightStreakBlur,
+            backgroundImage: FLIGHT_STREAK_BACKGROUND,
+            willChange: "transform, opacity, filter",
+          }}
+        />
+
         <SpaceParticles />
 
         {/* Solid black void behind the end-of-flight object — the scene's
@@ -1649,7 +1814,11 @@ export default function MultiverseFlight() {
            Unmounted outright when dismissed (not merely transparent) so the
            particle canvas inside stops existing rather than idling. */}
         <motion.div
-          className={`absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center ${
+          // px-5 rather than px-6 buys the tagline two more characters of
+          // measure on a 320px phone; the bottom padding keeps the signature
+          // clear of the "Thank you for flying" hint pinned at bottom-10 on
+          // the layer below, which short screens would otherwise overlap.
+          className={`absolute inset-0 z-10 flex flex-col items-center justify-center px-5 pb-20 pt-10 text-center sm:px-6 sm:pb-24 sm:pt-14 ${
             isEndParticleActive ? "pointer-events-auto" : "pointer-events-none"
           }`}
           initial={false}
@@ -1668,7 +1837,7 @@ export default function MultiverseFlight() {
              the mark at any aspect ratio. */}
           <motion.div
             aria-hidden="true"
-            className="pointer-events-none absolute left-1/2 top-1/2 h-[min(86vh,760px)] w-[min(86vh,760px)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,_rgba(56,189,248,0.16)_0%,_rgba(14,165,233,0.07)_38%,_transparent_68%)]"
+            className="pointer-events-none absolute left-1/2 top-1/2 h-[min(86vh,130vw,760px)] w-[min(86vh,130vw,760px)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,_rgba(56,189,248,0.16)_0%,_rgba(14,165,233,0.07)_38%,_transparent_68%)]"
             initial={false}
             animate={
               showEndLogo
@@ -1717,11 +1886,15 @@ export default function MultiverseFlight() {
               initial={false}
               animate={{ opacity: showEndLogo ? 1 : 0, y: showEndLogo ? 0 : -6 }}
               transition={{ duration: 0.7, delay: showEndLogo ? 0.25 : 0, ease: "easeOut" }}
-              className="mb-4 text-[9px] font-semibold uppercase tracking-[0.5em] text-sky-200/45 sm:text-[10px]"
+              className="mb-3 text-[9px] font-semibold uppercase tracking-[0.34em] text-sky-200/45 sm:mb-4 sm:tracking-[0.5em] lg:text-[10px]"
             >
               End of transmission
             </motion.span>
-            <p className="text-lg font-semibold uppercase leading-[1.35] tracking-[0.18em] text-sky-50 drop-shadow-[0_4px_20px_rgba(2,8,23,0.65)] sm:text-2xl lg:text-[2rem]">
+            {/* Sized in vw below the sm breakpoint so the two lines hold
+               their shape on a 320px phone instead of wrapping into four —
+               tracking is part of that budget, so it tightens with the type
+               rather than staying at the desktop 0.18em. */}
+            <p className="text-[clamp(0.9rem,4.6vw,1.35rem)] font-semibold uppercase leading-[1.35] tracking-[0.1em] text-sky-50 drop-shadow-[0_4px_20px_rgba(2,8,23,0.65)] sm:text-2xl sm:tracking-[0.18em] lg:text-[2rem]">
               I BUILD. YOU IMAGINE.
               <br />
               TOGETHER, WE CREATE.
@@ -1735,19 +1908,31 @@ export default function MultiverseFlight() {
           {/* The mark is drawn larger and denser than before. It previously
              read as a sparse ring of debris rather than a logo: 560 points
              spread over a 280px sample is below the density where the glyph
-             shapes close up. This canvas is now genuinely ~420px (the sizing
-             bug that stretched it full-screen is fixed) and the draw loop no
+             shapes close up. This canvas is a real, bounded box now (the
+             sizing bug that stretched it full-screen is fixed) and the draw
+             loop no
              longer does per-particle save/rotate or shadow blur, so it can
              carry roughly double the points for a fraction of the old cost —
              measured at a full 60fps with the canvas contributing ~nothing.
              shrink-0 keeps the flex column from stretching or squashing it. */}
+          {/* Box and ink are both derived from the live viewport (see
+             endMarkBox) rather than from breakpoint guesses, so the square
+             mark can never outgrow a short screen and push the signature
+             off the bottom. The negative margin is proportional for the
+             same reason — a flat -24px eats a third of a 160px mark. */}
           <ParticleLogo
             src="/images/us2.png"
-            size={isMobile ? 250 : 340}
-            particleCount={isMobile ? 490 : 840}
-            disperseStrength={isMobile ? 260 : 360}
+            size={endMarkSize}
+            particleCount={endParticleCount}
+            disperseStrength={Math.round(endMarkSize * 1.06)}
             active={showEndLogo}
-            className="-my-4 h-[min(64vw,460px)] w-[min(64vw,460px)] shrink-0 sm:-my-6"
+            className="shrink-0"
+            style={{
+              width: markBox,
+              height: markBox,
+              marginTop: -markBox * 0.05,
+              marginBottom: -markBox * 0.05,
+            }}
           />
           {/* Closing signature. It used to blink — a full fade to zero and
              back on a loop — which read as the name being unsure whether it
@@ -1763,9 +1948,13 @@ export default function MultiverseFlight() {
             transition={{ duration: 0.8, delay: showEndLogo ? 0.9 : 0, ease: "easeOut" }}
             className="relative z-10 flex flex-col items-center"
           >
+            {/* The name is set on one nowrap line, so its width is the
+               constraint, not its height — vw below sm keeps it inside a
+               narrow phone's gutters instead of being clipped at both
+               ends. */}
             <SignatureName
               active={showEndLogo}
-              className="text-4xl text-sky-100/90 sm:text-5xl lg:text-6xl"
+              className="text-[clamp(1.75rem,9vw,2.25rem)] text-sky-100/90 sm:text-5xl lg:text-6xl"
             />
             {/* A hairline that fades out at both ends, so the signature has
                a base to sit on instead of floating. Sized in ch units to
@@ -1787,6 +1976,7 @@ export default function MultiverseFlight() {
               card={card}
               index={index}
               isMobile={isMobile}
+              isStacked={isStacked}
               mobileOffsetScale={mobileOffsetScale}
               smoothScrollProgress={smoothScrollProgress}
               revealStart={getRevealWindow(index).start}
@@ -1794,16 +1984,6 @@ export default function MultiverseFlight() {
             />
           ))}
         </motion.div>
-
-        {/* Outside the 3D corridor group on purpose — see SkillLayoverCluster. */}
-        {SKILL_LAYOVERS.map((layover) => (
-          <SkillLayoverCluster
-            key={layover.group.name}
-            layover={layover}
-            isMobile={isMobile}
-            smoothScrollProgress={smoothScrollProgress}
-          />
-        ))}
 
         {/* The loop's veil. Sits above everything so it can cover the instant
            scroll is reset to the top (see runLoop). It only needs to mask a

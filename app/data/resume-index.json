@@ -1,0 +1,68 @@
+[
+  {
+    "id": "resume-0-0",
+    "title": "Resume: Summary",
+    "url": "/resume.tex",
+    "text": "Senior frontend engineer with 7+ years of hands-on experience building high-performance, scalable web applications. Deep expertise across the full React ecosystem — from architecture and design systems to API integration and CI/CD pipelines. Equally fluent in UI/UX design, having shipped polished interfaces across web and mobile. Side toolkit spans Adobe Photoshop, Premiere Pro, and Illustrator for end-to-end creative production."
+  },
+  {
+    "id": "resume-1-0",
+    "title": "Resume: Technical Skills",
+    "url": "/resume.tex",
+    "text": "Frontend React.js, Next.js, TypeScript, JavaScript (ES2022+), HTML5, CSS3, Redux Toolkit, React Router, Zustand UI & Design Tailwind CSS, Material-UI (MUI), Shadcn/UI, Figma, Adobe Photoshop, Illustrator, Premiere Pro Accessibility WCAG 2.1 AA/AAA, ARIA, Screen Reader Testing, Keyboard Navigation, Colour Contrast, Focus Management Testing Jest, React Testing Library, Cypress, Accessibility Testing (axe, Lighthouse) Performance Core Web Vitals, Code Splitting, Lazy Loading, Memoisation, Bundle Optimisation, PWA Backend / API REST API Integration, GraphQL (consumption), Node.js (basics) Other Design Systems, Agile/Scrum, SEO, i18n/l10n, CI/CD, Framer Motion"
+  },
+  {
+    "id": "resume-2-0",
+    "title": "Resume: Professional Experience",
+    "url": "/resume.tex",
+    "text": "Emirates Face Recognition (EFR) Application Developer Sep 2024 – Present Abu Dhabi, UAE Developing and maintaining web-based application interfaces for a biometric face recognition platform used across UAE government and enterprise clients. Architecting reusable React component libraries and design tokens to enforce visual consistency across multiple product surfaces. Integrating real-time data streams and REST APIs with robust error handling and optimistic UI patterns. Collaborating cross-functionally with backend engineers and hardware teams to align frontend behaviour with biometric pipeline requirements. Driving performance optimisation — code splitting, lazy loading, memoisation — reducing initial bundle size by over 30%."
+  },
+  {
+    "id": "resume-2-1",
+    "title": "Resume: Professional Experience",
+    "url": "/resume.tex",
+    "text": "Epixel Solutions Development Team Lead / Senior Frontend Developer Nov 2022 – May 2024 Led a frontend team of 5+ engineers delivering Epixel MLM Software — a large-scale SaaS platform serving thousands of concurrent users. Owned frontend architecture decisions: state management (Redux Toolkit), routing conventions, and shared component design system. Conducted code reviews, established coding standards, and mentored junior developers on TypeScript best practices and testing patterns. Introduced Jenkins-based CI pipelines for automated linting, unit tests, and build verification, cutting regression cycles by ~40%. Rebuilt critical dashboard modules in Next.js (SSR + SSG), improving SEO scores and time-to-interactive significantly."
+  },
+  {
+    "id": "resume-2-2",
+    "title": "Resume: Professional Experience",
+    "url": "/resume.tex",
+    "text": "Aspire Systems Software Engineer Nov 2020 – Oct 2022 Led frontend rebuild of Guardian Insurance USA's legacy application — migrating a monolithic system to a modern React/Next.js architecture with improved performance, accessibility (WCAG 2.1 AA), and maintainability. Built and maintained feature-rich React applications for enterprise clients, working within an Agile delivery model with two-week sprints. Developed reusable UI components aligned with Material-UI design guidelines, accelerating feature delivery across projects. Collaborated with UX designers to translate Figma wireframes into pixel-perfect, accessible (WCAG AA) interfaces. Wrote unit and integration tests using Jest and React Testing Library, maintaining coverage above 80% on core modules."
+  },
+  {
+    "id": "resume-2-3",
+    "title": "Resume: Professional Experience",
+    "url": "/resume.tex",
+    "text": "Uvionics Tech India Pvt. Ltd. UI Developer Aug 2018 – Nov 2020 Developed responsive web UIs for industrial IoT dashboards using React, JavaScript, HTML5, and CSS3. Consumed RESTful APIs to render real-time sensor data, charts, and alert systems in the browser. Collaborated in cross-functional teams with embedded engineers to ensure UI accurately reflected device state. Created UI/UX mockups in Adobe Photoshop and Illustrator, bridging design and engineering workflows."
+  },
+  {
+    "id": "resume-3-0",
+    "title": "Resume: Featured Projects",
+    "url": "/resume.tex",
+    "text": "Emirates Face Recognition Dashboards Application Developer · AI/ML · 2025 Multi-tenant biometric dashboard platform serving 50+ tenants from a single application — each tenant monitors its own deployment with isolated data, while a secure authorisation layer independently segregates every tenant's users. Features real-time biometric transaction monitoring and configurable alert thresholds for 24/7 availability. Next.js 14, TypeScript, Redux, TailwindCSS, Framer Motion"
+  },
+  {
+    "id": "resume-3-1",
+    "title": "Resume: Featured Projects",
+    "url": "/resume.tex",
+    "text": "Telecom Onboarding Dashboard Frontend Developer · Web App · 2025 Configurable analytics dashboard for telecom customer onboarding — interactive charts, sortable tables, and multi-dimension filters with a side-by-side comparison view and KPI tracking. Config-driven setup, shipped as a static export and deployed on-premise via IIS for air-gapped enterprise environments. Next.js, TypeScript, Redux, TailwindCSS, IIS"
+  },
+  {
+    "id": "resume-4-0",
+    "title": "Resume: Creative & Design Skills",
+    "url": "/resume.tex",
+    "text": "UI/UX Design: End-to-end product design for web and mobile — user flows, wireframing, prototyping, and high-fidelity mockups. Graphic Design: Adobe Photoshop, Illustrator — branding, visual assets, marketing collateral. Certified graphic designer. Video Editing: Adobe Premiere Pro — content creation and post-production editing."
+  },
+  {
+    "id": "resume-5-0",
+    "title": "Resume: Certifications",
+    "url": "/resume.tex",
+    "text": "GraphQL — Udemy · JavaScript for Web Development · UI/UX Designing"
+  },
+  {
+    "id": "resume-6-0",
+    "title": "Resume: Education",
+    "url": "/resume.tex",
+    "text": "Bachelor of Technology (B.Tech) — Computer Science & Engineering KMP College of Engineering · 2014 – incomplete Graphic Designer Certification"
+  }
+]
