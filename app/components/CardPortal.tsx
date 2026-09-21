@@ -268,6 +268,7 @@ export function CardPortal({
   ariaLabel,
   isExpanded = false,
   letterbox = false,
+  isMobile = false
 }: CardPortalProps) {
   const arrowRef = useRef<AnimatedIconHandle>(null);
   const hasEnteredRef = useRef(false);
@@ -576,29 +577,28 @@ export function CardPortal({
           className="relative h-full w-full transform-flat"
         >
           <div className="absolute inset-0">
-          {/* Space backdrop filling the window, carrying this section's portal color */}
-          <Space tint={atmosphere.accent} active={isNear} />
+            {/* Space backdrop filling the window, carrying this section's portal color */}
+            <Space tint={atmosphere.accent} active={isNear} />
 
-          {isEntry && !isMobile && (
-            // Whole group lifted 14px: the mark reads better sitting slightly
-            // above the portal's optical centre. Expanded, it climbs a good
-            // deal further — the astronaut flies in from the bottom of this
-            // same window and was landing across the mark, and the signature
-            // swaps to the mark's top edge at the same moment, so the pair
-            // needs the headroom. The letterbox portal is a third the height,
-            // so it gets a proportionally smaller lift rather than the same
-            // pixels, which would walk the mark straight out of frame.
-            <div
-              className={`absolute inset-0 transition-transform duration-700 ease-out ${
-                isExpanded
-                  ? letterbox
-                    ? "-translate-y-6"
-                    : "-translate-y-12 sm:-translate-y-16"
-                  : "-translate-y-3.5"
-              }`}
-            >
-              <div className="absolute inset-0 flex items-center justify-center">
-                {/* This wrapper is sized by the mark itself and is the
+            {isEntry && !isMobile && (
+              // Whole group lifted 14px: the mark reads better sitting slightly
+              // above the portal's optical centre. Expanded, it climbs a good
+              // deal further — the astronaut flies in from the bottom of this
+              // same window and was landing across the mark, and the signature
+              // swaps to the mark's top edge at the same moment, so the pair
+              // needs the headroom. The letterbox portal is a third the height,
+              // so it gets a proportionally smaller lift rather than the same
+              // pixels, which would walk the mark straight out of frame.
+              <div
+                className={`absolute inset-0 transition-transform duration-700 ease-out ${isExpanded
+                    ? letterbox
+                      ? "-translate-y-6"
+                      : "-translate-y-12 sm:-translate-y-16"
+                    : "-translate-y-3.5"
+                  }`}
+              >
+                <div className="absolute inset-0 flex items-center justify-center">
+                  {/* This wrapper is sized by the mark itself and is the
                    signature's positioning context. The card is what stretches
                    — the home portal grows tall when the bio expands — so
                    anchoring the name to card percentages walked it up to the
@@ -606,47 +606,47 @@ export function CardPortal({
                    own box it stays pinned to the logo at any card height or
                    width (the image is capped by the portal's width on
                    narrow screens, so its box is not a fixed 300px either). */}
-                <div className="relative">
-                  <Image
-                    src="/images/us.png"
-                    alt=""
-                    // The file is 1659x1408 — a 1.178:1 mark, not a square.
-                    // Declaring it 300x300 gave the layout box a 1:1 aspect
-                    // that the artwork does not have, and `object-cover` then
-                    // resolved that mismatch by cropping. Whenever the box
-                    // ends up wider than 1.178:1 — which is every stacked /
-                    // letterbox portal, i.e. every phone — cover scales the
-                    // image to fill the width and the overflow comes off the
-                    // top and bottom, taking the glyph's head and feet with
-                    // it. 300x255 is the file's own ratio, so the box is now
-                    // the shape of the art it holds.
-                    width={300}
-                    height={255}
-                    sizes="(min-width: 1024px) 30vw, 60vw"
-                    // Answers a hover anywhere on the billboard (the card
-                    // owns `group/card`): the mark comes up out of the
-                    // starfield and leans a little closer. Opacity and
-                    // transform only — no filter — so the hover is pure
-                    // compositing and never re-rasterizes the card layer the
-                    // flight works so hard to keep cached.
-                    // `object-contain`, never `cover`: this is a brand mark,
-                    // so the failure mode when the box and the art disagree
-                    // has to be empty space, not a cropped logo. The portal's
-                    // box is driven by the card's own layout and the
-                    // max-height below, so it cannot be guaranteed to match
-                    // the art's ratio at every size — contain makes that
-                    // harmless.
-                    className={`h-auto w-auto object-contain mix-blend-screen transition-[opacity,transform] duration-500 ease-out group-hover/card:opacity-80 motion-safe:group-hover/card:scale-[1.06] ${
-                      // Dimmer once the bio is open: the astronaut becomes the
-                      // subject of the window at that point and the mark is
-                      // what it is flying in front of. Hover still lifts both
-                      // back to the same 80%.
-                      isExpanded ? "opacity-40" : "opacity-55"
-                    } ${letterbox ? "max-h-[min(8rem,13vh)] px-4 py-1" : "px-8 py-2"}`}
-                    aria-hidden="true"
-                  />
+                  <div className="relative">
+                    <Image
+                      src="/images/us.png"
+                      alt=""
+                      // The file is 1659x1408 — a 1.178:1 mark, not a square.
+                      // Declaring it 300x300 gave the layout box a 1:1 aspect
+                      // that the artwork does not have, and `object-cover` then
+                      // resolved that mismatch by cropping. Whenever the box
+                      // ends up wider than 1.178:1 — which is every stacked /
+                      // letterbox portal, i.e. every phone — cover scales the
+                      // image to fill the width and the overflow comes off the
+                      // top and bottom, taking the glyph's head and feet with
+                      // it. 300x255 is the file's own ratio, so the box is now
+                      // the shape of the art it holds.
+                      width={300}
+                      height={255}
+                      sizes="(min-width: 1024px) 30vw, 60vw"
+                      // Answers a hover anywhere on the billboard (the card
+                      // owns `group/card`): the mark comes up out of the
+                      // starfield and leans a little closer. Opacity and
+                      // transform only — no filter — so the hover is pure
+                      // compositing and never re-rasterizes the card layer the
+                      // flight works so hard to keep cached.
+                      // `object-contain`, never `cover`: this is a brand mark,
+                      // so the failure mode when the box and the art disagree
+                      // has to be empty space, not a cropped logo. The portal's
+                      // box is driven by the card's own layout and the
+                      // max-height below, so it cannot be guaranteed to match
+                      // the art's ratio at every size — contain makes that
+                      // harmless.
+                      className={`h-auto w-auto object-contain mix-blend-screen transition-[opacity,transform] duration-500 ease-out group-hover/card:opacity-80 motion-safe:group-hover/card:scale-[1.06] ${
+                        // Dimmer once the bio is open: the astronaut becomes the
+                        // subject of the window at that point and the mark is
+                        // what it is flying in front of. Hover still lifts both
+                        // back to the same 80%.
+                        isExpanded ? "opacity-40" : "opacity-55"
+                        } ${letterbox ? "max-h-[min(8rem,13vh)] px-4 py-1" : "px-8 py-2"}`}
+                      aria-hidden="true"
+                    />
 
-                  {/* Same cycling signature the closing beat ends on, so the
+                    {/* Same cycling signature the closing beat ends on, so the
                      flight opens and closes on the same gesture.
 
                      It swaps sides of the mark on expand: the astronaut flies
@@ -664,158 +664,158 @@ export function CardPortal({
                      below the glyph, so a name centred on an edge clears the
                      artwork by a comfortable gap while still reading as
                      attached to it. */}
-                  <motion.div
-                    className="absolute inset-x-0 flex justify-center"
-                    initial={false}
-                    style={{ translateY: "-50%" }}
-                    animate={{ top: isExpanded ? "0%" : "100%" }}
-                    transition={{ type: "spring", stiffness: 190, damping: 23, mass: 0.9 }}
-                  >
-                    <SignatureName
-                      className={
-                        letterbox
-                          ? "text-sm text-sky-100/85"
-                          : "text-lg text-sky-100/85 sm:text-xl lg:text-2xl"
-                      }
-                    />
-                  </motion.div>
+                    <motion.div
+                      className="absolute inset-x-0 flex justify-center"
+                      initial={false}
+                      style={{ translateY: "-50%" }}
+                      animate={{ top: isExpanded ? "0%" : "100%" }}
+                      transition={{ type: "spring", stiffness: 190, damping: 23, mass: 0.9 }}
+                    >
+                      <SignatureName
+                        className={
+                          letterbox
+                            ? "text-sm text-sky-100/85"
+                            : "text-lg text-sky-100/85 sm:text-xl lg:text-2xl"
+                        }
+                      />
+                    </motion.div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Color overlay giving this section's universe its own tone */}
-          <div
-            className="absolute inset-0"
-            style={{ background: atmosphere.overlay }}
-          />
+            {/* Color overlay giving this section's universe its own tone */}
+            <div
+              className="absolute inset-0"
+              style={{ background: atmosphere.overlay }}
+            />
 
-          {isEntry ? (
-            <motion.div
-              className="absolute inset-x-0 bottom-0 h-[65%]"
-              style={{
-                transform: earthTransform,
-                willChange: "transform",
-              }}
-            >
-              {/* The particle-formed mark used to render here alongside the
+            {isEntry ? (
+              <motion.div
+                className="absolute inset-x-0 bottom-0 h-[65%]"
+                style={{
+                  transform: earthTransform,
+                  willChange: "transform",
+                }}
+              >
+                {/* The particle-formed mark used to render here alongside the
                  static background image above — same source picture, two
                  independently-sized/positioned copies of it on screen at
                  once, reading as a stray second logo rather than one
                  graphic. The background image already carries that mark, so
                  this slot now only ever shows the astronaut once the bio
                  expands, and shows nothing the rest of the time. */}
-              <AnimatePresence>
-                {isExpanded && !isMobile && (
-                  <motion.div
-                    key="astronaut"
-                    // Expansion starts close and settles outward. The nested
-                    // layer below continues the same dolly direction only
-                    // while the visitor moves forward through the flight.
-                    initial={{ opacity: 0, scale: 1.22, y: "0.35em" }}
-                    animate={{ opacity: 1, scale: 1, y: "0em" }}
-                    exit={{ opacity: 0 }}
-                    transition={{
-                      opacity: { duration: 0.45, ease: POWER2_OUT },
-                      scale: { duration: 0.82, ease: POWER2_OUT },
-                      y: { duration: 0.82, ease: POWER2_OUT },
-                    }}
-                    className="absolute inset-0"
-                  >
+                <AnimatePresence>
+                  {isExpanded && !isMobile && (
                     <motion.div
-                      className="absolute inset-0"
-                      style={{
-                        scale: astronautDollyScale,
-                        y: astronautDollyY,
-                        transformOrigin: "50% 72%",
-                        willChange: "transform",
+                      key="astronaut"
+                      // Expansion starts close and settles outward. The nested
+                      // layer below continues the same dolly direction only
+                      // while the visitor moves forward through the flight.
+                      initial={{ opacity: 0, scale: 1.22, y: "0.35em" }}
+                      animate={{ opacity: 1, scale: 1, y: "0em" }}
+                      exit={{ opacity: 0 }}
+                      transition={{
+                        opacity: { duration: 0.45, ease: POWER2_OUT },
+                        scale: { duration: 0.82, ease: POWER2_OUT },
+                        y: { duration: 0.82, ease: POWER2_OUT },
                       }}
+                      className="absolute inset-0"
                     >
-                      <Image
-                        src="/astr.svg"
-                        alt=""
-                        fill
-                        sizes="(min-width: 600px) 24vw, 32vh"
-                        // Drifts up and grows very slightly on hover, as if
-                        // pushing off toward the visitor. Slower than the
-                        // mark's own response (700ms vs 500ms) so the two
-                        // read as one gesture with the astronaut trailing it
-                        // rather than as two things twitching together.
-                        className="object-contain object-bottom p-10 transition-transform duration-700 ease-out sm:p-12 motion-safe:group-hover/card:-translate-y-2 motion-safe:group-hover/card:scale-[1.04]"
-                        aria-hidden="true"
-                      />
+                      <motion.div
+                        className="absolute inset-0"
+                        style={{
+                          scale: astronautDollyScale,
+                          y: astronautDollyY,
+                          transformOrigin: "50% 72%",
+                          willChange: "transform",
+                        }}
+                      >
+                        <Image
+                          src="/astr.svg"
+                          alt=""
+                          fill
+                          sizes="(min-width: 600px) 24vw, 32vh"
+                          // Drifts up and grows very slightly on hover, as if
+                          // pushing off toward the visitor. Slower than the
+                          // mark's own response (700ms vs 500ms) so the two
+                          // read as one gesture with the astronaut trailing it
+                          // rather than as two things twitching together.
+                          className="object-contain object-bottom p-10 transition-transform duration-700 ease-out sm:p-12 motion-safe:group-hover/card:-translate-y-2 motion-safe:group-hover/card:scale-[1.04]"
+                          aria-hidden="true"
+                        />
+                      </motion.div>
                     </motion.div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          ) : (
-            <motion.div
-              className="absolute inset-0"
-              style={{
-                opacity: motifOpacity,
-                scale: motifScale,
-                willChange: "opacity, transform",
-                // Screen rather than normal: the artwork is pastel fills on a
-                // transparent ground, and laid over the starfield opaquely it
-                // read as a sticker pasted on the window. Screening it lets
-                // the stars carry through the planet and makes its light the
-                // same light as the space around it. It has to live on THIS
-                // element, not on a child: this one already carries an
-                // animated opacity, which isolates its subtree, so a child's
-                // blend mode would have nothing but transparency to blend
-                // against and would silently render as normal.
-                ...(illustrationFilterByIndex[index]
-                  ? { mixBlendMode: "screen" as const }
-                  : null),
-              }}
-            >
-              {illustrationFilterByIndex[index] ? (
-                <>
-                  {/* Ambient halo in this section's accent, centred on the
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            ) : (
+              <motion.div
+                className="absolute inset-0"
+                style={{
+                  opacity: motifOpacity,
+                  scale: motifScale,
+                  willChange: "opacity, transform",
+                  // Screen rather than normal: the artwork is pastel fills on a
+                  // transparent ground, and laid over the starfield opaquely it
+                  // read as a sticker pasted on the window. Screening it lets
+                  // the stars carry through the planet and makes its light the
+                  // same light as the space around it. It has to live on THIS
+                  // element, not on a child: this one already carries an
+                  // animated opacity, which isolates its subtree, so a child's
+                  // blend mode would have nothing but transparency to blend
+                  // against and would silently render as normal.
+                  ...(illustrationFilterByIndex[index]
+                    ? { mixBlendMode: "screen" as const }
+                    : null),
+                }}
+              >
+                {illustrationFilterByIndex[index] ? (
+                  <>
+                    {/* Ambient halo in this section's accent, centred on the
                      planet. Faint and tight on purpose — wide or strong, it
                      hazes the whole portal to flat blue and the deep-space
                      falloff disappears. */}
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      background: `radial-gradient(circle at ${ILLUSTRATION_FOCUS}, ${atmosphere.accent}38 0%, ${atmosphere.accent}14 26%, transparent 46%)`,
-                    }}
-                  />
-                  <motion.div
-                    // Inset from the frame so the rings can't be sliced by the
-                    // portal's edge, and masked to a soft circle around the
-                    // planet so the artwork's bounding box dissolves into the
-                    // starfield instead of ending on a hard rectangle.
-                    className="absolute inset-[14%]"
-                    style={{
-                      rotate: spinRotate,
-                      // The spin used to swing the whole frame, so the
-                      // off-centre planet orbited the portal and clipped its
-                      // edges. Pinning the origin to the planet turns the same
-                      // scroll-driven rotation into the globe turning in place.
-                      // The mask is radially symmetric about this same point,
-                      // so it stays put while the art rotates under it.
-                      transformOrigin: ILLUSTRATION_FOCUS,
-                      maskImage: ILLUSTRATION_MASK,
-                      WebkitMaskImage: ILLUSTRATION_MASK,
-                    }}
-                  >
-                    <Image
-                      src={PORTAL_ILLUSTRATION}
-                      alt=""
-                      fill
-                      sizes="(min-width: 1024px) 30vw, 30vh"
-                      className="object-contain opacity-[0.88]"
-                      style={{ filter: illustrationFilterByIndex[index] }}
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        background: `radial-gradient(circle at ${ILLUSTRATION_FOCUS}, ${atmosphere.accent}38 0%, ${atmosphere.accent}14 26%, transparent 46%)`,
+                      }}
                     />
-                  </motion.div>
-                </>
-              ) : (
-                <PortalMotif motif={atmosphere.motif} accent={atmosphere.accent} />
-              )}
-            </motion.div>
-          )}
+                    <motion.div
+                      // Inset from the frame so the rings can't be sliced by the
+                      // portal's edge, and masked to a soft circle around the
+                      // planet so the artwork's bounding box dissolves into the
+                      // starfield instead of ending on a hard rectangle.
+                      className="absolute inset-[14%]"
+                      style={{
+                        rotate: spinRotate,
+                        // The spin used to swing the whole frame, so the
+                        // off-centre planet orbited the portal and clipped its
+                        // edges. Pinning the origin to the planet turns the same
+                        // scroll-driven rotation into the globe turning in place.
+                        // The mask is radially symmetric about this same point,
+                        // so it stays put while the art rotates under it.
+                        transformOrigin: ILLUSTRATION_FOCUS,
+                        maskImage: ILLUSTRATION_MASK,
+                        WebkitMaskImage: ILLUSTRATION_MASK,
+                      }}
+                    >
+                      <Image
+                        src={PORTAL_ILLUSTRATION}
+                        alt=""
+                        fill
+                        sizes="(min-width: 1024px) 30vw, 30vh"
+                        className="object-contain opacity-[0.88]"
+                        style={{ filter: illustrationFilterByIndex[index] }}
+                      />
+                    </motion.div>
+                  </>
+                ) : (
+                  <PortalMotif motif={atmosphere.motif} accent={atmosphere.accent} />
+                )}
+              </motion.div>
+            )}
           </div>
         </motion.div>
 
@@ -830,9 +830,8 @@ export function CardPortal({
 
       {/* Aperture glow ring — ambient invitation, always animating */}
       <div
-        className={`pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-inset ring-(--accent)/40 lg:rounded-3xl ${
-          isNear ? "portal-aperture-pulse" : ""
-        }`}
+        className={`pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-inset ring-(--accent)/40 lg:rounded-3xl ${isNear ? "portal-aperture-pulse" : ""
+          }`}
       />
 
       {/* Scroll-progress stroke — traces the rounded border in as this

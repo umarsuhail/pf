@@ -40,7 +40,7 @@ export const cards: FlightCard[] = [
   {
     id: "home",
     eyebrow: "01 / Hello",
-    title: "Hi, I'm Umar Suhail",
+    title: "",
     description: NARRATION_SCRIPT,
     details: [
       "Next.js developer and frontend developer based in Abu Dhabi",

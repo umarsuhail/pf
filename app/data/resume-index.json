@@ -15,7 +15,7 @@
     "id": "resume-2-0",
     "title": "Resume: Professional Experience",
     "url": "/resume.tex",
-    "text": "Emirates Face Recognition (EFR) Application Developer Sep 2024 – Present Abu Dhabi, UAE Developing and maintaining web-based application interfaces for a biometric face recognition platform used across UAE government and enterprise clients. Architecting reusable React component libraries and design tokens to enforce visual consistency across multiple product surfaces. Integrating real-time data streams and REST APIs with robust error handling and optimistic UI patterns. Collaborating cross-functionally with backend engineers and hardware teams to align frontend behaviour with biometric pipeline requirements. Driving performance optimisation — code splitting, lazy loading, memoisation — reducing initial bundle size by over 30%."
+    "text": "Emirates Face Recognition (EFR) Application Developer Nov 2024 – Present Abu Dhabi, UAE Developing and maintaining web-based application interfaces for a biometric face recognition platform used across UAE government and enterprise clients. Architecting reusable React component libraries and design tokens to enforce visual consistency across multiple product surfaces. Integrating real-time data streams and REST APIs with robust error handling and optimistic UI patterns. Collaborating cross-functionally with backend engineers and hardware teams to align frontend behaviour with biometric pipeline requirements. Driving performance optimisation — code splitting, lazy loading, memoisation — reducing initial bundle size by over 30%."
   },
   {
     "id": "resume-2-1",

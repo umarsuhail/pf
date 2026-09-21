@@ -978,9 +978,13 @@ export default function MultiverseFlight() {
   // fixed pairs at their original viewports.
   const endMarkSize = Math.round(markBox * (isMobile ? 0.88 : 0.76));
   // Point count follows area, so a small mark is not over-packed and a large
-  // one does not thin out into the sparse ring this started as.
+  // one does not thin out into the sparse ring this started as. One point per
+  // 44px² — roughly a point every 6-7px — is where the glyph strokes stop
+  // reading as scattered dust and close into letterforms; the previous 138
+  // spaced them nearly 12px apart, which is what made the mark look thin
+  // however large it was drawn.
   const endParticleCount = Math.round(
-    Math.min(840, Math.max(240, (endMarkSize * endMarkSize) / 138)),
+    Math.min(2600, Math.max(600, (endMarkSize * endMarkSize) / 44)),
   );
 
   const { scrollYProgress } = useScroll({

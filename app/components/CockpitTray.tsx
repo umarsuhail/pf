@@ -478,6 +478,61 @@ export default function CockpitTray() {
     }
   }, []);
 
+  // Taking over someone's whole screen unasked is the kind of thing a site
+  // should offer, not decide, so engaging now puts the question first and the
+  // launch behind the answer. The tour runs either way — answering "no" just
+  // flies it in the window. Only fresh launches ask: resuming a paused tour
+  // reuses whatever was chosen for it (see fullscreenChoiceRef), since being
+  // asked again on every Continue would be its own kind of rude.
+  const [askFullscreen, setAskFullscreen] = useState(false);
+  const fullscreenChoiceRef = useRef(false);
+  const fullscreenAskRef = useRef<HTMLButtonElement>(null);
+
+  // While the question is up it owns the keyboard: focus lands on the
+  // primary answer so Enter takes it, and Escape backs out without starting
+  // anything.
+  useEffect(() => {
+    if (!askFullscreen) return;
+    fullscreenAskRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAskFullscreen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [askFullscreen]);
+
+  const canFullscreen = () =>
+    typeof document !== "undefined" &&
+    typeof document.documentElement.requestFullscreen === "function" &&
+    !document.fullscreenElement;
+
+  // Everything engaging actually does, once the fullscreen question is
+  // settled. Called straight from the Engage click when there is nothing to
+  // ask, or from the prompt's own buttons — both are real user gestures,
+  // which is what audio playback and the Fullscreen API each require.
+  const launchAutopilot = useCallback(
+    (useFullscreen: boolean) => {
+      fullscreenChoiceRef.current = useFullscreen;
+      requestPlayback();
+      setIsOpen(false);
+      setAskFullscreen(false);
+      // Must be called synchronously inside the gesture — it would be
+      // rejected from the tour's own async flow.
+      if (useFullscreen) enterFullscreen();
+
+      if (pathname !== "/") {
+        sessionStorage.setItem("autopilot-pending", "1");
+        router.push("/");
+        return;
+      }
+
+      window.dispatchEvent(
+        new CustomEvent("flight-autopilot", { detail: { action: "start" } }),
+      );
+    },
+    [enterFullscreen, pathname, requestPlayback, router],
+  );
+
   // Engaging is the one click that starts everything: the tour flies itself
   // and the soundtrack runs under it. Audio can only ever begin here, from a
   // real gesture — nothing autoplays on load. The flight only exists on "/",
@@ -494,36 +549,28 @@ export default function CockpitTray() {
     if (isPaused && pathname === "/") {
       resumeAudio();
       setIsOpen(false);
-      enterFullscreen();
+      if (fullscreenChoiceRef.current) enterFullscreen();
       window.dispatchEvent(
         new CustomEvent("flight-autopilot", { detail: { action: "resume" } }),
       );
       return;
     }
 
-    requestPlayback();
-    setIsOpen(false);
-    // Must be called here, synchronously inside the click's user
-    // activation — it would be rejected from the tour's own async flow.
-    enterFullscreen();
-
-    if (pathname !== "/") {
-      sessionStorage.setItem("autopilot-pending", "1");
-      router.push("/");
+    // Nothing to ask where the browser has no element fullscreen to give
+    // (iPhone Safari) or the visitor is already in it — those just fly.
+    if (!canFullscreen()) {
+      launchAutopilot(false);
       return;
     }
 
-    window.dispatchEvent(
-      new CustomEvent("flight-autopilot", { detail: { action: "start" } }),
-    );
+    setAskFullscreen(true);
   }, [
     isPaused,
     isRunning,
     pathname,
-    requestPlayback,
     resumeAudio,
-    router,
     enterFullscreen,
+    launchAutopilot,
   ]);
 
   // Pausing (from the transport or a real wheel/touch/key handback) freezes
@@ -621,6 +668,76 @@ export default function CockpitTray() {
       ref={containerRef}
       className="pointer-events-none fixed inset-x-0 top-0 z-50"
     >
+      {/* The fullscreen question. Both answers start the tour — this only
+         decides how much of the screen it gets — so neither button is a
+         cancel; dismissing (Esc, or the backdrop) is what backs out. */}
+      <AnimatePresence>
+        {askFullscreen && (
+          <motion.div
+            key="fullscreen-ask"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            onClick={() => setAskFullscreen(false)}
+            className="pointer-events-auto fixed inset-0 z-60 flex items-center justify-center bg-slate-950/75 px-6 backdrop-blur-sm"
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="fullscreen-ask-title"
+              aria-describedby="fullscreen-ask-copy"
+              onClick={(event) => event.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.94, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={TRAY_SPRING}
+              className={`w-[min(92vw,430px)] rounded-3xl px-6 pb-6 pt-7 text-center ${METAL_SURFACE}`}
+            >
+              <BrushedGrain />
+              <Sheen delay={0.12} />
+              <Rivets className="inset-x-4 top-2.5" />
+
+              <p className="relative z-10 text-[10px] font-semibold uppercase tracking-[0.42em] text-sky-200/60">
+                Autopilot
+              </p>
+              <h2
+                id="fullscreen-ask-title"
+                className="relative z-10 mt-3 text-xl font-semibold text-sky-50"
+              >
+                Fly full screen?
+              </h2>
+              <p
+                id="fullscreen-ask-copy"
+                className="relative z-10 mx-auto mt-2 max-w-[36ch] text-xs leading-5 text-slate-300/80"
+              >
+                The tour runs either way. Full screen hands the whole display
+                to the flight; staying in the window leaves your tabs and
+                toolbar exactly where they are.
+              </p>
+
+              <div className="relative z-10 mt-6 flex flex-col gap-2 sm:flex-row-reverse sm:justify-center">
+                <button
+                  ref={fullscreenAskRef}
+                  type="button"
+                  onClick={() => launchAutopilot(true)}
+                  className="min-h-11 rounded-full border border-sky-200/35 bg-sky-200/15 px-5 text-xs font-semibold uppercase tracking-[0.22em] text-sky-50 transition-colors hover:bg-sky-200/25"
+                >
+                  Full screen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => launchAutopilot(false)}
+                  className="min-h-11 rounded-full border border-white/15 px-5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-300 transition-colors hover:border-white/25 hover:text-sky-100"
+                >
+                  Stay in this window
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Mounted only once actually needed (tray opened, or the latch's own
          play button pressed first) — see requestPlayback/audioReady. */}
       {audioReady && (

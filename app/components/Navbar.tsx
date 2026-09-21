@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import { BotIcon } from "./icons/bot";
 
 const navLinks = [
   {
@@ -355,14 +356,7 @@ export default function NeumorphicNavbar() {
           className="p-2 rounded-md cursor-pointer border-white/45 bg-white/70 px-3 py-4 shadow-[0_12px_32px_rgba(15,23,42,0.14)] backdrop-blur-sm  mb-2"
           onClick={() => handleNavigate("home")}
         >
-          <Image
-            src="/images/us2.png"
-            alt="Umar Suhail"
-            width={150}
-            height={128}
-            priority
-            className="h-10 w-auto object-contain sm:h-12"
-          />
+         <BotIcon/>
         </button>
         <div className={`flex absolute top-[80px] right-0 items-center gap-3 rounded-2xl border border-white/45 bg-white/70 pl-2 pr-3 py-4 shadow-[0_12px_32px_rgba(15,23,42,0.14)] backdrop-blur-sm transition-all duration-300`}>
           <div className="flex h-88 flex-col items-center justify-between [@media(max-height:560px)]:h-56">
