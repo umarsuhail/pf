@@ -174,6 +174,126 @@ html {
   }
 }
 
+/* VEGA communications console ------------------------------------------------
+   A static coordinate grid and two compositor-only accents give the chat its
+   spacecraft-instrument character without adding another canvas or repainting
+   a large filtered surface on every frame. */
+.vega-panel-grid {
+  background-image:
+    linear-gradient(rgba(103, 232, 249, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(103, 232, 249, 0.025) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(180deg, black, transparent 88%);
+}
+
+@keyframes vegaScan {
+  0% {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+
+  12%,
+  82% {
+    opacity: 0.28;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(560px);
+  }
+}
+
+.vega-scanline {
+  top: 0;
+  animation: vegaScan 9s linear infinite;
+}
+
+@keyframes vegaOrbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.vega-orbit-ring {
+  animation: vegaOrbit 18s linear infinite;
+}
+
+.vega-scrollbar {
+  scrollbar-color: rgba(103, 232, 249, 0.35) transparent;
+  scrollbar-width: thin;
+}
+
+.vega-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.vega-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.vega-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: linear-gradient(rgba(103, 232, 249, 0.5), rgba(129, 140, 248, 0.35));
+}
+
+@keyframes spacetimeFlow {
+  to {
+    stroke-dashoffset: -84;
+  }
+}
+
+@keyframes spacetimeBreathe {
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes spacetimePulse {
+  0%,
+  100% {
+    transform: scale(0.82);
+    opacity: 0.62;
+  }
+
+  50% {
+    transform: scale(1.16);
+    opacity: 1;
+  }
+}
+
+.spacetime-field-active .spacetime-worldline {
+  animation: spacetimeFlow 7s linear infinite;
+}
+
+.spacetime-field-active .spacetime-grid {
+  animation: spacetimeBreathe 8s ease-in-out infinite;
+}
+
+.spacetime-field-active .spacetime-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spacetimePulse 4.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vega-scanline,
+  .vega-orbit-ring,
+  .spacetime-worldline,
+  .spacetime-grid,
+  .spacetime-pulse {
+    animation: none;
+  }
+
+  .vega-scanline {
+    display: none;
+  }
+}
+
 /* Per-section portal motifs (About/Skills/Projects/Experience/Open Source/Contact) */
 @keyframes motifBreathe {
 
@@ -236,10 +356,10 @@ html {
   animation-delay: -0.8s;
 }
 
-/* Ambient glow drifting across the loading card's background image — two
+/* Ambient glow drifting across the loading card's background video — two
    soft blobs, blue and steel, that slowly swap emphasis and dominant
    position so it reads as light moving through the scene rather than a
-   static tint. Screen-blended and kept faint so bg.jpg stays the subject. */
+   static tint. Screen-blended and kept faint so the footage stays the subject. */
 @keyframes loaderCardGlow {
 
   0%,

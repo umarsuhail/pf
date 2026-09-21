@@ -25,6 +25,12 @@ const TRAY_SPRING = {
   mass: 0.8,
 } as const;
 
+// The console is physically attached to the latch below it, so opening has
+// to animate layout height. A transform-only entrance makes the latch jump
+// to its final position before the panel catches up.
+const CONSOLE_OPEN = { duration: 0.42, ease: [0.22, 1, 0.36, 1] } as const;
+const CONSOLE_CLOSE = { duration: 0.24, ease: [0.4, 0, 1, 1] } as const;
+
 // The soundtrack is a two-act programme, not a loop. intro.wav is the
 // narration with its own background music already mixed in (see
 // data/narration.ts — still played through the "span" machinery below in
@@ -189,6 +195,7 @@ export default function CockpitTray() {
   const [activeId, setActiveId] = useState("home");
   const [isLatchHot, setIsLatchHot] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [leg, setLeg] = useState(-1);
   const [track, setTrack] = useState<"intro" | "main" | null>(null);
   const [isMuted, setIsMuted] = useState(false);
@@ -409,6 +416,25 @@ export default function CockpitTray() {
     emitNarration(NARRATION_SPANS.length, 0, 0, false);
   }, [runRamp]);
 
+  // A paused tour keeps both deck positions and the current crossfade
+  // targets intact. Continuing simply restarts the deck that was active;
+  // no src/currentTime values are rewritten, so narration and music pick up
+  // on the exact audio frame where the visitor paused them.
+  const pauseAudio = useCallback(() => {
+    cancelAnimationFrame(rampRef.current);
+    narrationRef.current?.pause();
+    mainRef.current?.pause();
+  }, []);
+
+  const resumeAudio = useCallback(() => {
+    const active = track === "intro" ? narrationRef.current : mainRef.current;
+    if (!active) return;
+    void active
+      .play()
+      .then(runRamp)
+      .catch(() => {});
+  }, [runRamp, track]);
+
   const toggleMute = () => {
     setIsMuted((prev) => {
       const next = !prev;
@@ -459,14 +485,22 @@ export default function CockpitTray() {
   // starts at the beginning, not wherever the visitor happened to be reading.
   const toggleAutopilot = useCallback(() => {
     if (isRunning) {
-      // Exit-fullscreen happens in the flight-autopilot-state listener when
-      // running flips false, so this path and every other way the tour ends
-      // share one exit point.
       window.dispatchEvent(
-        new CustomEvent("flight-autopilot", { detail: { action: "stop" } }),
+        new CustomEvent("flight-autopilot", { detail: { action: "pause" } }),
       );
       return;
     }
+
+    if (isPaused && pathname === "/") {
+      resumeAudio();
+      setIsOpen(false);
+      enterFullscreen();
+      window.dispatchEvent(
+        new CustomEvent("flight-autopilot", { detail: { action: "resume" } }),
+      );
+      return;
+    }
+
     requestPlayback();
     setIsOpen(false);
     // Must be called here, synchronously inside the click's user
@@ -482,19 +516,36 @@ export default function CockpitTray() {
     window.dispatchEvent(
       new CustomEvent("flight-autopilot", { detail: { action: "start" } }),
     );
-  }, [isRunning, pathname, requestPlayback, router, enterFullscreen]);
+  }, [
+    isPaused,
+    isRunning,
+    pathname,
+    requestPlayback,
+    resumeAudio,
+    router,
+    enterFullscreen,
+  ]);
 
-  // The tour also ends on its own, or when the user takes the controls back
-  // by scrolling — the music and the fullscreen both follow it either way,
-  // since every way a tour can end funnels through this one running:false.
+  // Pausing (from the transport or a real wheel/touch/key handback) freezes
+  // the audio decks in place. Only a completed/cancelled tour tears the
+  // soundtrack down and exits fullscreen.
   useEffect(() => {
     const onState = (event: Event) => {
-      const detail = (event as CustomEvent<{ running?: boolean; index?: number }>)
-        .detail;
+      const detail = (
+        event as CustomEvent<{
+          running?: boolean;
+          paused?: boolean;
+          index?: number;
+        }>
+      ).detail;
       const running = Boolean(detail?.running);
+      const paused = Boolean(detail?.paused);
       setIsRunning(running);
-      setLeg(running ? (detail?.index ?? -1) : -1);
-      if (!running) {
+      setIsPaused(paused);
+      setLeg(running || paused ? (detail?.index ?? -1) : -1);
+      if (paused) {
+        pauseAudio();
+      } else if (!running) {
         stopAudio();
         exitFullscreen();
       }
@@ -506,11 +557,19 @@ export default function CockpitTray() {
         "flight-autopilot-state",
         onState as EventListener,
       );
-  }, [stopAudio, exitFullscreen]);
+  }, [pauseAudio, stopAudio, exitFullscreen]);
 
   const navigate = (id: string) => {
     setActiveId(id);
     setIsOpen(false);
+
+    // Only the multiverse route owns the scroll-event listener. From a
+    // standalone section, these controls perform real route navigation.
+    if (pathname !== "/") {
+      router.push(id === "home" ? "/" : `/${id}`);
+      return;
+    }
+
     window.dispatchEvent(
       new CustomEvent("navigate-flight-section", { detail: { id } }),
     );
@@ -547,6 +606,15 @@ export default function CockpitTray() {
   const toggleChat = () => {
     window.dispatchEvent(new CustomEvent("toggle-holochat"));
   };
+
+  // On the flight this follows the live camera state. A standalone route has
+  // no camera broadcaster, so derive the highlight directly from its URL
+  // without a route-change effect and its extra render.
+  const routeId = pathname.split("/").filter(Boolean)[0];
+  const visibleActiveId =
+    pathname === "/" || !stops.some((stop) => stop.id === routeId)
+      ? activeId
+      : routeId;
 
   return (
     <div
@@ -601,25 +669,34 @@ export default function CockpitTray() {
 
         {/* Centre column: the console, with the latch hanging beneath it */}
         <div className="col-start-2 flex flex-col items-center">
-          <AnimatePresence initial={false}>
-            {isOpen && (
+          {/* Animate the real occupied height so the latch remains attached
+              throughout both directions. `inert` keeps the always-mounted
+              controls out of focus and hit-testing while collapsed. */}
+          <motion.div
+            initial={false}
+            animate={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
+            transition={isOpen ? CONSOLE_OPEN : CONSOLE_CLOSE}
+            className="grid w-[min(94vw,880px)]"
+          >
+            <div className="min-h-0 overflow-hidden">
               <motion.nav
-                key="console"
                 aria-label="Cockpit section tray"
-                initial={{ y: "-100%", rotateX: -55, opacity: 0 }}
-                animate={{ y: 0, rotateX: 0, opacity: 1 }}
-                exit={{
-                  y: "-100%",
-                  rotateX: -55,
-                  opacity: 0,
-                  transition: { ...TRAY_SPRING, delay: 0.1 },
+                aria-hidden={!isOpen}
+                inert={!isOpen}
+                initial={false}
+                animate={{
+                  y: isOpen ? 0 : -12,
+                  opacity: isOpen ? 1 : 0,
+                  scale: isOpen ? 1 : 0.985,
                 }}
-                transition={TRAY_SPRING}
-                style={{ transformOrigin: "top center", perspective: 900 }}
-                className={`pointer-events-auto w-[min(94vw,880px)] rounded-b-3xl border-t-0 px-3 pb-4 pt-4 sm:px-5 ${METAL_SURFACE}`}
+                transition={isOpen ? CONSOLE_OPEN : CONSOLE_CLOSE}
+                style={{ transformOrigin: "top center" }}
+                className={`w-full rounded-b-3xl border-t-0 px-3 pb-4 pt-4 sm:px-5 ${
+                  isOpen ? "pointer-events-auto" : "pointer-events-none"
+                } ${METAL_SURFACE}`}
               >
                 <BrushedGrain />
-                <Sheen delay={0.45} />
+                <Sheen delay={0.45} active={isOpen} />
                 <Rivets className="inset-x-4 top-2.5" />
 
                 {/* Console header strip */}
@@ -634,8 +711,8 @@ export default function CockpitTray() {
                 </div>
 
                 <div className="relative z-10 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-                  {stops.map((stop, i) => {
-                    const isActive = activeId === stop.id;
+                  {stops.map((stop) => {
+                    const isActive = visibleActiveId === stop.id;
                     return (
                       <motion.button
                         key={stop.id}
@@ -644,9 +721,8 @@ export default function CockpitTray() {
                         onMouseEnter={() => stopIconRefs.current[stop.id]?.startAnimation()}
                         onMouseLeave={() => stopIconRefs.current[stop.id]?.stopAnimation()}
                         aria-current={isActive ? "page" : undefined}
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.04 + i * 0.03, duration: 0.25 }}
+                        whileTap={{ scale: 0.97 }}
+                        transition={{ duration: 0.14 }}
                         className={`group relative flex flex-col items-start gap-1 overflow-hidden rounded-lg border px-2.5 py-2 text-left transition-colors ${
                           isActive
                             ? "border-sky-300/50 bg-sky-400/15 shadow-[inset_0_0_18px_rgba(125,211,252,0.28),inset_0_1px_0_rgba(255,255,255,0.25)]"
@@ -693,40 +769,54 @@ export default function CockpitTray() {
                   <button
                     type="button"
                     onClick={toggleAutopilot}
-                    aria-pressed={isRunning}
+                    aria-pressed={isRunning || isPaused}
+                    aria-label={
+                      isRunning
+                        ? "Pause autoplay"
+                        : isPaused
+                          ? "Continue autoplay"
+                          : "Start autoplay"
+                    }
                     className={`flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] transition-colors ${
                       isRunning
                         ? "border-amber-300/45 bg-amber-400/15 text-amber-100 hover:bg-amber-400/25"
+                        : isPaused
+                          ? "border-sky-300/45 bg-sky-400/15 text-sky-100 hover:bg-sky-400/25"
                         : "border-sky-200/30 bg-[linear-gradient(160deg,#33445a,#0d141d)] text-sky-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_2px_6px_rgba(0,0,0,0.6)] hover:border-sky-200/60"
                     }`}
                   >
                     <svg width="11" height="11" viewBox="0 0 24 24" aria-hidden="true">
                       {isRunning ? (
-                        <rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" />
+                        <>
+                          <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" />
+                          <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" />
+                        </>
                       ) : (
                         <path fill="currentColor" d="M8 5.14v13.72L19 12z" />
                       )}
                     </svg>
-                    {isRunning ? "Disengage" : "Autoplay"}
+                    {isRunning ? "Pause" : isPaused ? "Continue" : "Autoplay"}
                   </button>
 
                   <div className="min-w-0 flex-1">
                     <p className="text-[9px] font-semibold uppercase tracking-[0.3em] text-slate-500">
-                      {isRunning
+                      {isRunning || isPaused
                         ? `Autopilot · Leg ${Math.min(leg + 1, stops.length)}/${stops.length}`
                         : "Autopilot Standby"}
                     </p>
                     <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-100/90">
                       {isRunning
                         ? (stops[leg]?.label ?? "Departing")
-                        : "Sit back — it flies itself"}
+                        : isPaused
+                          ? `Paused at ${stops[leg]?.label ?? "current position"}`
+                          : "Sit back — it flies itself"}
                     </p>
                     {/* Tour progress across the seven stops */}
                     <span className="mt-1 block h-[3px] w-full overflow-hidden rounded-full bg-white/10">
                       <motion.span
                         className="block h-full origin-left rounded-full bg-[linear-gradient(90deg,#34d399,#7dd3fc)]"
                         animate={{
-                          scaleX: isRunning
+                          scaleX: isRunning || isPaused
                             ? Math.min(1, (leg + 1) / stops.length)
                             : 0,
                         }}
@@ -762,7 +852,7 @@ export default function CockpitTray() {
                      this is the most dispensable part of it. */}
                   <div className="hidden h-6 items-end gap-[3px] sm:flex">
                     {[0.5, 0.9, 0.65, 1, 0.75].map((peak, i) => {
-                      const live = track !== null && !isMuted;
+                      const live = track !== null && !isMuted && !isPaused;
                       return (
                         <motion.span
                           key={i}
@@ -794,8 +884,8 @@ export default function CockpitTray() {
 
                 <Rivets className="inset-x-4 bottom-2.5" />
               </motion.nav>
-            )}
-          </AnimatePresence>
+            </div>
+          </motion.div>
 
           {/* The latch — always visible, hangs just under the console. Closed,
              it's floating free against the page, so it gets the notch ears;
@@ -828,42 +918,56 @@ export default function CockpitTray() {
             <button
               type="button"
               onClick={toggleAutopilot}
-              aria-pressed={isRunning}
-              aria-label={isRunning ? "Disengage autopilot" : "Autoplay the tour"}
+              aria-pressed={isRunning || isPaused}
+              aria-label={
+                isRunning
+                  ? "Pause autoplay"
+                  : isPaused
+                    ? "Continue autoplay"
+                    : "Autoplay the tour"
+              }
               className={`relative z-10 flex h-5 w-5 items-center justify-center rounded-full transition-colors ${
                 isRunning
                   ? "text-amber-300 drop-shadow-[0_0_5px_rgba(252,211,77,0.8)]"
+                  : isPaused
+                    ? "text-sky-300 drop-shadow-[0_0_5px_rgba(125,211,252,0.7)]"
                   : "text-slate-500 hover:text-sky-200"
               }`}
             >
               <svg width="11" height="11" viewBox="0 0 24 24" aria-hidden="true">
                 {isRunning ? (
-                  <rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" />
+                  <>
+                    <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" />
+                    <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" />
+                  </>
                 ) : (
                   <path fill="currentColor" d="M8 5.14v13.72L19 12z" />
                 )}
               </svg>
             </button>
 
-            <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
+            {pathname === "/" && (
+              <>
+                <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
 
-            {/* Journey rail (RouteMap) show/hide — a separate mounted
-               sibling, toggled purely over the event bus (see toggleSidenav
-               above). */}
-            <button
-              type="button"
-              onClick={toggleSidenav}
-              aria-pressed={isSidenavVisible}
-              aria-label={isSidenavVisible ? "Hide journey rail" : "Show journey rail"}
-              className={`relative z-10 flex h-5 w-5 items-center justify-center rounded-full transition-colors ${
-                isSidenavVisible ? "text-sky-200" : "text-slate-500 hover:text-sky-200"
-              }`}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
-                <line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" strokeWidth="1.6" />
-              </svg>
-            </button>
+                {/* The journey dial only exists on the multiverse route. On
+                    detail pages this control did nothing, so it is omitted. */}
+                <button
+                  type="button"
+                  onClick={toggleSidenav}
+                  aria-pressed={isSidenavVisible}
+                  aria-label={isSidenavVisible ? "Hide journey dial" : "Show journey dial"}
+                  className={`relative z-10 flex h-5 w-5 items-center justify-center rounded-full transition-colors ${
+                    isSidenavVisible ? "text-sky-200" : "text-slate-500 hover:text-sky-200"
+                  }`}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                    <line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" strokeWidth="1.6" />
+                  </svg>
+                </button>
+              </>
+            )}
 
             <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
 
@@ -885,8 +989,11 @@ export default function CockpitTray() {
                 src="/images/us2.png"
                 alt=""
                 fill
-                sizes="100vw"
-                className="absolute inset-0"
+                // The button is a fixed h-5 w-5 (20px) at every breakpoint.
+                // "100vw" had Next picking a candidate sized for the whole
+                // viewport and painting it into a 20px circle.
+                sizes="20px"
+                className="absolute inset-0 object-cover"
               />
             </button>
 

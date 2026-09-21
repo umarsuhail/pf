@@ -1,16 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-// Assets the very first screen depends on — gate the loader on these
-// actually finishing, not a fake timer. a1.png/a2.png (the end-of-flight
-// earth/moon) used to be listed here too, but they're only ever seen after
-// scrolling to ~90% of the flight — holding the opening loader on ~1.7MB of
-// combined weight for content that far off just made the "necessary" wait
-// longer for no visible benefit. next/image's own lazy loading fetches them
-// once the visitor is actually approaching that point in the scroll.
-const CRITICAL_ASSETS = ["/bg.jpg"];
-const MIN_VISIBLE_MS = 900;
+// The opening film is also useful loading time: the app renders underneath
+// this overlay, and the reveal waits for both the film and window load.
 const EXIT_DURATION_MS = 700;
 const RADIUS = 26;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
@@ -18,6 +11,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 const ringColor = (progress: number) => `hsl(${190 + progress * 1.7}, 85%, 65%)`;
 
 export default function PageLoader() {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -26,48 +20,83 @@ export default function PageLoader() {
     document.body.style.overflow = "hidden";
 
     let cancelled = false;
-    let loaded = 0;
-    const total = CRITICAL_ASSETS.length + 1; // +1 for full window load
-    const startedAt = Date.now();
+    let detachVideo = () => {};
+    let detachWindow = () => {};
+    let appLoaded = document.readyState === "complete";
+    let videoRatio = 0;
 
-    const bump = () => {
-      loaded += 1;
-      if (!cancelled) setProgress(Math.round((loaded / total) * 100));
+    // The video owns 90% of the meter and normal app loading owns the final
+    // 10%. The application keeps loading underneath this fixed overlay, but
+    // the reveal is gated on both jobs so a fast app never cuts the film off.
+    const updateProgress = () => {
+      if (cancelled) return;
+      setProgress(
+        Math.min(100, Math.round(videoRatio * 90 + (appLoaded ? 10 : 0))),
+      );
     };
 
-    const preloadImage = (src: string) =>
-      new Promise<void>((resolve) => {
-        const img = new window.Image();
-        img.onload = () => {
-          bump();
-          resolve();
-        };
-        img.onerror = () => {
-          bump();
-          resolve();
-        };
-        img.src = src;
-      });
+    const videoFinished = new Promise<void>((resolve) => {
+      const video = videoRef.current;
+      if (!video || video.error || video.ended) {
+        videoRatio = 1;
+        updateProgress();
+        resolve();
+        return;
+      }
+
+      let settled = false;
+      const onTimeUpdate = () => {
+        if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+        videoRatio = Math.min(1, video.currentTime / video.duration);
+        updateProgress();
+      };
+      const settle = () => {
+        if (settled) return;
+        settled = true;
+        videoRatio = 1;
+        updateProgress();
+        detachVideo();
+        resolve();
+      };
+      detachVideo = () => {
+        video.removeEventListener("timeupdate", onTimeUpdate);
+        video.removeEventListener("ended", settle);
+        video.removeEventListener("error", settle);
+      };
+
+      video.addEventListener("timeupdate", onTimeUpdate);
+      video.addEventListener("ended", settle, { once: true });
+      video.addEventListener("error", settle, { once: true });
+      video.currentTime = 0;
+      void video.play().catch(settle);
+    });
 
     const windowLoaded = new Promise<void>((resolve) => {
-      if (document.readyState === "complete") {
+      if (appLoaded) {
+        updateProgress();
         resolve();
       } else {
-        window.addEventListener("load", () => resolve(), { once: true });
+        const onLoad = () => {
+          appLoaded = true;
+          updateProgress();
+          resolve();
+        };
+        detachWindow = () => window.removeEventListener("load", onLoad);
+        window.addEventListener("load", onLoad, { once: true });
       }
-    }).then(bump);
+    });
 
-    Promise.all([...CRITICAL_ASSETS.map(preloadImage), windowLoaded]).then(() => {
+    Promise.all([videoFinished, windowLoaded]).then(() => {
       if (cancelled) return;
-      // Never flash for fast loads, never feel stuck for slow ones
-      const remaining = Math.max(MIN_VISIBLE_MS - (Date.now() - startedAt), 0);
-      window.setTimeout(() => {
-        if (!cancelled) setReady(true);
-      }, remaining);
+      setProgress(100);
+      setReady(true);
     });
 
     return () => {
       cancelled = true;
+      detachVideo();
+      detachWindow();
+      document.body.style.overflow = "";
     };
   }, []);
 
@@ -92,12 +121,20 @@ export default function PageLoader() {
       }`}
     >
       {/* Stays a landscape-shaped preview card on phones — a 70vh × 70vw box
-         in portrait is an awkward tall crop of a wide background image. */}
+         in portrait would be an awkward tall crop of the background video. */}
       <div className="relative aspect-16/10 w-[86vw] overflow-hidden rounded-2xl shadow-2xl shadow-black/60 lg:aspect-auto lg:h-[70vh] lg:w-[70vw] lg:rounded-3xl">
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: "url(/bg.jpg)" }}
-        />
+        <video
+          ref={videoRef}
+          aria-hidden="true"
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+          disablePictureInPicture
+          className="absolute inset-0 h-full w-full object-cover object-center"
+        >
+          <source src="/bg.mp4" type="video/mp4" />
+        </video>
         {/* Blue/steel ambient glow, drifting and screen-blended so it reads
            as light moving across the card rather than a flat color wash. */}
         <div aria-hidden="true" className="loader-card-glow absolute inset-0" />

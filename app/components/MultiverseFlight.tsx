@@ -93,6 +93,11 @@ const FLIGHT_VELOCITY_SPRING = {
   mass: 0.24,
 } as const;
 
+// Camera velocity below which there is no motion blur at all. Reading a card,
+// nudging the wheel, and the camera spring settling all sit under this, which
+// is the point: a still scene should be sharp.
+const FLIGHT_BLUR_FLOOR = 0.055;
+
 const FLIGHT_STREAK_BACKGROUND =
   "repeating-conic-gradient(from 0deg at 50% 50%, transparent 0deg 2deg, rgba(186,230,253,0.22) 2.35deg 2.62deg, transparent 3.15deg 8deg), radial-gradient(ellipse at 50% 50%, rgba(56,189,248,0.22) 0%, transparent 64%)";
 
@@ -994,24 +999,37 @@ export default function MultiverseFlight() {
   // while the ship is moving, then fades away without a flash or pull-back.
   const cameraVelocity = useVelocity(smoothScrollProgress);
   const smoothCameraVelocity = useSpring(cameraVelocity, FLIGHT_VELOCITY_SPRING);
+  // Real motion blur is a function of how far the scene moved during one
+  // exposure, so below a genuine speed there is none of it at all. The old
+  // curve had no floor and a x7 gain, which saturated at a camera velocity of
+  // ~0.14 — a gentle wheel nudge. The smear was therefore present essentially
+  // whenever the page was not perfectly still, which is what made it read as
+  // an effect laid over the scene rather than as speed.
+  //
+  // FLIGHT_BLUR_FLOOR is the deadband: drift below it and the corridor is
+  // sharp. Past it the ramp is gentler, so intensity keeps climbing with
+  // actual speed instead of pinning at the top the moment it engages.
   const forwardFlightIntensity = useTransform(smoothCameraVelocity, (velocity) =>
-    Math.min(1, Math.max(0, velocity) * 7),
+    Math.min(1, Math.max(0, Math.max(0, velocity) - FLIGHT_BLUR_FLOOR) * 3.4),
   );
-  // The motion-blur layer, pulled well back. Intensity still saturates on any
-  // quick scroll, so the effect's strength is set here rather than by the
-  // velocity curve: peak opacity 0.22 -> 0.10, peak blur 3.5px -> 1.4px, and a
-  // shallower zoom/drift. What's left is a suggestion of forward flow instead
-  // of a smear over the whole corridor.
+  // Peaks come down with it: opacity 0.10 -> 0.065, blur 1.4px -> 0.85px, and
+  // a shallower zoom and drift. Combined with the deadband above, the corridor
+  // is sharp at reading speed and only smears when the flight is genuinely
+  // moving.
   const flightStreakOpacity = useTransform(
     forwardFlightIntensity,
-    [0, 0.12, 1],
-    [0, 0.02, 0.1],
+    [0, 0.25, 1],
+    [0, 0.012, 0.065],
   );
-  const flightStreakScale = useTransform(forwardFlightIntensity, [0, 1], [1.03, 1.09]);
-  const flightStreakY = useTransform(forwardFlightIntensity, [0, 1], ["0%", "-3.5%"]);
+  const flightStreakScale = useTransform(forwardFlightIntensity, [0, 1], [1.02, 1.05]);
+  const flightStreakY = useTransform(forwardFlightIntensity, [0, 1], ["0%", "-2%"]);
+  // Still always a blur() string, never "none". Toggling a filter on and off
+  // makes the compositor create and destroy the layer's buffer; holding one
+  // filter that happens to reach 0px costs a cheap no-op blur instead, and the
+  // layer is culled by its own opacity long before that matters.
   const flightStreakBlur = useTransform(
     forwardFlightIntensity,
-    (value) => `blur(${(value * 1.4).toFixed(2)}px)`,
+    (value) => `blur(${(value * 0.85).toFixed(2)}px)`,
   );
 
   const zCamera = useTransform(smoothScrollProgress, [0, 1], [0, isMobile ? 7800 : 8400]);
@@ -1305,18 +1323,21 @@ export default function MultiverseFlight() {
   // it, then move on, and finish on the ending. The whole flight is already
   // a pure function of scroll position, so the tour drives nothing but
   // window.scrollY — every card, the camera and the route map follow for
-  // free. Any real input from the user (wheel, touch, key) hands control
-  // straight back.
+  // free. Any real input from the user (wheel, touch, key) pauses the tour
+  // and hands control back without discarding its resumable position.
   useEffect(() => {
     let raf = 0;
     let timer = 0;
     let detach: (() => void) | undefined;
     let introNarrationComplete = false;
+    let lifecycle: "idle" | "running" | "paused" = "idle";
+    let pauseFlight: (() => void) | undefined;
+    let resumeFlight: (() => void) | undefined;
 
-    const emit = (running: boolean, index: number) =>
+    const emit = (running: boolean, index: number, paused = false) =>
       window.dispatchEvent(
         new CustomEvent("flight-autopilot-state", {
-          detail: { running, index, total: cards.length },
+          detail: { running, paused, index, total: cards.length },
         }),
       );
 
@@ -1329,21 +1350,26 @@ export default function MultiverseFlight() {
       detach = undefined;
     };
 
-    const stop = () => {
-      const wasRunning = raf !== 0 || timer !== 0;
+    const finish = () => {
+      const hadSession = lifecycle !== "idle";
       halt();
-      if (wasRunning) emit(false, -1);
+      lifecycle = "idle";
+      pauseFlight = undefined;
+      resumeFlight = undefined;
+      if (hadSession) emit(false, -1);
     };
+
+    const pause = () => pauseFlight?.();
 
     const armHandback = () => {
       const opts = { passive: true } as const;
-      window.addEventListener("wheel", stop, opts);
-      window.addEventListener("touchstart", stop, opts);
-      window.addEventListener("keydown", stop);
+      window.addEventListener("wheel", pause, opts);
+      window.addEventListener("touchstart", pause, opts);
+      window.addEventListener("keydown", pause);
       detach = () => {
-        window.removeEventListener("wheel", stop);
-        window.removeEventListener("touchstart", stop);
-        window.removeEventListener("keydown", stop);
+        window.removeEventListener("wheel", pause);
+        window.removeEventListener("touchstart", pause);
+        window.removeEventListener("keydown", pause);
       };
     };
 
@@ -1467,9 +1493,12 @@ export default function MultiverseFlight() {
 
       let index = 0;
       let from = 0;
-      let legStart = 0;
       let legMs = 0;
       let dwellUntil = 0;
+      let dwellRemaining = 0;
+      let travelElapsed = 0;
+      let phaseStarted = 0;
+      let phase: "starting" | "travel" | "dwell" = "starting";
       // Authoritative camera progress. Dwell states keep the document pinned
       // to this value so the next leg continues from the visible frame.
       let currentProgress = 0;
@@ -1485,7 +1514,9 @@ export default function MultiverseFlight() {
       const beginLeg = (now: number) => {
         from = currentProgress;
         legMs = legs[index].travelMs;
-        legStart = now;
+        travelElapsed = 0;
+        phaseStarted = now;
+        phase = "travel";
         if (legs[index].cardIndex < cards.length) emit(true, legs[index].cardIndex);
       };
 
@@ -1509,20 +1540,21 @@ export default function MultiverseFlight() {
       const tick = (now: number) => {
         raf = requestAnimationFrame(tick);
 
-        if (dwellUntil) {
+        if (phase === "dwell") {
           holdCurrentProgress();
           if (now < dwellUntil) return;
           if (legs[index].waitForNarration && !introNarrationComplete) return;
           dwellUntil = 0;
+          dwellRemaining = 0;
           index += 1;
           if (index >= legs.length) {
-            stop();
+            finish();
             return;
           }
           beginLeg(now);
         }
 
-        const t = Math.min(1, (now - legStart) / legMs);
+        const t = Math.min(1, (travelElapsed + now - phaseStarted) / legMs);
         const eased = legs[index].linear ? t : ease(t);
         const p = from + (legs[index].target - from) * eased;
         currentProgress = p;
@@ -1543,23 +1575,82 @@ export default function MultiverseFlight() {
         smoothScrollProgress.jump(p);
 
         if (t >= 1) {
-          dwellUntil = now + legs[index].holdMs;
+          travelElapsed = legMs;
+          dwellRemaining = legs[index].holdMs;
+          dwellUntil = now + dwellRemaining;
+          phase = "dwell";
         }
       };
 
+      pauseFlight = () => {
+        if (lifecycle !== "running") return;
+        const now = performance.now();
+        if (phase === "travel") {
+          travelElapsed = Math.min(
+            legMs,
+            travelElapsed + Math.max(0, now - phaseStarted),
+          );
+        } else if (phase === "dwell") {
+          dwellRemaining = Math.max(0, dwellUntil - now);
+        }
+
+        halt();
+        lifecycle = "paused";
+        const cardIndex = Math.min(
+          legs[index]?.cardIndex ?? 0,
+          cards.length - 1,
+        );
+        emit(false, cardIndex, true);
+      };
+
+      resumeFlight = () => {
+        if (lifecycle !== "paused") return;
+        lifecycle = "running";
+        armHandback();
+        const now = performance.now();
+        const cardIndex = Math.min(
+          legs[index]?.cardIndex ?? 0,
+          cards.length - 1,
+        );
+        emit(true, cardIndex);
+
+        if (phase === "starting") {
+          raf = requestAnimationFrame(holdAtStart);
+          return;
+        }
+        if (phase === "dwell") {
+          dwellUntil = now + dwellRemaining;
+        } else {
+          phaseStarted = now;
+        }
+        raf = requestAnimationFrame(tick);
+      };
+
+      lifecycle = "running";
       raf = requestAnimationFrame(holdAtStart);
     };
 
     const onCommand = (event: Event) => {
-      const action = (event as CustomEvent<{ action?: "start" | "stop" }>)
-        .detail?.action;
+      const action = (
+        event as CustomEvent<{
+          action?: "start" | "pause" | "resume" | "stop";
+        }>
+      ).detail?.action;
 
+      if (action === "pause") {
+        pause();
+        return;
+      }
+      if (action === "resume") {
+        resumeFlight?.();
+        return;
+      }
       if (action === "stop") {
-        stop();
+        finish();
         return;
       }
 
-      halt();
+      finish();
       armHandback();
       // The "Let's go" toast (mounted globally, listening for this) fires
       // right here — before the reset-to-beginning below — so the
@@ -1583,10 +1674,10 @@ export default function MultiverseFlight() {
     return () => {
       window.removeEventListener("flight-autopilot", onCommand as EventListener);
       window.removeEventListener("narration-progress", onNarrationProgress as EventListener);
-      // stop(), not halt() — unmounting mid-tour (e.g. a card's own "Next"
+      // finish(), not halt() — unmounting mid-tour (e.g. a card's own "Next"
       // link navigating away) must still tell CockpitTray the tour ended, or
-      // its Disengage button is left pointing at a listener that's gone.
-      stop();
+      // its transport button is left pointing at a listener that's gone.
+      finish();
     };
   }, [smoothScrollProgress]);
 
