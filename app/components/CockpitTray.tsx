@@ -195,6 +195,7 @@ export default function CockpitTray() {
   const [activeId, setActiveId] = useState("home");
   const [isLatchHot, setIsLatchHot] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [leg, setLeg] = useState(-1);
   const [track, setTrack] = useState<"intro" | "main" | null>(null);
   const [isMuted, setIsMuted] = useState(false);
@@ -415,6 +416,25 @@ export default function CockpitTray() {
     emitNarration(NARRATION_SPANS.length, 0, 0, false);
   }, [runRamp]);
 
+  // A paused tour keeps both deck positions and the current crossfade
+  // targets intact. Continuing simply restarts the deck that was active;
+  // no src/currentTime values are rewritten, so narration and music pick up
+  // on the exact audio frame where the visitor paused them.
+  const pauseAudio = useCallback(() => {
+    cancelAnimationFrame(rampRef.current);
+    narrationRef.current?.pause();
+    mainRef.current?.pause();
+  }, []);
+
+  const resumeAudio = useCallback(() => {
+    const active = track === "intro" ? narrationRef.current : mainRef.current;
+    if (!active) return;
+    void active
+      .play()
+      .then(runRamp)
+      .catch(() => {});
+  }, [runRamp, track]);
+
   const toggleMute = () => {
     setIsMuted((prev) => {
       const next = !prev;
@@ -465,14 +485,22 @@ export default function CockpitTray() {
   // starts at the beginning, not wherever the visitor happened to be reading.
   const toggleAutopilot = useCallback(() => {
     if (isRunning) {
-      // Exit-fullscreen happens in the flight-autopilot-state listener when
-      // running flips false, so this path and every other way the tour ends
-      // share one exit point.
       window.dispatchEvent(
-        new CustomEvent("flight-autopilot", { detail: { action: "stop" } }),
+        new CustomEvent("flight-autopilot", { detail: { action: "pause" } }),
       );
       return;
     }
+
+    if (isPaused && pathname === "/") {
+      resumeAudio();
+      setIsOpen(false);
+      enterFullscreen();
+      window.dispatchEvent(
+        new CustomEvent("flight-autopilot", { detail: { action: "resume" } }),
+      );
+      return;
+    }
+
     requestPlayback();
     setIsOpen(false);
     // Must be called here, synchronously inside the click's user
@@ -488,19 +516,36 @@ export default function CockpitTray() {
     window.dispatchEvent(
       new CustomEvent("flight-autopilot", { detail: { action: "start" } }),
     );
-  }, [isRunning, pathname, requestPlayback, router, enterFullscreen]);
+  }, [
+    isPaused,
+    isRunning,
+    pathname,
+    requestPlayback,
+    resumeAudio,
+    router,
+    enterFullscreen,
+  ]);
 
-  // The tour also ends on its own, or when the user takes the controls back
-  // by scrolling — the music and the fullscreen both follow it either way,
-  // since every way a tour can end funnels through this one running:false.
+  // Pausing (from the transport or a real wheel/touch/key handback) freezes
+  // the audio decks in place. Only a completed/cancelled tour tears the
+  // soundtrack down and exits fullscreen.
   useEffect(() => {
     const onState = (event: Event) => {
-      const detail = (event as CustomEvent<{ running?: boolean; index?: number }>)
-        .detail;
+      const detail = (
+        event as CustomEvent<{
+          running?: boolean;
+          paused?: boolean;
+          index?: number;
+        }>
+      ).detail;
       const running = Boolean(detail?.running);
+      const paused = Boolean(detail?.paused);
       setIsRunning(running);
-      setLeg(running ? (detail?.index ?? -1) : -1);
-      if (!running) {
+      setIsPaused(paused);
+      setLeg(running || paused ? (detail?.index ?? -1) : -1);
+      if (paused) {
+        pauseAudio();
+      } else if (!running) {
         stopAudio();
         exitFullscreen();
       }
@@ -512,7 +557,7 @@ export default function CockpitTray() {
         "flight-autopilot-state",
         onState as EventListener,
       );
-  }, [stopAudio, exitFullscreen]);
+  }, [pauseAudio, stopAudio, exitFullscreen]);
 
   const navigate = (id: string) => {
     setActiveId(id);
@@ -724,40 +769,54 @@ export default function CockpitTray() {
                   <button
                     type="button"
                     onClick={toggleAutopilot}
-                    aria-pressed={isRunning}
+                    aria-pressed={isRunning || isPaused}
+                    aria-label={
+                      isRunning
+                        ? "Pause autoplay"
+                        : isPaused
+                          ? "Continue autoplay"
+                          : "Start autoplay"
+                    }
                     className={`flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] transition-colors ${
                       isRunning
                         ? "border-amber-300/45 bg-amber-400/15 text-amber-100 hover:bg-amber-400/25"
+                        : isPaused
+                          ? "border-sky-300/45 bg-sky-400/15 text-sky-100 hover:bg-sky-400/25"
                         : "border-sky-200/30 bg-[linear-gradient(160deg,#33445a,#0d141d)] text-sky-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_2px_6px_rgba(0,0,0,0.6)] hover:border-sky-200/60"
                     }`}
                   >
                     <svg width="11" height="11" viewBox="0 0 24 24" aria-hidden="true">
                       {isRunning ? (
-                        <rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" />
+                        <>
+                          <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" />
+                          <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" />
+                        </>
                       ) : (
                         <path fill="currentColor" d="M8 5.14v13.72L19 12z" />
                       )}
                     </svg>
-                    {isRunning ? "Disengage" : "Autoplay"}
+                    {isRunning ? "Pause" : isPaused ? "Continue" : "Autoplay"}
                   </button>
 
                   <div className="min-w-0 flex-1">
                     <p className="text-[9px] font-semibold uppercase tracking-[0.3em] text-slate-500">
-                      {isRunning
+                      {isRunning || isPaused
                         ? `Autopilot · Leg ${Math.min(leg + 1, stops.length)}/${stops.length}`
                         : "Autopilot Standby"}
                     </p>
                     <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-100/90">
                       {isRunning
                         ? (stops[leg]?.label ?? "Departing")
-                        : "Sit back — it flies itself"}
+                        : isPaused
+                          ? `Paused at ${stops[leg]?.label ?? "current position"}`
+                          : "Sit back — it flies itself"}
                     </p>
                     {/* Tour progress across the seven stops */}
                     <span className="mt-1 block h-[3px] w-full overflow-hidden rounded-full bg-white/10">
                       <motion.span
                         className="block h-full origin-left rounded-full bg-[linear-gradient(90deg,#34d399,#7dd3fc)]"
                         animate={{
-                          scaleX: isRunning
+                          scaleX: isRunning || isPaused
                             ? Math.min(1, (leg + 1) / stops.length)
                             : 0,
                         }}
@@ -793,7 +852,7 @@ export default function CockpitTray() {
                      this is the most dispensable part of it. */}
                   <div className="hidden h-6 items-end gap-[3px] sm:flex">
                     {[0.5, 0.9, 0.65, 1, 0.75].map((peak, i) => {
-                      const live = track !== null && !isMuted;
+                      const live = track !== null && !isMuted && !isPaused;
                       return (
                         <motion.span
                           key={i}
@@ -859,17 +918,28 @@ export default function CockpitTray() {
             <button
               type="button"
               onClick={toggleAutopilot}
-              aria-pressed={isRunning}
-              aria-label={isRunning ? "Disengage autopilot" : "Autoplay the tour"}
+              aria-pressed={isRunning || isPaused}
+              aria-label={
+                isRunning
+                  ? "Pause autoplay"
+                  : isPaused
+                    ? "Continue autoplay"
+                    : "Autoplay the tour"
+              }
               className={`relative z-10 flex h-5 w-5 items-center justify-center rounded-full transition-colors ${
                 isRunning
                   ? "text-amber-300 drop-shadow-[0_0_5px_rgba(252,211,77,0.8)]"
+                  : isPaused
+                    ? "text-sky-300 drop-shadow-[0_0_5px_rgba(125,211,252,0.7)]"
                   : "text-slate-500 hover:text-sky-200"
               }`}
             >
               <svg width="11" height="11" viewBox="0 0 24 24" aria-hidden="true">
                 {isRunning ? (
-                  <rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" />
+                  <>
+                    <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" />
+                    <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" />
+                  </>
                 ) : (
                   <path fill="currentColor" d="M8 5.14v13.72L19 12z" />
                 )}

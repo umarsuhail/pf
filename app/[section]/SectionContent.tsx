@@ -27,6 +27,7 @@ import { getSkillGroups } from "../data/skillGroups";
 import CallbackForm from "../components/CallbackForm";
 import NarratedText from "../components/NarratedText";
 import HandwritingText from "../components/TypoGraphyHand";
+import { ProjectStackShowcase } from "./ProjectStackShowcase";
 import { SkillsShowcase } from "./SkillsShowcase";
 
 const RESUME_PDF_URL = "/umar-suhail-resume-2026.pdf";
@@ -75,7 +76,6 @@ function Eyebrow({ card }: { card: FlightCard }) {
     </span>
   );
 }
-
 function GlowOverlay() {
   return (
     <div className="pointer-events-none absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-white/5 blur-3xl" />
@@ -387,18 +387,7 @@ export function SectionContent({
               </div>
             </div>
 
-            <div className="relative min-h-[320px] overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/35 shadow-[0_32px_90px_-28px_rgba(14,165,233,0.55)] sm:min-h-[420px] lg:min-h-[520px]">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_26%_18%,rgba(125,211,252,0.22),transparent_34%),radial-gradient(circle_at_78%_76%,rgba(52,211,153,0.18),transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.42),rgba(2,6,23,0.74))]" />
-              <div className="absolute inset-x-8 bottom-10 h-20 rounded-full bg-sky-300/20 blur-3xl" />
-              <Image
-                src="/images/pro-hero.png"
-                alt="Collage of project interface cards and digital product screens"
-                fill
-                priority
-                sizes="(max-width: 1024px) calc(100vw - 2rem), 46vw"
-                className="object-contain p-5 drop-shadow-[0_30px_36px_rgba(0,0,0,0.38)] sm:p-8 lg:p-10"
-              />
-            </div>
+            <ProjectStackShowcase projects={projects} />
           </motion.header>
         )}
 
