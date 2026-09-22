@@ -52,7 +52,7 @@ export default function AutopilotStartToast() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.96 }}
             transition={{ type: "spring", stiffness: 320, damping: 26 }}
-            className="flex items-center gap-2.5 rounded-full border border-white/15 bg-slate-950/85 py-2.5 pl-4 pr-5 text-sky-50 shadow-[0_16px_40px_rgba(2,8,23,0.55)] backdrop-blur-xl"
+            className="flex items-center gap-2.5 rounded-full border border-white/15 bg-slate-950/85 py-2.5 pl-4 pr-5 text-sky-50 shadow-[0_16px_40px_rgba(2,8,23,0.55)] "
           >
             <AirplaneIcon ref={iconRef} size={18} className="text-(--accent)" />
             <span className="text-sm font-semibold tracking-wide">Let&apos;s go</span>

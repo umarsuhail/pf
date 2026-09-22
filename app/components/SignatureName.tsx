@@ -76,13 +76,13 @@ export default function SignatureName({
           aria-hidden="true"
           // The size difference between faces is absorbed *into* the motion
           // instead of being fought. Each face resolves out of a slight
-          // under-scale and blur and leaves through a slight over-scale, so
+          // under-scale and leaves through a slight over-scale, so
           // a hand that happens to set larger reads as part of a deliberate
           // zoom-through rather than a size pop. Scaling from the centre
           // (transformOrigin below) keeps the name pinned while it changes.
-          initial={{ opacity: 0, scale: 0.9, y: "0.1em", filter: "blur(7px)" }}
-          animate={{ opacity: 1, scale: 1, y: "0em", filter: "blur(0px)" }}
-          exit={{ opacity: 0, scale: 1.08, y: "-0.1em", filter: "blur(7px)" }}
+          initial={{ opacity: 0, scale: 0.9, y: "0.1em" }}
+          animate={{ opacity: 1, scale: 1, y: "0em" }}
+          exit={{ opacity: 0, scale: 1.08, y: "-0.1em" }}
           transition={{
             // Opacity settles fastest so the two hands are never both fully
             // legible at once — overlapping legibility is what reads as a

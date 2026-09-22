@@ -199,10 +199,10 @@ export default function PageLoader() {
       role="status"
       aria-live="polite"
       aria-busy={!ready}
-      className={`fixed inset-0 z-100 overflow-hidden bg-background transition-[opacity,transform,filter] ease-out ${
+      className={`fixed inset-0 z-100 overflow-hidden bg-background transition-[opacity,transform] ease-out ${
         ready
-          ? "pointer-events-none scale-110 opacity-0 blur-md duration-700"
-          : "scale-100 opacity-100 blur-none duration-500"
+          ? "pointer-events-none scale-110 opacity-0  duration-700"
+          : "scale-100 opacity-100  duration-500"
       }`}
     >
       {/* The corridor. Same perspective the flight itself is staged in, so

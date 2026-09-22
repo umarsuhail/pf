@@ -29,6 +29,9 @@ const AutopilotStartToast = dynamic(() => import("./AutopilotStartToast"), {
 // It had never actually reached the page — the only file rendering it was
 // AppChrome.tsx, which nothing imports.
 const ScrollDial = dynamic(() => import("./ScrollDial"), { ssr: false });
+// The intro leg's way out — see SkipIntroPrompt. Only ever renders while
+// autopilot is holding on the narrated first card.
+const SkipIntroPrompt = dynamic(() => import("./SkipIntroPrompt"), { ssr: false });
 
 export default function ChromeBeforeMain() {
   return (
@@ -36,6 +39,7 @@ export default function ChromeBeforeMain() {
       <ScrollSound />
       <CockpitTray />
       <AutopilotStartToast />
+      <SkipIntroPrompt />
       <ScrollDial />
     </>
   );

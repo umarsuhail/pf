@@ -166,7 +166,7 @@ export default function NeumorphicNavbar() {
           layout
           transition={PILL_SPRING}
           aria-label="Sections"
-          className="flex items-center gap-1 overflow-hidden rounded-full border border-white/15 bg-slate-950/70 p-1.5 shadow-[0_8px_32px_rgba(2,8,23,0.55)] backdrop-blur-md"
+          className="flex items-center gap-1 overflow-hidden rounded-full border border-white/15 bg-slate-950/70 p-1.5 shadow-[0_8px_32px_rgba(2,8,23,0.55)] "
         >
           <motion.button
             layout
@@ -254,7 +254,7 @@ export default function NeumorphicNavbar() {
           </AnimatePresence>
         </motion.nav>
 
-        {/* <nav className="relative flex items-center justify-between rounded-2xl border border-white/70 bg-gray-100/95 px-3 py-2 shadow-md backdrop-blur-sm sm:h-20 sm:rounded-full sm:px-4 sm:py-0 sm:shadow-[8px_8px_16px_#d1d5db,-8px_-8px_16px_#ffffff]">
+        {/* <nav className="relative flex items-center justify-between rounded-2xl border border-white/70 bg-gray-100/95 px-3 py-2 shadow-md sm:h-20 sm:rounded-full sm:px-4 sm:py-0 sm:shadow-[8px_8px_16px_#d1d5db,-8px_-8px_16px_#ffffff]">
           <div className="hidden items-center gap-3 lg:flex">
             {navLinks.map((link) => {
               const isActive = activeId === link.id;
@@ -353,12 +353,12 @@ export default function NeumorphicNavbar() {
       >
         <button
           type="button"
-          className="p-2 rounded-md cursor-pointer border-white/45 bg-white/70 px-3 py-4 shadow-[0_12px_32px_rgba(15,23,42,0.14)] backdrop-blur-sm  mb-2"
+          className="p-2 rounded-md cursor-pointer border-white/45 bg-white/70 px-3 py-4 shadow-[0_12px_32px_rgba(15,23,42,0.14)]   mb-2"
           onClick={() => handleNavigate("home")}
         >
          <BotIcon/>
         </button>
-        <div className={`flex absolute top-[80px] right-0 items-center gap-3 rounded-2xl border border-white/45 bg-white/70 pl-2 pr-3 py-4 shadow-[0_12px_32px_rgba(15,23,42,0.14)] backdrop-blur-sm transition-all duration-300`}>
+        <div className={`flex absolute top-[80px] right-0 items-center gap-3 rounded-2xl border border-white/45 bg-white/70 pl-2 pr-3 py-4 shadow-[0_12px_32px_rgba(15,23,42,0.14)] transition-all duration-300`}>
           <div className="flex h-88 flex-col items-center justify-between [@media(max-height:560px)]:h-56">
             {navLinks.map((link) => {
               const isActive = activeId === link.id;
@@ -414,7 +414,7 @@ export default function NeumorphicNavbar() {
           type="button"
           onClick={() => setIsCollapsed((prev) => !prev)}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="mt-2 absolute top-[55px] left-[-10px] self-center rounded-full border border-white/45 bg-white/70 p-1.5 shadow-[0_4px_12px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-all duration-300 hover:bg-white/90"
+          className="mt-2 absolute top-[55px] left-[-10px] self-center rounded-full border border-white/45 bg-white/70 p-1.5 shadow-[0_4px_12px_rgba(15,23,42,0.12)]  transition-all duration-300 hover:bg-white/90"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

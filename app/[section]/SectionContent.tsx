@@ -70,7 +70,7 @@ const PANEL_CLASS =
 
 function Eyebrow({ card }: { card: FlightCard }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200/30 bg-emerald-200/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.32em] text-emerald-100 backdrop-blur-md">
+    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200/30 bg-emerald-200/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.32em] text-emerald-100">
       <CardIcon id={card.id} size={14} aria-hidden="true" />
       {card.eyebrow}
     </span>
@@ -78,7 +78,7 @@ function Eyebrow({ card }: { card: FlightCard }) {
 }
 function GlowOverlay() {
   return (
-    <div className="pointer-events-none absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-white/5 blur-3xl" />
+    <div className="pointer-events-none absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-white/5" />
   );
 }
 
@@ -174,11 +174,10 @@ export function SectionContent({
   };
 
   const itemVariants: Variants = {
-    hidden: { opacity: 0, y: 30, filter: "blur(8px)" },
+    hidden: { opacity: 0, y: 30 },
     show: {
       opacity: 1,
       y: 0,
-      filter: "blur(0px)",
       transition: { type: "spring", stiffness: 100, damping: 20 },
     },
   };
@@ -188,7 +187,7 @@ export function SectionContent({
       {card.id === "skills" && (
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-0 z-0 bg-slate-950/10 backdrop-blur-[6px]"
+          className="pointer-events-none fixed inset-0 z-0 bg-slate-950/10 "
         />
       )}
 
@@ -261,7 +260,7 @@ export function SectionContent({
 
               {/* Portrait — TODO: swap for a higher-res headshot if you have one */}
               <div className="relative mx-auto w-full max-w-sm lg:max-w-none">
-                <div className="pointer-events-none absolute inset-0 rounded-full bg-emerald-400/10 blur-3xl" />
+                <div className="pointer-events-none absolute inset-0 rounded-full bg-emerald-400/10" />
                 <div className="relative aspect-square w-full overflow-hidden rounded-[2rem] border border-white/10">
                   <Image src="/images/me-s.jpg" alt="Umar Suhail" fill className="object-cover" />
                 </div>
@@ -273,7 +272,7 @@ export function SectionContent({
                 ].map((chip) => (
                   <div
                     key={chip.title}
-                    className={`absolute hidden rounded-xl border border-white/10 bg-slate-900/85 px-4 py-3 shadow-lg backdrop-blur-md sm:block ${chip.pos}`}
+                    className={`absolute hidden rounded-xl border border-white/10 bg-slate-900/85 px-4 py-3 shadow-lg sm:block ${chip.pos}`}
                   >
                     <p className="text-xs font-semibold text-sky-50">{chip.title}</p>
                     <p className="text-[11px] text-slate-100/60">{chip.detail}</p>
@@ -436,7 +435,7 @@ export function SectionContent({
                         className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                       />
                       <span
-                        className={`absolute left-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-xl border backdrop-blur-sm ${accent}`}
+                        className={`absolute left-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-xl border ${accent}`}
                       >
                         <Icon size={16} aria-hidden="true" />
                       </span>
@@ -536,7 +535,7 @@ export function SectionContent({
                   return (
                     <div
                       key={line}
-                      className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 backdrop-blur-sm"
+                      className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 "
                     >
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-sky-100/50">
                         {label}

@@ -44,8 +44,8 @@ export default function RevealSection({
       ref={ref}
       className={`transition-all duration-1000 ease-out ${
         visible
-          ? "translate-y-0 opacity-100 blur-none"
-          : "translate-y-10 opacity-0 blur-md"
+          ? "translate-y-0 opacity-100 "
+          : "translate-y-10 opacity-0 "
       } ${className}`}
       style={{ transitionDelay: `${delay}ms` }}
     >

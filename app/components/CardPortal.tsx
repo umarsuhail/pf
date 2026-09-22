@@ -158,7 +158,7 @@ function PortalMotif({ motif, accent }: { motif: MotifType; accent: string }) {
     case "orb":
       return (
         <div
-          className="motif-breathe absolute left-1/2 top-1/2 h-[46%] w-[46%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[2px]"
+          className="motif-breathe absolute left-1/2 top-1/2 h-[46%] w-[46%] -translate-x-1/2 -translate-y-1/2 rounded-full "
           style={{
             background: `radial-gradient(circle, ${accent}66 0%, ${accent}22 45%, transparent 75%)`,
           }}
@@ -250,7 +250,7 @@ function PortalMotif({ motif, accent }: { motif: MotifType; accent: string }) {
     default:
       return (
         <div
-          className="motif-breathe absolute left-1/2 top-1/2 h-[60%] w-[60%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[6px]"
+          className="motif-breathe absolute left-1/2 top-1/2 h-[60%] w-[60%] -translate-x-1/2 -translate-y-1/2 rounded-full "
           style={{
             background: `radial-gradient(circle, ${accent}44 0%, ${accent}15 50%, transparent 75%)`,
           }}

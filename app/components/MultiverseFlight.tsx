@@ -97,10 +97,10 @@ const FLIGHT_VELOCITY_SPRING = {
   mass: 0.24,
 } as const;
 
-// Camera velocity below which there is no motion blur at all. Reading a card,
+// Camera velocity below which the speed trail stays hidden. Reading a card,
 // nudging the wheel, and the camera spring settling all sit under this, which
 // is the point: a still scene should be sharp.
-const FLIGHT_BLUR_FLOOR = 0.055;
+const FLIGHT_STREAK_FLOOR = 0.055;
 
 const FLIGHT_STREAK_BACKGROUND =
   "repeating-conic-gradient(from 0deg at 50% 50%, transparent 0deg 2deg, rgba(186,230,253,0.22) 2.35deg 2.62deg, transparent 3.15deg 8deg), radial-gradient(ellipse at 50% 50%, rgba(56,189,248,0.22) 0%, transparent 64%)";
@@ -558,11 +558,6 @@ function BillboardCard({
     fadeStops,
     [index === 0 ? 1 : 0.0, index === 0 ? 1 : 0.42, 1, 1, 0.0]
   );
-  const upcomingBlur = useTransform(
-    smoothScrollProgress,
-    fadeStops,
-    [index === 0 ? 0 : 4, index === 0 ? 0 : 1.2, 0, 0, 3]
-  );
   const upcomingScale = useTransform(
     smoothScrollProgress,
     fadeStops,
@@ -596,19 +591,6 @@ function BillboardCard({
 
   const activeReadabilityBoost = useTransform(straightening, [0, 1], [0, 1]);
   const effectiveOpacity = useTransform(() => Math.min(1, upcomingOpacity.get() + activeReadabilityBoost.get() * 0.38));
-  // A continuously-animating blur() is one of the most expensive styles on
-  // the page: every fractional radius change forces the compositor to
-  // re-rasterize the whole card layer (large, box-shadowed, rounded), and
-  // during scroll that was happening on every frame for every card at once.
-  // Quantizing to 0.5px steps keeps the visual identical while cutting the
-  // re-rasters to a handful per transit — and "none" (rather than blur(0px))
-  // while a card is sharp frees the compositor from the filter entirely in
-  // the state cards spend most of their time in.
-  const cardFilter = useTransform(() => {
-    const raw = upcomingBlur.get() * (1 - straightening.get());
-    const stepped = Math.round(raw * 2) / 2;
-    return stepped <= 0 ? "none" : `blur(${stepped}px)`;
-  });
   // Faded-out cards are still hit-testable — and since every card is
   // absolutely stacked in the same container, the later ones sit on top and
   // swallow clicks meant for the card actually in view (that's what made
@@ -625,7 +607,6 @@ function BillboardCard({
         rotateY: activeRotateY,
         rotateX: activeRotateX,
         opacity: effectiveOpacity,
-        filter: cardFilter,
         scale: upcomingScale,
         background: cardGradient,
         // The card is a real 3D surface: it is tilted and pushed down the
@@ -1008,23 +989,10 @@ export default function MultiverseFlight() {
   // while the ship is moving, then fades away without a flash or pull-back.
   const cameraVelocity = useVelocity(smoothScrollProgress);
   const smoothCameraVelocity = useSpring(cameraVelocity, FLIGHT_VELOCITY_SPRING);
-  // Real motion blur is a function of how far the scene moved during one
-  // exposure, so below a genuine speed there is none of it at all. The old
-  // curve had no floor and a x7 gain, which saturated at a camera velocity of
-  // ~0.14 — a gentle wheel nudge. The smear was therefore present essentially
-  // whenever the page was not perfectly still, which is what made it read as
-  // an effect laid over the scene rather than as speed.
-  //
-  // FLIGHT_BLUR_FLOOR is the deadband: drift below it and the corridor is
-  // sharp. Past it the ramp is gentler, so intensity keeps climbing with
-  // actual speed instead of pinning at the top the moment it engages.
+  // Keep the speed trail subtle at reading speed; animate only opacity and transforms.
   const forwardFlightIntensity = useTransform(smoothCameraVelocity, (velocity) =>
-    Math.min(1, Math.max(0, Math.max(0, velocity) - FLIGHT_BLUR_FLOOR) * 3.4),
+    Math.min(1, Math.max(0, Math.max(0, velocity) - FLIGHT_STREAK_FLOOR) * 3.4),
   );
-  // Peaks come down with it: opacity 0.10 -> 0.065, blur 1.4px -> 0.85px, and
-  // a shallower zoom and drift. Combined with the deadband above, the corridor
-  // is sharp at reading speed and only smears when the flight is genuinely
-  // moving.
   const flightStreakOpacity = useTransform(
     forwardFlightIntensity,
     [0, 0.25, 1],
@@ -1032,15 +1000,6 @@ export default function MultiverseFlight() {
   );
   const flightStreakScale = useTransform(forwardFlightIntensity, [0, 1], [1.02, 1.05]);
   const flightStreakY = useTransform(forwardFlightIntensity, [0, 1], ["0%", "-2%"]);
-  // Still always a blur() string, never "none". Toggling a filter on and off
-  // makes the compositor create and destroy the layer's buffer; holding one
-  // filter that happens to reach 0px costs a cheap no-op blur instead, and the
-  // layer is culled by its own opacity long before that matters.
-  const flightStreakBlur = useTransform(
-    forwardFlightIntensity,
-    (value) => `blur(${(value * 0.85).toFixed(2)}px)`,
-  );
-
   const zCamera = useTransform(smoothScrollProgress, [0, 1], [0, isMobile ? 7800 : 8400]);
 
   // Colour now comes from the cross-faded SPACE_REGIONS layers below rather
@@ -1751,7 +1710,7 @@ export default function MultiverseFlight() {
         />
 
         {/* A lightweight speed-trail layer, deliberately behind the particle
-           field and every card. The blur never touches text, portals, or the
+           field and every card. The trail sits behind text, portals, and the
            route map; it only gives the surrounding space some forward flow. */}
         <motion.div
           aria-hidden="true"
@@ -1760,9 +1719,8 @@ export default function MultiverseFlight() {
             opacity: flightStreakOpacity,
             scale: flightStreakScale,
             y: flightStreakY,
-            filter: flightStreakBlur,
             backgroundImage: FLIGHT_STREAK_BACKGROUND,
-            willChange: "transform, opacity, filter",
+            willChange: "transform, opacity",
           }}
         />
 

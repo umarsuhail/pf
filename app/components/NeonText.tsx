@@ -16,23 +16,6 @@ export default function NeonText({
 
   return (
     <div className={`absolute inline-block ${className}`}>
-      {/* Ambient glow behind text */}
-      <motion.div
-        aria-hidden
-        className="absolute inset-0 blur-2xl opacity-40"
-        animate={{
-          opacity: [0.25, 0.55, 0.3, 0.7, 0.25],
-          scale: [0.98, 1.03, 1, 1.04, 0.98],
-        }}
-        transition={{
-          duration: 2.8,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-      >
-        <span className="text-[#39ff14]">{text}</span>
-      </motion.div>
-
       {/* Main text */}
       <motion.div
         className="relative font-bold tracking-[0.12em] text-[#39ff14]"
@@ -63,12 +46,10 @@ export default function NeonText({
               hidden: {
                 opacity: 0,
                 y: 12,
-                filter: "blur(8px)",
               },
               visible: {
                 opacity: 1,
                 y: 0,
-                filter: "blur(0px)",
                 transition: {
                   duration: 0.45,
                   ease: [0.22, 1, 0.36, 1],
