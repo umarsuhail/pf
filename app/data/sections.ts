@@ -26,6 +26,7 @@ export type FlightCard = {
     image: string;
     category: string;
     stack: string[];
+    href?: string;
   }[];
   timeline?: {
     company: string;
@@ -158,7 +159,8 @@ export const cards: FlightCard[] = [
           "ATS-friendly resume builder with live editing, styling, preview, and PDF/TeX export.",
         image: "/images/pro1.png",
         category: "Tools",
-        stack: ["Next.js", "TypeScript", "Tailwind CSS", "PDFKit"],
+        stack: ["Next.js", "TypeScript", "Tailwind CSS", "LaTeX"],
+        href: process.env.NEXT_PUBLIC_ATS_STUDIO_URL ?? "http://localhost:3010",
       },
     ],
   },
