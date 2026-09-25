@@ -11,7 +11,7 @@ import {
   type MotionValue,
 } from "framer-motion";
 import Link from "next/link";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CardPortal } from "./CardPortal";
 import { CardIcon } from "./icons/card-icon";
 import { DownloadIcon, type DownloadIconHandle } from "./icons/download";
@@ -22,6 +22,24 @@ import SpaceParticles from "./SpaceParticles";
 import ParticleLogo from "./HeroLogo";
 import SignatureName from "./SignatureName";
 import { POWER3_OUT } from "../lib/easings";
+// The camera constants moved to lib/camera so the technology spiral can fly
+// through the same coordinate system rather than a copy of it.
+import { MAX_CARD_CAMERA_Z, cameraTravelFor } from "../lib/camera";
+import {
+  TRACK_VH,
+  progressFromScroll,
+  scrollFromProgress,
+} from "../data/flightTimeline";
+import { useTravelGear } from "../lib/travel-gear";
+import TechnologyLayover, { LayoverCaption } from "./TechnologyLayover";
+import {
+  buildSnapPoints,
+  TECHNOLOGY_FOCUS_STOPS,
+  TECHNOLOGY_LAYOVER_END,
+  TECHNOLOGY_LAYOVER_START,
+  getCardSlotProgress,
+  sectionProgressStops,
+} from "../data/flightStops";
 
 import {
   cardGradients,
@@ -29,8 +47,6 @@ import {
   sectionProgressMap,
   type FlightCard,
 } from "../data/sections";
-
-const sectionProgressStops = cards.map((card) => sectionProgressMap[card.id]);
 
 const HOME_HEADLINE_PHRASES = [
   "reliable apps",
@@ -68,25 +84,19 @@ const PHYSICS = {
   expansion: { type: "spring", stiffness: 180, damping: 22, mass: 0.9 },
 } as const;
 
-// Soft and heavily overdamped (zeta ~2.4). The document still scrolls
-// natively at whatever speed the visitor flicks it, but the camera refuses to
-// be flicked: it glides to wherever the scroll landed over about a second and
-// arrives without a trace of rebound. A one-section flick used to snap the
-// camera into place in 0.42s, which is what made fast scrolling read as
-// jumping between sections rather than travelling between them; the same
-// flick now takes ~1.15s, and slamming the whole page takes ~1.3s instead of
-// 0.6s. Peak camera speed roughly halves as a side effect, which is also what
-// takes most of the sting out of the speed trail below.
+// A short, overdamped settle. Native scrolling and the rotary dial both land
+// on discrete scene stops now, so a long camera follow only makes a firm stop
+// feel slippery. This is quick enough to register as a mechanical snap while
+// remaining non-oscillating on a low-refresh mobile display.
 const CAMERA_SPRING = {
-  stiffness: 120,
-  damping: 34,
-  mass: 0.42,
+  stiffness: 260,
+  damping: 32,
+  mass: 0.32,
   restDelta: 0.00005,
 } as const;
 
-// Softened to match: this smooths the *derivative* of the camera above, so a
-// stiff spring here would put the speed trail's fade back on the input's
-// timing rather than the camera's and undo the calm the camera spring buys.
+// The velocity readout stays overdamped so the faster positional snap does
+// not turn the decorative speed trail into a flash at every section change.
 const FLIGHT_VELOCITY_SPRING = {
   stiffness: 240,
   damping: 40,
@@ -129,6 +139,10 @@ type SpaceRegion = {
   drift: number;
 };
 
+// Anchored to the panels themselves, not to copies of their coordinates: a
+// region that repeats "0.22" keeps pointing at where Skills used to be the
+// first time a stop moves, and the card then flies through someone else's
+// colour. `dusk` and `void` have no card of their own and keep literals.
 const SPACE_REGIONS: SpaceRegion[] = [
   {
     // Departure — still inside a lit atmosphere, brightest point of the trip.
@@ -139,36 +153,43 @@ const SPACE_REGIONS: SpaceRegion[] = [
     drift: -3,
   },
   {
-    // Skills — emerald gas cloud, matching that portal's #34d399.
-    id: "emerald",
-    at: 0.22,
+    // Skills — teal gas cloud, matching that portal's #2dd4bf.
+    id: "teal",
+    at: sectionProgressMap.skills,
     background:
-      "radial-gradient(90% 70% at 22% 38%, rgba(52,211,153,0.17) 0%, rgba(16,185,129,0.08) 42%, transparent 70%), radial-gradient(80% 60% at 82% 72%, rgba(14,165,233,0.11) 0%, transparent 62%), linear-gradient(180deg, #021a21 0%, #010d13 100%)",
+      "radial-gradient(90% 70% at 22% 38%, rgba(45,212,191,0.17) 0%, rgba(13,148,136,0.08) 42%, transparent 70%), radial-gradient(80% 60% at 82% 72%, rgba(14,165,233,0.11) 0%, transparent 62%), linear-gradient(180deg, #02191e 0%, #010d11 100%)",
     drift: -6,
   },
   {
     // Projects — electric blue trench, the deepest "open water" stretch.
     id: "azure",
-    at: 0.56,
+    at: sectionProgressMap.projects,
     background:
       "radial-gradient(100% 80% at 74% 32%, rgba(96,165,250,0.18) 0%, rgba(37,99,235,0.09) 40%, transparent 70%), radial-gradient(70% 60% at 18% 76%, rgba(129,140,248,0.1) 0%, transparent 60%), linear-gradient(180deg, #05132b 0%, #010611 100%)",
     drift: -9,
   },
   {
-    // Experience — a warm amber nebula. The one hot colour in the run; it is
-    // what keeps the second half from reading as one long blue dissolve.
-    id: "amber",
-    at: 0.69,
+    // Experience — a violet nebula, the deepest point of the trip and the
+    // exact colour of that card's own accent (#a78bfa), so the card bleeds
+    // into the sky rather than ending at its edge. This was the run's one hot
+    // colour (amber, with a rose second light); it kept the second half from
+    // being a single blue dissolve, but at the cost of a highway-sign yellow
+    // in the middle of deep space. Separation now comes from hue distance
+    // inside the cold half of the wheel instead of from temperature.
+    id: "violet",
+    at: sectionProgressMap.experience,
     background:
-      "radial-gradient(95% 75% at 30% 62%, rgba(251,191,36,0.15) 0%, rgba(217,119,6,0.08) 38%, transparent 68%), radial-gradient(75% 60% at 80% 24%, rgba(244,63,94,0.09) 0%, transparent 60%), linear-gradient(180deg, #160b04 0%, #090306 100%)",
+      "radial-gradient(95% 75% at 30% 62%, rgba(167,139,250,0.16) 0%, rgba(124,58,237,0.08) 38%, transparent 68%), radial-gradient(75% 60% at 80% 24%, rgba(217,70,239,0.08) 0%, transparent 60%), linear-gradient(180deg, #0d0620 0%, #050209 100%)",
     drift: -12,
   },
   {
-    // Resume — cooling back down through violet as the warmth falls behind.
-    id: "violet",
+    // The stretch between Experience and Contact — no card sits here, it is
+    // travel. Indigo: the violet above cooling toward the void rather than a
+    // colour of its own.
+    id: "dusk",
     at: 0.81,
     background:
-      "radial-gradient(90% 70% at 62% 44%, rgba(167,139,250,0.14) 0%, rgba(99,102,241,0.07) 40%, transparent 68%), linear-gradient(180deg, #0b071d 0%, #030208 100%)",
+      "radial-gradient(90% 70% at 62% 44%, rgba(129,140,248,0.13) 0%, rgba(79,70,229,0.07) 40%, transparent 68%), linear-gradient(180deg, #080a1d 0%, #020308 100%)",
     drift: -15,
   },
   {
@@ -224,19 +245,7 @@ function SpaceRegionLayer({
 // place to hold an autoplay scene: copy gets cropped and the portal swallows
 // the viewport. Every navigation now lands just before that point in the
 // card's readable "slot", where the whole panel has room to breathe.
-const CARD_SLOT_LEAD = 0.048;
 const CARD_SLOT_MIN_APPROACH = 0.045;
-
-function getCardSlotProgress(index: number) {
-  if (index <= 0) return 0;
-
-  const current = sectionProgressStops[index];
-  const previous = sectionProgressStops[index - 1];
-  const span = Math.max(current - previous, 0.08);
-  // Preserve a little arrival runway even for tightly packed cards, while
-  // keeping the physical distance to the camera consistent on wide gaps.
-  return Math.max(previous + span * 0.3, current - CARD_SLOT_LEAD);
-}
 
 function getNavTargetProgress(targetId: string) {
   const index = cards.findIndex((c) => c.id === targetId);
@@ -262,16 +271,24 @@ function getRevealWindow(index: number) {
   const current = sectionProgressStops[index];
   const span = Math.max(current - previous, 0.08);
   const slot = getCardSlotProgress(index);
-  return {
+  let start = Math.max(
     // Begin the handoff while the card is still at a comfortable depth, and
     // have its sharp, full-scale state arrive exactly at the readable slot.
-    start: Math.max(
-      previous + span * 0.24,
-      slot - Math.max(span * 0.3, CARD_SLOT_MIN_APPROACH),
-      0,
-    ),
-    end: slot,
-  };
+    previous + span * 0.24,
+    slot - Math.max(span * 0.3, CARD_SLOT_MIN_APPROACH),
+    0,
+  );
+
+  // A card arriving on the far side of the technology layover waits for it.
+  // Its natural approach would begin 0.135 of progress before its slot, which
+  // is most of the way back through the helix — the billboard would fade up
+  // behind the tools and the two would be on screen together, each making the
+  // other unreadable.
+  if (previous < TECHNOLOGY_LAYOVER_END && slot > TECHNOLOGY_LAYOVER_END) {
+    start = Math.max(start, TECHNOLOGY_LAYOVER_END + 0.01);
+  }
+
+  return { start: Math.min(start, slot - 0.01), end: slot };
 }
 
 function getFocusWindow(index: number) {
@@ -304,6 +321,8 @@ const DEPART_SPAN = 0.34;
 const AUTOPILOT_SECTION_SECONDS = 10;
 const AUTOPILOT_HOLD = 3.5;
 const AUTOPILOT_TRAVEL = AUTOPILOT_SECTION_SECONDS - AUTOPILOT_HOLD;
+const AUTOPILOT_TECH_TRAVEL = 0.72;
+const AUTOPILOT_TECH_HOLD = 0.9;
 
 // The last real card (contact) and the tail beyond it (the earth/moon/end-
 // credits payoff) both get more time than the standard mid-tour hold —
@@ -332,8 +351,19 @@ function getDepartWindow(index: number) {
   // readable slot, or an autoplay hold would stack a blown-up outgoing panel
   // over its newly framed replacement.
   const span = Math.min(DEPART_SPAN, (1 - current) / 0.85, (next - current) / 0.85);
-  const start = Math.min(current + span * 0.3, 1);
+  let start = Math.min(current + span * 0.3, 1);
   let end = Math.min(current + span * 0.85, 1);
+
+  // A card leaving into the technology layover has to be *gone* before it,
+  // not merely dimming through it. The Skills card is the case this exists
+  // for: its gap to Projects is wide enough that the generic maths gave it a
+  // departure running to 0.509, so the billboard sat at pass-through size
+  // across most of the toolkit. The fade is pulled forward into the room
+  // between its own stop and the first tool instead.
+  if (current < TECHNOLOGY_LAYOVER_START && next > TECHNOLOGY_LAYOVER_START) {
+    end = Math.min(end, TECHNOLOGY_LAYOVER_START - 0.01);
+    start = Math.min(start, end - 0.06);
+  }
 
   // The final card is the exception. Every other card's fade ends when the
   // next card arrives, but this one has no successor, so the generic maths
@@ -358,6 +388,20 @@ function toStrictlyIncreasing(values: number[]) {
     out.push(Math.max(values[i], out[i - 1] + 0.0005));
   }
   return out;
+}
+
+// Snap landings keep the document scrollable and accessible while making a
+// gesture land somewhere chosen. Which landings exist is the gear's call —
+// first gear has none at all.
+function snapMarkerTop(progress: number) {
+  // Converted out of flight progress: these are absolutely positioned down the
+  // track, and the track is scroll. A marker left in progress would sit at the
+  // right moment of the flight in the wrong place in the document.
+  const percentage = Number((scrollFromProgress(progress) * 100).toFixed(4));
+  // The target progress maps over containerHeight - viewportHeight, not the
+  // full track. Expanded form avoids CSS multiplication while remaining
+  // responsive to orientation and browser-toolbar changes.
+  return `calc(${percentage}% - ${percentage}dvh)`;
 }
 
 function RotatingHomeHeadline() {
@@ -547,6 +591,12 @@ function BillboardCard({
 
   const focus = getFocusWindow(index);
   const depart = getDepartWindow(index);
+  const cameraTravel = cameraTravelFor(isMobile);
+  const cardTranslateZ = useTransform(
+    smoothScrollProgress,
+    (progress) =>
+      Math.min(card.z, MAX_CARD_CAMERA_Z - progress * cameraTravel),
+  );
   const fadeStops = toStrictlyIncreasing([0, revealStart, revealEnd, depart.start, depart.end]);
   
   const upcomingOpacity = useTransform(
@@ -600,7 +650,25 @@ function BillboardCard({
   // re-rasters to a handful per transit — and "none" (rather than blur(0px))
   // while a card is sharp frees the compositor from the filter entirely in
   // the state cards spend most of their time in.
+  // Off entirely on phones, and not merely reduced.
+  //
+  // Two reasons, and the second is the one that matters on iOS. First, cost: a
+  // fractional blur radius re-rasterizes the whole card — gradient, border,
+  // rounded corners, 90px shadow — and a mobile GPU pays far more for that
+  // than a desktop one, for a depth cue that is barely visible on a card a
+  // third of the size and already separated by opacity and scale.
+  //
+  // Second, `filter` is a CSS *grouping property*: any value other than
+  // `none` forces `transform-style: flat` on the element it is set on. This
+  // card declares `preserve-3d` and has children standing off its face at
+  // translateZ. Blink tolerates that; WebKit is stricter about flattening a
+  // grouped child into its parent's plane, which is what collapses the
+  // corridor's depth on Safari and iOS and leaves every card drawn at the
+  // same size side by side. Returning a constant `none` removes the property
+  // from the element altogether rather than toggling it, which is the only
+  // form of this that is safe.
   const cardFilter = useTransform(() => {
+    if (isMobile) return "none";
     const raw = upcomingBlur.get() * (1 - straightening.get());
     const stepped = Math.round(raw * 2) / 2;
     return stepped <= 0 ? "none" : `blur(${stepped}px)`;
@@ -613,11 +681,20 @@ function BillboardCard({
   const cardPointerEvents = useTransform(effectiveOpacity, (o) =>
     o > 0.55 ? "auto" : "none",
   );
+  // Opacity alone is not sufficient around a CSS perspective singularity.
+  // Chromium can retain a nearly-transparent promoted layer for a frame as
+  // it crosses the camera plane, then project that cached texture backwards
+  // across the viewport. `visibility` removes a departed layer from painting
+  // after its opacity reaches zero. Upcoming cards remain renderable because
+  // their long, faint approach is an intentional part of the corridor depth.
+  const cardVisibility = useTransform(smoothScrollProgress, (progress) =>
+    progress >= depart.end ? "hidden" : "visible",
+  );
 
   return (
     <motion.div
       style={{
-        translateZ: card.z,
+        translateZ: cardTranslateZ,
         rotateY: activeRotateY,
         rotateX: activeRotateX,
         opacity: effectiveOpacity,
@@ -640,6 +717,7 @@ function BillboardCard({
         // frame's rasterization.
         transformStyle: "preserve-3d",
         pointerEvents: cardPointerEvents,
+        visibility: cardVisibility,
         // The flight is a scale animation, and scale is the one transform a
         // compositor cannot fake: without this the card is not a layer of its
         // own, so Chrome re-rasterizes the whole panel — gradient, border,
@@ -876,6 +954,9 @@ function BillboardCard({
 
 export default function MultiverseFlight() {
   const containerRef = useRef<HTMLDivElement>(null);
+  // The gearbox both inputs read; see lib/travel-gear.ts. Only its snap
+  // setting matters here — the dial reads the same object for its own ratio.
+  const gear = useTravelGear();
   // `compact` drives the smaller in-flight card sizing. The flight now runs
   // at every viewport — portrait phones included — with `mobileOffsetScale`
   // (derived from the actual viewport width below) keeping the left/right
@@ -964,6 +1045,72 @@ export default function MultiverseFlight() {
     };
   }, []);
 
+  // How far one wheel gesture lands you is the gear's decision, not this
+  // component's.
+  //
+  // This used to hard-code `y mandatory` with a marker at every stop, which
+  // made one gesture worth one whole panel — you could not scroll *through* a
+  // section, only past it. First gear now turns the layer off entirely (free,
+  // smooth travel), second divides each section into three landings, third
+  // keeps the original panel-at-a-time jump. The flight is a continuous
+  // function of scroll position either way, so nothing below this cares.
+  const snapPoints = useMemo(
+    () => buildSnapPoints(gear.snapStepsPerSection),
+    [gear.snapStepsPerSection],
+  );
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const previousSnapType = root.style.scrollSnapType;
+    const previousSnapPadding = root.style.scrollPaddingTop;
+    const snaps = gear.snapStepsPerSection > 0;
+
+    // Two things drive the scroll position themselves and must not have
+    // mandatory snapping pulling at them every frame: the autopilot tour, and
+    // a hand on the dial. The dial is the reason this is not just the
+    // autopilot flag any more — landings belong to the wheel, and the ring is
+    // supposed to travel continuously whatever gear it is in.
+    let autopilotRunning = false;
+    let dialTurning = false;
+    const applySnap = () => {
+      root.style.scrollSnapType =
+        snaps && !autopilotRunning && !dialTurning ? "y mandatory" : "none";
+    };
+
+    const onAutopilotState = (event: Event) => {
+      autopilotRunning = Boolean(
+        (event as CustomEvent<{ running?: boolean }>).detail?.running,
+      );
+      applySnap();
+    };
+    const onDialState = (event: Event) => {
+      dialTurning = Boolean(
+        (event as CustomEvent<{ turning?: boolean }>).detail?.turning,
+      );
+      applySnap();
+    };
+
+    applySnap();
+    root.style.scrollPaddingTop = "0px";
+    window.addEventListener(
+      "flight-autopilot-state",
+      onAutopilotState as EventListener,
+    );
+    window.addEventListener("flight-dial-turn", onDialState as EventListener);
+    return () => {
+      window.removeEventListener(
+        "flight-autopilot-state",
+        onAutopilotState as EventListener,
+      );
+      window.removeEventListener(
+        "flight-dial-turn",
+        onDialState as EventListener,
+      );
+      root.style.scrollSnapType = previousSnapType;
+      root.style.scrollPaddingTop = previousSnapPadding;
+    };
+  }, [gear.snapStepsPerSection]);
+
   const isMobile = compact;
   // `endMarkBox` is 0 until the first measure lands (there is no window to
   // read during SSR); the breakpoint guess stands in for that one render.
@@ -972,16 +1119,28 @@ export default function MultiverseFlight() {
   // less room to spend on breathing space) — these ratios reproduce the old
   // fixed pairs at their original viewports.
   const endMarkSize = Math.round(markBox * (isMobile ? 0.88 : 0.76));
+  // The composition still reserves exactly `markBox`, but the transparent
+  // canvas inside it is larger so interaction particles can travel beyond the
+  // logo without exposing a clipped square. The viewport itself remains the
+  // final, natural boundary.
+  const endParticleCanvasSize = Math.round(markBox * 1.95);
   // Point count follows area, so a small mark is not over-packed and a large
   // one does not thin out into the sparse ring this started as.
   const endParticleCount = Math.round(
-    Math.min(840, Math.max(240, (endMarkSize * endMarkSize) / 138)),
+    Math.min(1020, Math.max(300, (endMarkSize * endMarkSize) / 115)),
   );
 
-  const { scrollYProgress } = useScroll({
+  const { scrollYProgress: trackScroll } = useScroll({
     target: containerRef,
     offset: ["start start", "end end"],
   });
+
+  // Everything below this line works in flight progress, never in raw scroll.
+  // The timeline decides how much scrolling each leg costs (see
+  // data/flightTimeline.ts); this is the one place that conversion happens on
+  // the way in, and `scrollFromProgress` is the one used on the way out by
+  // anything that writes a scroll position.
+  const scrollYProgress = useTransform(trackScroll, progressFromScroll);
 
   // Keep document scrolling native, then give just the 3D camera a short,
   // overdamped visual follow. That removes the hard step between wheel/touch
@@ -1027,12 +1186,20 @@ export default function MultiverseFlight() {
   // makes the compositor create and destroy the layer's buffer; holding one
   // filter that happens to reach 0px costs a cheap no-op blur instead, and the
   // layer is culled by its own opacity long before that matters.
-  const flightStreakBlur = useTransform(
-    forwardFlightIntensity,
-    (value) => `blur(${(value * 0.85).toFixed(2)}px)`,
+  // A full-viewport animated blur under a `mix-blend-mode: screen` layer is
+  // the single most expensive composite on this page, and on a phone it is not
+  // close. The opacity and scale drift alone still read as forward flow —
+  // which is the part that survives on a small screen anyway — so the filter
+  // is dropped rather than softened there.
+  const flightStreakBlur = useTransform(forwardFlightIntensity, (value) =>
+    isMobile ? "none" : `blur(${(value * 0.85).toFixed(2)}px)`,
   );
 
-  const zCamera = useTransform(smoothScrollProgress, [0, 1], [0, isMobile ? 7800 : 8400]);
+  const zCamera = useTransform(
+    smoothScrollProgress,
+    [0, 1],
+    [0, cameraTravelFor(isMobile)],
+  );
 
   // Colour now comes from the cross-faded SPACE_REGIONS layers below rather
   // than from animating this gradient's own colour stops. Interpolating a
@@ -1299,23 +1466,45 @@ export default function MultiverseFlight() {
 
   useEffect(() => {
     const handleNavigation = (event: Event) => {
-      const customEvent = event as CustomEvent<{ id?: string }>;
+      const customEvent = event as CustomEvent<{
+        id?: string;
+        progress?: number;
+        source?: "dial";
+      }>;
       const targetId = customEvent.detail?.id;
-      const targetProgress = targetId ? getNavTargetProgress(targetId) : undefined;
+      const targetProgress =
+        typeof customEvent.detail?.progress === "number"
+          ? customEvent.detail.progress
+          : targetId
+            ? getNavTargetProgress(targetId)
+            : undefined;
       const container = containerRef.current;
 
       if (targetProgress === undefined || !container) return;
       const containerTop = window.scrollY + container.getBoundingClientRect().top;
       const scrollableHeight = container.offsetHeight - window.innerHeight;
-
+      const root = document.documentElement;
+      const previousBehavior = root.style.scrollBehavior;
+      if (customEvent.detail?.source === "dial") {
+        root.style.scrollBehavior = "auto";
+      }
       window.scrollTo({
-        top: containerTop + scrollableHeight * targetProgress,
-        behavior: "smooth",
+        top: containerTop + scrollableHeight * scrollFromProgress(targetProgress),
+        behavior: customEvent.detail?.source === "dial" ? "auto" : "smooth",
       });
+      if (customEvent.detail?.source === "dial") {
+        requestAnimationFrame(() => {
+          root.style.scrollBehavior = previousBehavior;
+        });
+      }
     };
 
     window.addEventListener("navigate-flight-section", handleNavigation as EventListener);
-    return () => window.removeEventListener("navigate-flight-section", handleNavigation as EventListener);
+    window.addEventListener("navigate-flight-progress", handleNavigation as EventListener);
+    return () => {
+      window.removeEventListener("navigate-flight-section", handleNavigation as EventListener);
+      window.removeEventListener("navigate-flight-progress", handleNavigation as EventListener);
+    };
   }, []);
 
   // --- Autopilot --------------------------------------------------------
@@ -1405,7 +1594,7 @@ export default function MultiverseFlight() {
         scrollable = container.offsetHeight - window.innerHeight;
       };
 
-      // The container's height is a vh unit (see the `h-[1800vh]` track
+      // The container's height is a vh unit (see the `h-[2200svh]` track
       // below), so it — and the resulting `scrollable` — only actually
       // change when window.innerHeight does (the mobile-toolbar case the
       // comment above describes). Re-reading layout via
@@ -1422,7 +1611,11 @@ export default function MultiverseFlight() {
         refreshScrollGeometry();
       };
 
-      const toScrollTop = (p: number) => containerTop + scrollable * p;
+      // Takes flight progress, like every other caller in this file — the
+      // timeline conversion happens here so the tour's pacing stays expressed
+      // in the same units as the sections it is touring.
+      const toScrollTop = (p: number) =>
+        containerTop + scrollable * scrollFromProgress(p);
 
       // One leg per section plus the closing tail. Home's departure is gated
       // by the actual intro.wav completion event, not a nominal duration.
@@ -1475,6 +1668,17 @@ export default function MultiverseFlight() {
           cardIndex: i,
         });
 
+        if (card.id === "skills") {
+          TECHNOLOGY_FOCUS_STOPS.forEach((stop) => {
+            legs.push({
+              target: stop.progress,
+              travelMs: AUTOPILOT_TECH_TRAVEL * 1000,
+              linear: false,
+              holdMs: AUTOPILOT_TECH_HOLD * 1000,
+              cardIndex: i,
+            });
+          });
+        }
       });
 
       legs.push({
@@ -1703,7 +1907,41 @@ export default function MultiverseFlight() {
     // slower flight. Everything else is keyed off normalised progress, so
     // stretching this is the one knob that changes pace without disturbing
     // any of the per-card reveal/focus/depart windows.
-    <div ref={containerRef} className="relative h-[1800vh] w-full bg-transparent">
+    <div
+      ref={containerRef}
+      className="relative w-full bg-transparent"
+      // Stable viewport height is load-bearing on phones. With `2200vh`,
+      // revealing the browser toolbar while scrolling upward changed one vh
+      // by roughly 60px and magnified that into a ~1080px track resize. Since
+      // the camera is driven by normalised track progress, that resize looked
+      // like a sudden reverse jump. `svh` stays fixed across toolbar show/hide
+      // while preserving the same pacing at a settled viewport.
+      //
+      // Scroll anchoring is also disabled for iOS specifically.
+      //
+      // Nothing here reflows during scroll — it is one fixed-height track with
+      // a single sticky child — so anchoring has no legitimate work to do on
+      // this page and only ever fights the flight for the scroll position.
+      // Height comes from the timeline rather than a utility class: it is the
+      // sum of the legs, and a hard-coded class would be a second copy of that
+      // sum waiting to disagree with the first.
+      style={{ height: `${TRACK_VH}svh`, overflowAnchor: "none" }}
+    >
+      {/* Empty in first gear, which is what "free scrolling" means here. */}
+      {snapPoints.map((point) => (
+        <span
+          key={point.id}
+          aria-hidden="true"
+          className="pointer-events-none absolute left-0 h-px w-px"
+          style={{
+            top: snapMarkerTop(point.progress),
+            scrollSnapAlign: "start",
+            // What makes three landings *at least* three scrolls: a fling
+            // cannot pass over one.
+            scrollSnapStop: "always",
+          }}
+        />
+      ))}
       <div className="sticky top-0 flex h-screen w-screen items-center justify-center overflow-hidden [perspective:1100px]">
         {/* Furthest plane — barely moves, and is over-sized so translating it
            never drags an edge into frame. */}
@@ -1746,7 +1984,10 @@ export default function MultiverseFlight() {
             y: flightStreakY,
             filter: flightStreakBlur,
             backgroundImage: FLIGHT_STREAK_BACKGROUND,
-            willChange: "transform, opacity, filter",
+            // Naming `filter` reserves a filter-capable buffer for the
+            // layer's whole lifetime. On phones there is no filter to apply,
+            // so promising one is pure cost.
+            willChange: isMobile ? "transform, opacity" : "transform, opacity, filter",
           }}
         />
 
@@ -1825,16 +2066,16 @@ export default function MultiverseFlight() {
              the mark at any aspect ratio. */}
           <motion.div
             aria-hidden="true"
-            className="pointer-events-none absolute left-1/2 top-1/2 h-[min(86vh,130vw,760px)] w-[min(86vh,130vw,760px)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,_rgba(56,189,248,0.16)_0%,_rgba(14,165,233,0.07)_38%,_transparent_68%)]"
+            className="pointer-events-none absolute left-1/2 top-1/2 h-[min(86vh,130vw,760px)] w-[min(86vh,130vw,760px)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,_rgba(56,189,248,0.09)_0%,_rgba(14,165,233,0.035)_38%,_transparent_68%)]"
             initial={false}
             animate={
               showEndLogo
-                ? { opacity: [0.55, 1, 0.55], scale: [0.94, 1.06, 0.94] }
+                ? { opacity: [0.34, 0.64, 0.34], scale: [0.97, 1.03, 0.97] }
                 : { opacity: 0, scale: 0.9 }
             }
             transition={
               showEndLogo
-                ? { duration: 7, repeat: Infinity, ease: "easeInOut", delay: 0.4 }
+                ? { duration: 8, repeat: Infinity, ease: "easeInOut", delay: 0.4 }
                 : { duration: 0.5 }
             }
           />
@@ -1908,20 +2149,28 @@ export default function MultiverseFlight() {
              mark can never outgrow a short screen and push the signature
              off the bottom. The negative margin is proportional for the
              same reason — a flat -24px eats a third of a 160px mark. */}
-          <ParticleLogo
-            src="/images/us2.png"
-            size={endMarkSize}
-            particleCount={endParticleCount}
-            disperseStrength={Math.round(endMarkSize * 1.06)}
-            active={showEndLogo}
-            className="shrink-0"
+          <div
+            className="relative shrink-0"
             style={{
               width: markBox,
               height: markBox,
               marginTop: -markBox * 0.05,
               marginBottom: -markBox * 0.05,
             }}
-          />
+          >
+            <ParticleLogo
+              src="/images/us2.png"
+              size={endMarkSize}
+              particleCount={endParticleCount}
+              disperseStrength={Math.round(endMarkSize * 1.06)}
+              active={showEndLogo}
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+              style={{
+                width: endParticleCanvasSize,
+                height: endParticleCanvasSize,
+              }}
+            />
+          </div>
           {/* Closing signature. It used to blink — a full fade to zero and
              back on a loop — which read as the name being unsure whether it
              belonged on screen. It now stays put and re-sets itself in a
@@ -1971,7 +2220,21 @@ export default function MultiverseFlight() {
               revealEnd={getRevealWindow(index).end}
             />
           ))}
+
+          {/* The technology helix shares this group, and that is the whole
+             point of it: same camera, same depth units, same scroll. Between
+             Skills and Projects the corridor is lined with the tools instead
+             of being empty. */}
+          <TechnologyLayover
+            compact={isMobile}
+            progress={smoothScrollProgress}
+          />
         </motion.div>
+
+        {/* The layover's title, which is the only part of it that is still
+           screen-space: text this small has to stay on the pixel grid. The
+           tools themselves fly in the corridor above. */}
+        <LayoverCaption progress={smoothScrollProgress} isMobile={isMobile} />
 
         {/* The loop's veil. Sits above everything so it can cover the instant
            scroll is reset to the top (see runLoop). It only needs to mask a

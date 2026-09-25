@@ -2,18 +2,32 @@
 
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { cards, sectionProgressMap } from "../data/sections";
+import { FLIGHT_SECTION_STOPS } from "../data/flightStops";
+import { progressFromScroll } from "../data/flightTimeline";
 import { playTick, primeTicks } from "../lib/tick-sound";
+import { useTravelGear } from "../lib/travel-gear";
+import DialGearButton from "./DialGearButton";
 
-// Scrolling the real document is what drives the flight — the dial is just
-// another input onto that same scroll position, like the wheel or a key.
-// `behavior: "auto"` is deliberate on a live scrub: globals.css sets
-// `scroll-behavior: smooth` on <html>, and inheriting that would turn every
-// frame of a drag into its own competing smooth-scroll animation.
-function scrollToProgress(p: number, behavior: ScrollBehavior = "auto") {
-  const max = document.documentElement.scrollHeight - window.innerHeight;
-  if (max <= 0) return;
-  window.scrollTo({ top: max * Math.min(1, Math.max(0, p)), behavior });
+// Dial moves are discrete and must not inherit the document's global smooth
+// scrolling. The 3D camera owns the short visual settle after the document
+// lands; adding browser easing underneath it is what made the dial feel
+// slippery and let several section moves blend into one long glide.
+function scrollToProgress(p: number) {
+  window.dispatchEvent(
+    new CustomEvent("navigate-flight-progress", {
+      detail: { progress: Math.min(1, Math.max(0, p)), source: "dial" },
+    }),
+  );
+}
+
+// Mandatory snapping and a hand on the ring are the same argument had twice:
+// both decide where the document lands. The ring wins while it is being
+// turned — the flight has to follow it continuously, in every gear — so the
+// flight suspends its landings for the length of the gesture.
+function announceTurning(turning: boolean) {
+  window.dispatchEvent(
+    new CustomEvent("flight-dial-turn", { detail: { turning } }),
+  );
 }
 
 // A rotating bezel, not a potentiometer.
@@ -33,22 +47,30 @@ function scrollToProgress(p: number, behavior: ScrollBehavior = "auto") {
 const TURN = 360;
 
 // The real bezel is a notched ring: 36 detents, one every 10°, each with an
-// audible click. Matching the count matters more than it sounds — it sets how
-// much scroll one "click" is worth (1/36th of the flight), which is what makes
-// a slow turn feel like it is stepping through content rather than sliding.
+// audible click. Feedback follows physical rotation only; document scroll
+// never drives the ring or its detents.
 const DETENTS = 36;
-const DETENT_PROGRESS = 1 / DETENTS;
+const DETENT_DEGREES = TURN / DETENTS;
 
-// On release, a stop this close pulls the dial onto it. Roughly one detent:
-// close enough that the intent was obviously that section, far enough that
-// stopping deliberately between two of them is still respected.
-const RELEASE_SNAP_WINDOW = 0.03;
+// Turning the ring travels *continuously*: a quarter of the way through the
+// gear's rotation is a quarter of the way to the next section, and the flight
+// moves under the finger the whole time.
+//
+// This replaces a sector model — turn 48°, release, and the page jumped a
+// whole section — which made the dial a set of buttons arranged in a circle
+// and left the ring with nothing to say in between them. How much rotation a
+// section costs is the gear's decision now (lib/travel-gear.ts): three full
+// revolutions in first, one in second, a third of one in third. The detents
+// are what make that legible — 108 clicks to cross a section in first gear,
+// 12 in third — so the ring reports the distance, not just the arrival.
+//
+// Movement below MIN_TRAVEL is the hand resting rather than travelling, and
+// re-dispatching scroll for it would only fight the camera's own settle.
+const MIN_TRAVEL = 0.0004;
 
-const stops = cards.map((card) => ({
-  id: card.id,
-  label: card.eyebrow.split("/").slice(1).join("/").trim() || card.id,
-  progress: sectionProgressMap[card.id] ?? 0,
-}));
+const BEZEL_RETURN_TRANSITION = "transform 380ms cubic-bezier(0.2,0.8,0.2,1)";
+
+const stops = FLIGHT_SECTION_STOPS;
 
 function clamp01(v: number) {
   return Math.min(1, Math.max(0, v));
@@ -60,10 +82,45 @@ function getActiveId(p: number) {
   return id;
 }
 
-function nearestStop(p: number) {
-  return stops.reduce((best, stop) =>
-    Math.abs(stop.progress - p) < Math.abs(best.progress - p) ? stop : best,
-  );
+function nearestStopIndex(p: number) {
+  let nearest = 0;
+  let distance = Number.POSITIVE_INFINITY;
+  stops.forEach((stop, index) => {
+    const candidate = Math.abs(stop.progress - p);
+    if (candidate < distance) {
+      nearest = index;
+      distance = candidate;
+    }
+  });
+  return nearest;
+}
+
+// The dial's own coordinate: stop index plus the fraction travelled toward
+// the next one, so 1.0 of it is always exactly one section no matter how
+// unevenly the stops are spaced along the track (Experience -> Contact is
+// nearly three times the span of Projects -> Experience). Turning the ring
+// moves in *this* space and converts back, which is why a revolution is one
+// section everywhere on the flight rather than one section's worth of raw
+// progress carried over into the next.
+function turnFromProgress(p: number) {
+  const last = stops.length - 1;
+  for (let i = 0; i < last; i++) {
+    const from = stops[i].progress;
+    const to = stops[i + 1].progress;
+    if (p < to || i === last - 1) {
+      return i + (p - from) / Math.max(to - from, 1e-6);
+    }
+  }
+  return 0;
+}
+
+function progressFromTurn(turn: number) {
+  const last = stops.length - 1;
+  const clamped = Math.min(last, Math.max(0, turn));
+  const index = Math.min(last - 1, Math.floor(clamped));
+  const from = stops[index].progress;
+  const to = stops[index + 1].progress;
+  return clamp01(from + (to - from) * (clamped - index));
 }
 
 // Where the document actually is, right now. The flight only broadcasts
@@ -72,14 +129,12 @@ function nearestStop(p: number) {
 function readProgress() {
   if (typeof window === "undefined") return 0;
   const max = document.documentElement.scrollHeight - window.innerHeight;
-  return max > 0 ? clamp01(window.scrollY / max) : 0;
-}
-
-function prefersReducedMotion() {
-  return (
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
+  if (max <= 0) return 0;
+  // Through the timeline, not straight across: scroll position and flight
+  // progress are different clocks (see data/flightTimeline.ts), and reading
+  // one as the other puts the dial's opening label in the wrong section by
+  // however much the layover leg has been stretched.
+  return clamp01(progressFromScroll(window.scrollY / max));
 }
 
 // 0° = straight up, increasing clockwise — the watch convention, and the same
@@ -89,26 +144,13 @@ function polar(cx: number, cy: number, r: number, deg: number) {
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
-// Progress 1 would make start and end the same point, which SVG draws as
-// nothing at all rather than as a closed circle. Stopping a hair short keeps
-// the ring visually complete without the degenerate case.
-function describeArc(r: number, fromDeg: number, toDeg: number) {
-  const sweep = Math.min(toDeg - fromDeg, 359.99);
-  const start = polar(60, 60, r, fromDeg);
-  const end = polar(60, 60, r, fromDeg + sweep);
-  return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${r} ${r} 0 ${
-    sweep > 180 ? 1 : 0
-  } 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
-}
-
 // --- The bezel's engraved ring ------------------------------------------
 // Built once at module scope. These never change, and rebuilding them on every
-// render of a component that tracks scroll would be the most expensive thing
-// in the file.
+// render of a component that reports scroll would be needless work.
 //
 // Two densities. The engraved ring is 72 lines; on a phone that is 72 vector
-// nodes inside a layer that rotates on every scroll frame, which on a low-end
-// GPU is real money for detail that is roughly one device pixel wide at 68px
+// nodes inside a layer that rotates under the finger, which on a low-end GPU
+// is real money for detail that is roughly one device pixel wide at 68px
 // across. The compact ring keeps the machined read at a third of the nodes.
 function buildKnurls(count: number) {
   const everyDeg = 360 / count;
@@ -134,6 +176,11 @@ const DESKTOP_MAX_DIAL_SCALE = 1.7;
 
 export default function ScrollDial() {
   const pathname = usePathname();
+  // How much ground one turn of the ring covers. The wheel reads the same
+  // gear for its own landings (see MultiverseFlight), which is what keeps the
+  // two inputs feeling like two speeds of one vehicle rather than two
+  // unrelated controls.
+  const gear = useTravelGear();
   const [compact, setCompact] = useState(
     () => typeof window !== "undefined" && window.matchMedia(COMPACT_QUERY).matches,
   );
@@ -151,6 +198,15 @@ export default function ScrollDial() {
   const progressRef = useRef(0);
   const draggingRef = useRef(false);
   const lastAngleRef = useRef(0);
+  // Where the gesture started, in the dial's own turn coordinate, and how far
+  // the ring has been turned since. Travel is always start + rotation/ratio
+  // rather than an accumulation of per-frame steps, so a long turn cannot
+  // drift the traveller away from what the ring itself reads.
+  const turnStartRef = useRef(0);
+  const gestureRotationRef = useRef(0);
+  // The ring's absolute angle, persisted across gestures: a bezel that snaps
+  // back to zero every time you let go is a slider, not a bezel.
+  const bezelAngleRef = useRef(0);
   const lastDetentRef = useRef(0);
   // Whether the drag in progress came from a finger — see detentFeedback.
   const isTouchDragRef = useRef(false);
@@ -164,7 +220,6 @@ export default function ScrollDial() {
 
   const rootRef = useRef<SVGSVGElement>(null);
   const bezelRef = useRef<SVGGElement>(null);
-  const arcRef = useRef<SVGPathElement>(null);
 
   const maxDialScale = compact
     ? COMPACT_MAX_DIAL_SCALE
@@ -186,14 +241,14 @@ export default function ScrollDial() {
     [applyScaleVisual, maxDialScale],
   );
 
+  const applyBezelRotation = useCallback((degrees: number) => {
+    if (bezelRef.current) {
+      bezelRef.current.style.transform = `rotate(${degrees}deg)`;
+    }
+  }, []);
+
   const applyVisual = useCallback((p: number) => {
     progressRef.current = p;
-    if (bezelRef.current) {
-      bezelRef.current.style.transform = `rotate(${p * TURN}deg)`;
-    }
-    if (arcRef.current) {
-      arcRef.current.setAttribute("d", describeArc(44, 0, p * TURN));
-    }
     rootRef.current?.setAttribute("aria-valuenow", String(Math.round(p * 100)));
   }, []);
 
@@ -217,8 +272,11 @@ export default function ScrollDial() {
       const detail = (
         event as CustomEvent<{ progress?: number; activeId?: string }>
       ).detail;
-      if (typeof detail?.progress === "number") applyVisual(clamp01(detail.progress));
-      if (detail?.activeId) setActiveId(detail.activeId);
+      if (typeof detail?.progress === "number") {
+        const progress = clamp01(detail.progress);
+        applyVisual(progress);
+        setActiveId(getActiveId(progress));
+      }
     };
     window.addEventListener("flight-progress-update", onProgress as EventListener);
     return () =>
@@ -242,10 +300,27 @@ export default function ScrollDial() {
   // First paint. The markup below renders at a static zero — reading
   // progressRef during render would be both a lint error and a lie, since a
   // ref change never triggers one — so the opening frame is written to the
-  // DOM here instead. activeId is seeded in its own initialiser above, which
-  // keeps this effect to pure DOM writes.
+  // DOM here instead.
+  //
+  // activeId is re-seeded here too, and that is not belt-and-braces. Its
+  // useState initialiser runs during the first render, which for this
+  // component is *before the flight's track exists*: the dial is mounted
+  // with ssr:false, so on that render `scrollHeight - innerHeight` is not yet
+  // the 2200svh corridor and readProgress() answers 0. The label therefore
+  // opened on "Hello" — and because the flight only broadcasts progress when
+  // the camera spring actually moves, reloading deep in the page left it
+  // reading "Hello" until the visitor scrolled, no matter where they were.
   useEffect(() => {
     applyVisual(readProgress());
+    // Deferred a frame, for the same reason it is needed at all: the track
+    // has to have been laid out before readProgress() can mean anything, and
+    // a synchronous setState in an effect body is a cascading render besides.
+    const frame = requestAnimationFrame(() => {
+      const progress = readProgress();
+      applyVisual(progress);
+      setActiveId(getActiveId(progress));
+    });
+    return () => cancelAnimationFrame(frame);
   }, [applyVisual]);
 
   // If an orientation/breakpoint change lowers the allowed maximum, settle
@@ -276,11 +351,11 @@ export default function ScrollDial() {
   }, []);
 
   const commit = useCallback(
-    (p: number, behavior: ScrollBehavior = "auto") => {
+    (p: number) => {
       const clamped = clamp01(p);
       applyVisual(clamped);
       setActiveId(getActiveId(clamped));
-      scrollToProgress(clamped, behavior);
+      scrollToProgress(clamped);
     },
     [applyVisual],
   );
@@ -310,6 +385,7 @@ export default function ScrollDial() {
       setPinching(true);
       draggingRef.current = false;
       setDragging(false);
+      gestureRotationRef.current = 0;
       pinchStartDistanceRef.current = Math.hypot(b.x - a.x, b.y - a.y);
       pinchStartScaleRef.current = dialScaleRef.current;
       return;
@@ -317,8 +393,17 @@ export default function ScrollDial() {
 
     draggingRef.current = true;
     setDragging(true);
+    announceTurning(true);
+    // React state updates after this event. Disable easing synchronously so
+    // even the first pointer sample tracks the finger instead of lagging.
+    if (bezelRef.current) bezelRef.current.style.transition = "none";
     lastAngleRef.current = pointerAngle(e.clientX, e.clientY);
-    lastDetentRef.current = Math.round(progressRef.current / DETENT_PROGRESS);
+    // The gesture is measured from where the flight actually is, so grabbing
+    // the ring after scrolling with the wheel picks up from there rather
+    // than from wherever the last turn left off.
+    turnStartRef.current = turnFromProgress(progressRef.current);
+    gestureRotationRef.current = 0;
+    lastDetentRef.current = Math.round(bezelAngleRef.current / DETENT_DEGREES);
     isTouchDragRef.current = e.pointerType === "touch";
   };
 
@@ -352,6 +437,15 @@ export default function ScrollDial() {
     }
 
     if (!draggingRef.current) return;
+    // A pointermove with no button held is a hover, and hovers fire over this
+    // element constantly. If a release was ever missed — capture lost, the
+    // button let go outside the window, a context menu eating the pointerup —
+    // the drag flag would still be set and every hover after that would fly
+    // the page. Treat the absence of a button as the release it is.
+    if (e.pointerType === "mouse" && e.buttons === 0) {
+      endDrag();
+      return;
+    }
     const angle = pointerAngle(e.clientX, e.clientY);
 
     // Unwrap across the ±180° seam. Without this, turning up through 12
@@ -362,28 +456,84 @@ export default function ScrollDial() {
     else if (delta < -180) delta += 360;
     lastAngleRef.current = angle;
 
-    const next = clamp01(progressRef.current + delta / TURN);
-    commit(next);
+    gestureRotationRef.current += delta;
+    bezelAngleRef.current += delta;
+    applyBezelRotation(bezelAngleRef.current);
 
-    const detent = Math.round(next / DETENT_PROGRESS);
+    // One click per detent crossed, fired from the crossing rather than a
+    // timer, so the rate of clicking is the rate the ring is actually being
+    // turned. Read off the ring's absolute angle, not the gesture's, so the
+    // clicks stay evenly spaced across a release and re-grab.
+    const detent = Math.round(bezelAngleRef.current / DETENT_DEGREES);
     if (detent !== lastDetentRef.current) detentFeedback(detent);
+
+    // The whole of the travel, recomputed from the gesture's origin: the
+    // flight follows the ring continuously instead of waiting for a sector
+    // to complete. `degreesPerSection` is the gear ratio — the same rotation
+    // covers three times as much ground in second as in first.
+    const travelled =
+      turnStartRef.current + gestureRotationRef.current / gear.degreesPerSection;
+    const next = progressFromTurn(travelled);
+    if (Math.abs(next - progressRef.current) < MIN_TRAVEL) return;
+    commit(next);
   };
 
   const endDrag = useCallback(() => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
     setDragging(false);
-
-    // The dial's own version of what CSS scroll snap does for the wheel: let
-    // go near a section and the ring settles onto it. Same threshold idea as
-    // `proximity`, applied here because a programmatic scrub is not a gesture
-    // the snap engine will act on.
-    const stop = nearestStop(progressRef.current);
-    if (Math.abs(stop.progress - progressRef.current) <= RELEASE_SNAP_WINDOW) {
-      commit(stop.progress, prefersReducedMotion() ? "auto" : "smooth");
-      playTick(0.9, 0.3);
+    // Landings are the wheel's again. In a gear that has them, the browser
+    // settles to the nearest one from wherever the ring was let go — which
+    // is what a landing means; only first gear leaves you exactly there.
+    announceTurning(false);
+    gestureRotationRef.current = 0;
+    if (bezelRef.current) {
+      bezelRef.current.style.transition = BEZEL_RETURN_TRANSITION;
     }
-  }, [commit]);
+
+    // Third gear lands. It is the section-to-section gear, so letting go
+    // between two of them would be the one thing it is not for — the ring is
+    // eased the remaining fraction of a section so the landing is visible on
+    // the bezel too, not just in the page.
+    //
+    // First and second leave the traveller exactly where they stopped:
+    // stopping between two places is the whole point of a low gear, and a
+    // snap-back would undo the last part of every careful turn.
+    if (!gear.settlesOnStops) return;
+
+    const landing = stops[nearestStopIndex(progressRef.current)];
+    if (!landing) return;
+    const remainder =
+      turnFromProgress(landing.progress) - turnFromProgress(progressRef.current);
+    bezelAngleRef.current += remainder * gear.degreesPerSection;
+    applyBezelRotation(bezelAngleRef.current);
+    lastDetentRef.current = Math.round(bezelAngleRef.current / DETENT_DEGREES);
+    commit(landing.progress);
+  }, [applyBezelRotation, commit, gear]);
+
+  // The release can arrive anywhere.
+  //
+  // Pointer capture is supposed to guarantee that the pointerup comes back to
+  // the element that took it, and usually it does — but capture is lost on a
+  // context menu, on a browser gesture, on a re-render that swaps the node,
+  // and on anything that interrupts the pointer stream. Every one of those
+  // left the dial believing a hand was still on it: incoming flight progress
+  // was ignored (so the label froze wherever it was) and the next hover over
+  // the ring scrolled the page. Listening for the release on the window for
+  // the length of the drag closes all of those at once.
+  useEffect(() => {
+    if (!dragging) return;
+    const release = () => endDrag();
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+    // A drag that survives the tab going away is a drag nobody is holding.
+    window.addEventListener("blur", release);
+    return () => {
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
+      window.removeEventListener("blur", release);
+    };
+  }, [dragging, endDrag]);
 
   const onPointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
     pointersRef.current.delete(e.pointerId);
@@ -402,28 +552,39 @@ export default function ScrollDial() {
     endDrag();
   };
 
-  const step = (detents: number) =>
-    commit(progressRef.current + detents * DETENT_PROGRESS);
-
+  // Keyboard travel. One key, one section — and the ring turns the gear's
+  // worth of degrees to get there, so what a keyboard user sees the bezel do
+  // is the same movement a hand would have had to make.
   const toSection = (direction: 1 | -1) => {
-    const current = progressRef.current;
-    const ordered = direction === 1 ? stops : [...stops].reverse();
-    const next = ordered.find((s) =>
-      direction === 1 ? s.progress > current + 0.001 : s.progress < current - 0.001,
+    const currentIndex = nearestStopIndex(progressRef.current);
+    const targetIndex = Math.min(
+      stops.length - 1,
+      Math.max(0, currentIndex + direction),
     );
-    commit(next ? next.progress : direction === 1 ? 1 : 0, "smooth");
+    const target = stops[targetIndex];
+    if (!target) return;
+    const turned =
+      turnFromProgress(target.progress) - turnFromProgress(progressRef.current);
+    if (bezelRef.current) {
+      bezelRef.current.style.transition = BEZEL_RETURN_TRANSITION;
+    }
+    bezelAngleRef.current += turned * gear.degreesPerSection;
+    applyBezelRotation(bezelAngleRef.current);
+    lastDetentRef.current = Math.round(bezelAngleRef.current / DETENT_DEGREES);
+    commit(target.progress);
+    playTick(direction > 0 ? 1.05 : 0.92, 0.28);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<SVGSVGElement>) => {
     const keys: Record<string, () => void> = {
-      ArrowRight: () => step(1),
-      ArrowUp: () => step(1),
-      ArrowLeft: () => step(-1),
-      ArrowDown: () => step(-1),
+      ArrowRight: () => toSection(1),
+      ArrowUp: () => toSection(1),
+      ArrowLeft: () => toSection(-1),
+      ArrowDown: () => toSection(-1),
       PageDown: () => toSection(1),
       PageUp: () => toSection(-1),
-      Home: () => commit(0, "smooth"),
-      End: () => commit(1, "smooth"),
+      Home: () => commit(stops[0]?.progress ?? 0),
+      End: () => commit(stops[stops.length - 1]?.progress ?? 1),
       "+": () => commitScale(dialScaleRef.current + 0.15),
       "=": () => commitScale(dialScaleRef.current + 0.15),
       "-": () => commitScale(dialScaleRef.current - 0.15),
@@ -458,9 +619,8 @@ export default function ScrollDial() {
   const pageTotal = pad(stops.length);
   const knurls = compact ? KNURLS_COMPACT : KNURLS_FULL;
   // Filters are the single most expensive thing an SVG can carry on a weak
-  // GPU: each one rasterises its subtree into an offscreen buffer, and the pip
-  // and arc here sit inside a layer that rotates on every scroll frame. The
-  // lume reads fine as flat colour at 68px.
+  // GPU: each one rasterises its subtree into an offscreen buffer. The lume
+  // reads fine as flat colour at 68px, so compact mode skips those layers.
   const glow = (css: string) => (compact ? undefined : css);
   const size = compact ? 68 : 108;
 
@@ -477,7 +637,7 @@ export default function ScrollDial() {
       // one navigator instead of two things saying the same thing.
       className={`fixed z-50 transition-all duration-300 ${
         compact
-          ? "bottom-0 left-1/2 -translate-x-1/2 pb-3"
+          ? "bottom-0 left-1/2 w-52 max-w-[calc(100vw-1rem)] -translate-x-1/2 pb-3"
           : "right-4 top-1/2 -translate-y-1/2 lg:right-8"
       } ${
         isVisible
@@ -499,18 +659,31 @@ export default function ScrollDial() {
         </span>
       </div>
       <div
-        className="-m-5 touch-none p-5"
+        // The dial's position must not depend on the label above it. On
+        // phones the wrapper is a fixed width and the dial is centred in it;
+        // on desktop the wrapper is shrink-to-fit and right-anchored, so its
+        // width is whatever the label needs — left-aligning the face in there
+        // meant "Experience" pushed the dial sideways and "Hello" pulled it
+        // back. Pinning the face to the wrapper's right edge (the same edge
+        // the label grows inward from, and the origin its scale grows from)
+        // leaves it still while the name changes.
+        className={
+          compact
+            ? "mx-auto -my-5 w-fit touch-none p-5"
+            : "-m-5 flex justify-end touch-none p-5"
+        }
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerEnd}
         onPointerCancel={onPointerEnd}
+        onLostPointerCapture={endDrag}
         onWheel={onWheel}
       >
         <svg
           ref={rootRef}
           role="slider"
           tabIndex={0}
-          aria-label="Flight position — turn to travel, pinch to resize"
+          aria-label="Rotary flight control — turn and release to move one section, hold to continue, pinch to resize"
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={0}
@@ -583,9 +756,9 @@ export default function ScrollDial() {
             transform: "rotate(0deg)",
             transformOrigin: "60px 60px",
             transformBox: "view-box",
-            // Mid-drag the ring must track the hand exactly; released, a short
-            // ease absorbs the step between scroll samples.
-            transition: dragging ? "none" : "transform 260ms cubic-bezier(0.22,1,0.36,1)",
+            // Mid-drag the ring tracks the hand exactly. Release uses a
+            // slightly longer mechanical return, like a telephone rotary.
+            transition: dragging ? "none" : BEZEL_RETURN_TRANSITION,
             willChange: "transform",
           }}
         >
@@ -646,7 +819,8 @@ export default function ScrollDial() {
           strokeWidth="2"
         />
 
-        {/* Unlit minute track, then the lit run of it travelled so far. */}
+        {/* A fixed face track. It deliberately does not fill with scroll
+           progress: the rotary is a physical input, not a scroll indicator. */}
         <circle
           cx="60"
           cy="60"
@@ -655,13 +829,16 @@ export default function ScrollDial() {
           stroke="rgba(255,255,255,0.09)"
           strokeWidth="2.5"
         />
-        <path
-          ref={arcRef}
-          d={describeArc(44, 0, 0)}
+        <circle
+          cx="60"
+          cy="60"
+          r="44"
           fill="none"
           stroke="url(#dial-lume)"
           strokeWidth="2.5"
           strokeLinecap="round"
+          strokeDasharray="8 269"
+          transform="rotate(-94 60 60)"
           style={{ filter: glow("drop-shadow(0 0 3px rgba(56,189,248,0.55))") }}
         />
 
@@ -686,35 +863,15 @@ export default function ScrollDial() {
           );
         })}
 
-        {/* Page number, the way a watch shows a date: the big figure is where
-           you are, the small one is how many there are. Numbered to match the
-           cards' own eyebrows ("01 / Hello"), so the dial and the card in view
-           always agree.
-
-           This is plain state, not a per-frame ref write like the percent
-           readout it replaces — the number changes a handful of times across
-           the whole flight rather than sixty times a second, so a re-render on
-           those few changes is cheaper than writing textContent on every tick.
-           Continuous feedback while turning the bezel is the arc and the ring
-           itself, which is where a watch puts it too. */}
-        <text
-          x="60"
-          y={compact ? 62 : 60}
-          textAnchor="middle"
-          className={`fill-sky-50 font-semibold ${compact ? "text-[19px]" : "text-[24px]"}`}
-          style={{ letterSpacing: "0.02em" }}
-        >
-          {pageNumber}
-        </text>
-        <text
-          x="60"
-          y={compact ? 74 : 75}
-          textAnchor="middle"
-          className={`fill-slate-400 font-semibold ${compact ? "text-[8px]" : "text-[9px]"}`}
-          style={{ letterSpacing: "0.14em" }}
-        >
-          /{pageTotal}
-        </text>
+        {/* The middle of the face is the gearbox — see DialGearButton.
+           It replaces the page number that used to sit here: with the section
+           named on the card directly above the dial, the centre was spending
+           the only readout the face has on a figure that was already legible
+           two centimetres away, while the gear — which changes how far every
+           gesture travels — had nowhere to live. The number is still spoken
+           in the slider's aria-valuetext, so nothing was lost for a screen
+           reader. */}
+        <DialGearButton compact={compact} />
 
         {/* Crystal sheen. Skipped on phones — a full-face radial gradient over
            the dial is another composited layer for a highlight that is a few

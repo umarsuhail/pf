@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { scrollFromProgress } from "../data/flightTimeline";
 
 type RouteStop = {
   id: string;
@@ -59,7 +60,14 @@ function scrollToProgress(p: number) {
   const doc = document.documentElement;
   const max = doc.scrollHeight - window.innerHeight;
   if (max <= 0) return;
-  window.scrollTo({ top: max * clamp(p, 0, 1), behavior: "auto" });
+  // The drum's stops are flight progress; the document is scroll. They are
+  // different clocks (data/flightTimeline.ts), so a stop dropped straight
+  // into a scroll position lands somewhere else entirely on any leg whose
+  // scroll length has been retimed.
+  window.scrollTo({
+    top: max * scrollFromProgress(clamp(p, 0, 1)),
+    behavior: "auto",
+  });
 }
 
 export default function RouteMap() {

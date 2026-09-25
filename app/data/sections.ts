@@ -217,7 +217,7 @@ export const cards: FlightCard[] = [
   },
   {
     id: "contact",
-    eyebrow: "06 / Contact",
+    eyebrow: "05 / Contact",
     title: "Ready to Build Something Amazing?",
     description:
       "Have a project in mind or just want to talk frontend? I'm based in Abu Dhabi, open to new opportunities, and always happy to connect.",
@@ -239,11 +239,32 @@ export const cards: FlightCard[] = [
   },
 ];
 
+// Where each panel sits on the *flight*, normalised 0..1. Progress is flight
+// time, not scroll distance: how much scrolling a leg takes is decided
+// separately, in app/data/flightTimeline.ts.
+//
+// That separation is load-bearing. Every tuned constant in the flight — the
+// card slot lead, reveal and depart windows, the closing beat's arming
+// thresholds, each card's depth — is expressed in this progress. When the
+// Skills-to-Projects leg needed more room for the technology helix, the first
+// attempt lengthened the track and moved Skills to 0.18, which silently
+// re-priced all of those: a card read from 22% further away, fades spread
+// over 22% more depth, the whole flight subtly wrong everywhere. The timeline
+// gives that leg more scroll without any panel moving.
 export const sectionProgressMap: Record<string, number> = {
   home: 0,
-  skills: 0.22,
-  projects: 0.56,
-  experience: 0.69,
+  // Skills lands earlier and Projects later than they used to (0.22 and 0.56)
+  // for one reason: the technology layover between them needs to be a stretch
+  // of its own, with the Skills billboard fully gone before the first tool
+  // lights and the Projects billboard not yet arriving when the last one
+  // fades. At the old spacing the Skills card's departure fade ran to 0.509 —
+  // it was still on screen, at pass-through size, over most of the toolkit.
+  skills: 0.17,
+  projects: 0.62,
+  experience: 0.74,
+  // Contact does not move. The closing beat is tuned against it in progress
+  // units (END_ARM, END_RELEASE, LAST_CARD_CLEARED, the void fade, the
+  // receding earth), and every one of those would have to be re-derived.
   contact: 0.92,
 };
 

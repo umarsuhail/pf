@@ -86,9 +86,9 @@ type ParticleLogoProps = {
     style?: CSSProperties;
 
     /**
-     * Fires on click, alongside (not instead of) the built-in shatter
+     * Fires on click, alongside (not instead of) the built-in scatter
      * flourish — the click handler already calls stopPropagation() to keep
-     * the shatter from being cut off by an ancestor's own click handler, so
+     * the scatter from being cut off by an ancestor's own click handler, so
      * a parent that wants to react to the click (e.g. opening a panel)
      * needs this rather than its own onClick.
      */
@@ -104,9 +104,9 @@ type FormControls = { formIn: () => void; formOut: () => void };
 // rather than needing a blur. Warmed and brightened from the previous
 // values, which left the assembled mark reading as flat grey-blue dust.
 const TONE_COLORS = [
-    "rgba(56, 170, 248, 0.8)",
-    "rgba(150, 220, 255, 0.86)",
-    "rgba(240, 250, 255, 0.92)",
+    "rgba(56, 181, 248, 0.84)",
+    "rgba(158, 224, 255, 0.9)",
+    "rgba(244, 252, 255, 0.96)",
 ] as const;
 
 function toneBand(tone: number) {
@@ -119,12 +119,12 @@ function toneBand(tone: number) {
 // which is the mark's ambient texture. On top of that, individual sparks
 // catch the light one at a time: a slow flare up to white-hot and back down.
 // Deliberately never more than two at once — the whole read of a twinkle is
-// that the eye is drawn to one point, and a field of them flaring together
+// that the eye is drawn to a few points, and a field of them flaring together
 // collapses back into the uniform pulse the sine already provides.
 const SHIMMER_SLOTS = 2;
 // Flare duration and the pause a slot takes before claiming its next spark.
-// Both randomised per burst so the two slots drift out of step instead of
-// settling into a visible two-beat rhythm.
+// Both randomised per burst so the slots drift out of step instead of
+// settling into a visible rhythm.
 const SHIMMER_DURATION_MIN = 620;
 const SHIMMER_DURATION_MAX = 1150;
 const SHIMMER_GAP_MIN = 260;
@@ -133,12 +133,12 @@ const SHIMMER_GAP_MAX = 1400;
 // bursts never fire on particles still flying in or already dispersing.
 const SHIMMER_MIN_ALPHA = 0.6;
 // Peak size multiplier at the top of the flare.
-const SHIMMER_GROWTH = 1.4;
+const SHIMMER_GROWTH = 1.5;
 
 export default function ParticleLogo({
     src = "/images/us.png",
     className = "",
-    particleCount = 624,
+    particleCount = 760,
     speed = 1,
     disperseStrength = 480,
     size = 180,
@@ -149,7 +149,7 @@ export default function ParticleLogo({
     const canvasRef = useRef<HTMLCanvasElement>(null);
     // Populated synchronously by the setup effect below, read by the
     // separate `active`-prop-watching effect (and the click handler) so
-    // triggering a reveal/shatter doesn't have to tear down and rebuild
+    // triggering a reveal/scatter doesn't have to tear down and rebuild
     // the whole canvas/particle setup.
     const controlsRef = useRef<FormControls | null>(null);
     // The last `active` value actually acted on — either by initialize()
@@ -165,6 +165,7 @@ export default function ParticleLogo({
         x: 0,
         y: 0,
         active: false,
+        intensity: 0,
     });
 
     useEffect(() => {
@@ -241,6 +242,45 @@ export default function ParticleLogo({
             });
         };
 
+        // Moves both axes along one quadratic curve. A single controller owns
+        // x and y so a new lifecycle action can cleanly interrupt the path.
+        // Curved travel gives assembly a graceful orbit and keeps the click
+        // scatter from looking like rigid, straight radial spokes.
+        const tweenPath = (
+            particle: Particle,
+            controlX: number,
+            controlY: number,
+            targetX: number,
+            targetY: number,
+            opts: { duration: number; delay?: number; ease: readonly number[] },
+        ) => {
+            const startX = particle.x;
+            const startY = particle.y;
+            const previousXCtrl = particle.xCtrl;
+            previousXCtrl?.stop();
+            if (particle.yCtrl !== previousXCtrl) particle.yCtrl?.stop();
+
+            const pathCtrl = animate(0, 1, {
+                duration: opts.duration,
+                delay: opts.delay,
+                ease: opts.ease as unknown as [number, number, number, number],
+                onUpdate: (latest: number) => {
+                    const inverse = 1 - latest;
+                    particle.x =
+                        inverse * inverse * startX +
+                        2 * inverse * latest * controlX +
+                        latest * latest * targetX;
+                    particle.y =
+                        inverse * inverse * startY +
+                        2 * inverse * latest * controlY +
+                        latest * latest * targetY;
+                },
+            });
+
+            particle.xCtrl = pathCtrl;
+            particle.yCtrl = pathCtrl;
+        };
+
         // Cached canvas dimensions — draw() runs every frame, and calling
         // getBoundingClientRect there is a forced layout read 60 times a
         // second. The size only changes on resize, so it's read once here.
@@ -266,10 +306,15 @@ export default function ParticleLogo({
                 0,
                 viewW / 2,
                 viewH / 2,
-                Math.min(viewW, viewH) * 0.46,
+                // The canvas can be intentionally larger than the mark so a
+                // scatter has room to breathe. Key the resting glow to the
+                // ink size, not that expanded drawing field, so the unchanged
+                // UI does not suddenly inherit a much larger blue wash.
+                Math.min(size * 0.58, Math.min(viewW, viewH) * 0.46),
             );
-            halo.addColorStop(0, "rgba(56, 189, 248, 0.11)");
-            halo.addColorStop(0.52, "rgba(14, 165, 233, 0.035)");
+            halo.addColorStop(0, "rgba(125, 211, 252, 0.135)");
+            halo.addColorStop(0.44, "rgba(56, 189, 248, 0.05)");
+            halo.addColorStop(0.72, "rgba(14, 165, 233, 0.015)");
             halo.addColorStop(1, "rgba(14, 165, 233, 0)");
         };
 
@@ -337,7 +382,7 @@ export default function ParticleLogo({
              * mount, not per frame), but a 2px step over a 500x500 canvas is
              * 62,500 getImageData reads on the main thread before the first
              * particle even appears — a real startup hitch on slow devices,
-             * and denser than particleCount (900) actually needs a source
+             * and denser than particleCount actually needs a source
              * pool for. 3px cuts that to ~27,900 while still leaving far
              * more candidate points than particles requested.
              *
@@ -477,7 +522,7 @@ export default function ParticleLogo({
                     alpha: 0,
                     tone: random(0, 1),
                     twinkle: random(0, Math.PI * 2),
-                    isSpark: Math.random() > 0.9,
+                    isSpark: Math.random() > 0.88,
 
                     delay: random(0, 0.8),
 
@@ -513,7 +558,7 @@ export default function ParticleLogo({
 
         // Called once per frame, not per particle: retires finished bursts and
         // hands each free slot a new spark. Picking is a single random probe
-        // rather than a filtered scan — at ~10% sparks a probe usually lands,
+        // rather than a filtered scan — at ~12% sparks a probe usually lands,
         // and when it doesn't the slot simply tries again a frame or two
         // later, which costs nothing and keeps the pick unbiased.
         const updateShimmer = (now: number) => {
@@ -605,6 +650,8 @@ export default function ParticleLogo({
              * Mouse influence.
              */
             const mouse = mouseRef.current;
+            mouse.intensity +=
+                ((mouse.active ? 1 : 0) - mouse.intensity) * 0.075;
             const frameTime = performance.now();
             updateShimmer(frameTime);
             // Tracks the last colour band written to the context so the batch
@@ -612,25 +659,25 @@ export default function ParticleLogo({
             let currentBand = -1;
 
             particles.forEach((particle) => {
-                if (mouse.active) {
+                let hoverLift = 0;
+                if (mouse.intensity > 0.001) {
                     const dx = particle.x - mouse.x;
                     const dy = particle.y - mouse.y;
-
-                    const distance = Math.sqrt(
-                        dx * dx + dy * dy
-                    );
-
-                    const radius = 140;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const radius = Math.max(96, size * 0.46);
 
                     if (distance < radius && distance > 0) {
-                        const force =
-                            (1 - distance / radius) * 2.5;
-
+                        hoverLift =
+                            (1 - distance / radius) * mouse.intensity;
+                        const normalX = dx / distance;
+                        const normalY = dy / distance;
+                        // A restrained radial push plus a stronger tangent
+                        // turns the old hard-edged hole into a fluid wake that
+                        // curls around the pointer and settles gently.
                         particle.vx +=
-                            (dx / distance) * force;
-
+                            (normalX * 0.2 - normalY * 0.42) * hoverLift;
                         particle.vy +=
-                            (dy / distance) * force;
+                            (normalY * 0.2 + normalX * 0.42) * hoverLift;
                     }
                 }
 
@@ -676,7 +723,11 @@ export default function ParticleLogo({
                 // opaque rather than adding to it, so the burst can't clip
                 // against globalAlpha's ceiling and flatten at its peak.
                 ctx.globalAlpha =
-                    particle.alpha * (shimmer + burst * (1 - shimmer));
+                    particle.alpha *
+                    Math.min(
+                        1,
+                        shimmer + burst * (1 - shimmer) + hoverLift * 0.18,
+                    );
 
                 const band = toneBand(particle.tone);
                 if (band !== currentBand) {
@@ -696,25 +747,27 @@ export default function ParticleLogo({
                     currentBand = -1;
                 }
 
-                const flare = 1 + burst * SHIMMER_GROWTH;
+                const flare =
+                    1 + burst * SHIMMER_GROWTH + hoverLift * 0.42;
 
                 if (particle.isSpark) {
                     particle.rotation += particle.rotationSpeed;
-                    const arm = particle.size * 2.1 * flare;
-                    const thickness = particle.size * 0.76 * flare;
+                    const arm = particle.size * 2.2 * flare;
+                    const thickness = particle.size * 0.78 * flare;
                     // An axis-aligned cross with a faint wider core instead of
                     // ctx.shadowBlur. Shadow blur is a native per-call blur
-                    // pass; at ~10% of the particles and two rects each it was
-                    // the single most expensive thing on the page, and it does
-                    // not show up in a JS profile because the cost is native.
+                    // pass; even at ~12% of the particles and two rects each it
+                    // would be the single most expensive thing on the page,
+                    // and it does not show up in a JS profile because the cost
+                    // is native.
                     // The extra translucent square reads as the same bloom.
                     ctx.fillRect(particle.x - thickness / 2, particle.y - arm, thickness, arm * 2);
                     ctx.fillRect(particle.x - arm, particle.y - thickness / 2, arm * 2, thickness);
                     ctx.globalAlpha =
                         particle.alpha *
                         (shimmer + burst * (1 - shimmer)) *
-                        (0.28 + burst * 0.22);
-                    const halo = particle.size * 2.6 * flare;
+                        (0.31 + burst * 0.22);
+                    const halo = particle.size * 2.8 * flare;
                     ctx.fillRect(particle.x - halo / 2, particle.y - halo / 2, halo, halo);
                 } else {
                     const edge = particle.size * 1.35 * flare;
@@ -744,31 +797,49 @@ export default function ParticleLogo({
             visible = true;
 
             particles.forEach((particle) => {
-                const duration = 1.9 / speed;
-                const delay = (particle.delay * 0.4) / speed;
+                const duration = 2.3 / speed;
+                const delay = (particle.delay * 0.52) / speed;
+                const dx = particle.homeX - particle.x;
+                const dy = particle.homeY - particle.y;
+                const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+                // Bend around the direct route by a stable, particle-specific
+                // amount. Opposing bends interleave into a soft spiral while
+                // the stagger keeps the logo drawing itself on rather than
+                // arriving as one flat dissolve.
+                const bendDirection = Math.sin(particle.twinkle) >= 0 ? 1 : -1;
+                const bend =
+                    Math.min(distance * 0.28, size * 0.48) * bendDirection;
+                const controlX =
+                    (particle.x + particle.homeX) / 2 -
+                    (dy / distance) * bend;
+                const controlY =
+                    (particle.y + particle.homeY) / 2 +
+                    (dx / distance) * bend;
 
                 tweenField(particle, "alpha", "alphaCtrl", 1, {
-                    duration: 0.5 / speed,
+                    duration: 0.78 / speed,
                     delay: particle.delay / speed,
                     ease: POWER2_OUT,
                 });
-                tweenField(particle, "x", "xCtrl", particle.homeX, {
-                    duration,
-                    delay,
-                    ease: POWER3_OUT,
-                });
-                tweenField(particle, "y", "yCtrl", particle.homeY, {
-                    duration,
-                    delay,
-                    ease: POWER3_OUT,
-                });
+                tweenPath(
+                    particle,
+                    controlX,
+                    controlY,
+                    particle.homeX,
+                    particle.homeY,
+                    {
+                        duration,
+                        delay,
+                        ease: POWER2_OUT,
+                    },
+                );
             });
         };
 
         /*
          * FORM OUT — scatters particles back outward and fades them, the
          * mirror image of formIn. Also one-shot. Shared by the scroll/
-         * `active` lifecycle and the click-to-shatter handler below.
+         * `active` lifecycle and the click-to-scatter handler below.
          */
         const formOut = () => {
             if (!visible || destroyed || particles.length === 0) return;
@@ -831,54 +902,72 @@ export default function ParticleLogo({
         controlsRef.current = { formIn, formOut };
 
         /*
-         * SHATTER — an explosive click response: every particle blasts
-         * outward from the pointer itself (not just its own home position),
-         * hard and fast, then the logo reassembles on its own once the
-         * burst settles. One-shot per click; ignored while already mid-
-         * shatter or not currently formed.
+         * SPACE SHATTER — every point gets an independent polar destination in
+         * one broad disc. Sampling radius by square root distributes particles
+         * evenly by area, avoiding the four source-shaped clumps, a hollow ring,
+         * or any other readable geometry while the mark is apart.
          */
-        let shatterTimeout = 0;
-        const shatter = (originX: number, originY: number) => {
+        let scatterTimeout = 0;
+        const scatterIntoSpace = (originX: number, originY: number) => {
             if (!visible || destroyed || particles.length === 0) return;
             visible = false;
 
             particles.forEach((particle) => {
-                const dx = particle.homeX - originX;
-                const dy = particle.homeY - originY;
-                const originDistance = Math.sqrt(dx * dx + dy * dy) || 1;
-                // Particles nearer the click point get blown further —
-                // reads as an impact radiating outward, not a uniform pop.
-                const kick = disperseStrength * random(1.1, 1.9);
-                const falloff = Math.max(0.4, 1 - originDistance / 260);
-                const distance = kick * falloff + random(0, 40);
-                const angle =
-                    Math.atan2(dy, dx) + random(-0.35, 0.35);
+                const centerX = viewW / 2;
+                const centerY = viewH / 2;
+                const impactDistance = Math.hypot(
+                    particle.homeX - originX,
+                    particle.homeY - originY,
+                );
+                const angle = random(0, Math.PI * 2);
+                const maxReach = Math.min(
+                    size * 1.55,
+                    Math.min(viewW, viewH) * 0.46,
+                );
+                const distance = maxReach * Math.sqrt(random(0.04, 1));
+                const targetX = centerX + Math.cos(angle) * distance;
+                const targetY = centerY + Math.sin(angle) * distance;
+                // Bow each path independently around its straight midpoint so
+                // the burst stays organic without regrouping into directional
+                // bands on its way outward.
+                const bend = distance * random(-0.32, 0.32);
+                const controlX =
+                    (particle.homeX + targetX) / 2 - Math.sin(angle) * bend;
+                const controlY =
+                    (particle.homeY + targetY) / 2 + Math.cos(angle) * bend;
+                const duration =
+                    (0.72 + (distance / maxReach) * 0.38 + random(0, 0.1)) /
+                    speed;
+                const delay =
+                    Math.min(0.1, impactDistance / Math.max(size * 7, 1)) /
+                    speed;
 
-                const duration = random(0.35, 0.55) / speed;
-                const delay = random(0, 0.12) / speed;
-
-                tweenField(particle, "x", "xCtrl", particle.homeX + Math.cos(angle) * distance, {
-                    duration,
-                    delay,
-                    ease: POWER2_OUT,
-                });
-                tweenField(particle, "y", "yCtrl", particle.homeY + Math.sin(angle) * distance, {
-                    duration,
-                    delay,
-                    ease: POWER2_OUT,
-                });
-                tweenField(particle, "alpha", "alphaCtrl", 0.15, {
-                    duration: duration * 0.8,
+                tweenPath(
+                    particle,
+                    controlX,
+                    controlY,
+                    targetX,
+                    targetY,
+                    {
+                        duration,
+                        delay,
+                        ease: POWER3_OUT,
+                    },
+                );
+                tweenField(particle, "alpha", "alphaCtrl", random(0.2, 0.58), {
+                    duration: duration * 0.72,
                     delay,
                     ease: POWER2_OUT,
                 });
             });
 
-            window.clearTimeout(shatterTimeout);
-            shatterTimeout = window.setTimeout(() => {
+            window.clearTimeout(scatterTimeout);
+            // The outward snap finishes around 1.25s; the remaining beat lets
+            // the broad field hang in space before the softer return begins.
+            scatterTimeout = window.setTimeout(() => {
                 if (destroyed) return;
                 formIn();
-            }, 650 / speed);
+            }, 1780 / speed);
         };
 
         const handleMouseMove = (
@@ -887,27 +976,42 @@ export default function ParticleLogo({
             const rect =
                 canvas.getBoundingClientRect();
 
-            mouseRef.current.x =
-                event.clientX - rect.left;
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const interactionRadius = size * 0.64;
+            const insideLogo =
+                Math.hypot(x - viewW / 2, y - viewH / 2) <=
+                interactionRadius;
 
-            mouseRef.current.y =
-                event.clientY - rect.top;
-
-            mouseRef.current.active = true;
+            mouseRef.current.x = x;
+            mouseRef.current.y = y;
+            mouseRef.current.active = insideLogo;
+            canvas.style.cursor = insideLogo ? "pointer" : "default";
         };
 
         const handleMouseLeave = () => {
             mouseRef.current.active = false;
+            canvas.style.cursor = "default";
         };
 
         const handleClick = (event: MouseEvent) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            if (
+                Math.hypot(x - viewW / 2, y - viewH / 2) >
+                size * 0.64
+            ) {
+                return;
+            }
             // The logo is its own click target — this stops the click from
             // bubbling to whatever the canvas is nested inside (e.g. the
             // portal card's own "click anywhere to navigate" handler),
-            // which would otherwise cut the shatter off mid-animation.
+            // which would otherwise cut the scatter off mid-animation.
             event.stopPropagation();
-            const rect = canvas.getBoundingClientRect();
-            shatter(event.clientX - rect.left, event.clientY - rect.top);
+            mouseRef.current.active = false;
+            canvas.style.cursor = "default";
+            scatterIntoSpace(x, y);
             onActivate?.();
         };
 
@@ -972,7 +1076,7 @@ export default function ParticleLogo({
                 animationFrame
             );
 
-            window.clearTimeout(shatterTimeout);
+            window.clearTimeout(scatterTimeout);
 
             paintVisibilityObserver.disconnect();
             revealObserver?.disconnect();
@@ -1029,7 +1133,7 @@ export default function ParticleLogo({
     return (
         <canvas
             ref={canvasRef}
-            className={`block cursor-pointer ${className}`}
+            className={`block ${className}`}
             style={style}
         />
     );

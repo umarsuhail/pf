@@ -78,8 +78,8 @@ const signatureFontVars = [
 export const metadata: Metadata = {
   metadataBase: new URL("https://umar.website"),
   title: {
-    default: "Umar Suhail | Next.js & Frontend Developer in Abu Dhabi",
-    template: "%s | Umar Suhail",
+    default: "LOST IN SPACE | Umar Suhail",
+    template: "%s | LOST IN SPACE",
   },
   description:
     "Umar Suhail is a Lead Frontend Engineer and Application Developer in Abu Dhabi, UAE, with 7+ years building React, Next.js, TypeScript, and UI/UX-focused applications.",
@@ -93,12 +93,12 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Umar Suhail", url: "https://umar.website" }],
   creator: "Umar Suhail",
-  applicationName: "Umar Suhail",
+  applicationName: "LOST IN SPACE",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Umar Suhail",
+    title: "LOST IN SPACE",
   },
   icons: {
     icon: [
@@ -113,17 +113,17 @@ export const metadata: Metadata = {
     canonical: "https://umar.website",
   },
   openGraph: {
-    title: "Umar Suhail | Next.js & Frontend Developer in Abu Dhabi",
+    title: "LOST IN SPACE | Umar Suhail",
     description:
       "Umar Suhail is a Lead Frontend Engineer and Application Developer in Abu Dhabi, UAE, with 7+ years building React, Next.js, TypeScript, and UI/UX-focused applications.",
     url: "https://umar.website",
-    siteName: "Umar Suhail Portfolio",
+    siteName: "LOST IN SPACE",
     locale: "en_US",
     type: "profile",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Umar Suhail | Next.js & Frontend Developer in Abu Dhabi",
+    title: "LOST IN SPACE | Umar Suhail",
     description:
       "Lead Frontend Engineer and Application Developer based in Abu Dhabi, UAE.",
   },

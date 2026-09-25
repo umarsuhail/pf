@@ -25,11 +25,11 @@ export async function generateMetadata({
   if (!card) return {};
 
   return {
-    title: `${card.title} | Umar Suhail`,
+    title: card.title,
     description: card.description,
     alternates: { canonical: `/${card.id}` },
     openGraph: {
-      title: card.title,
+      title: `${card.title} | LOST IN SPACE`,
       description: card.description,
       type: "article",
       ...(card.image && { images: [{ url: card.image }] }),

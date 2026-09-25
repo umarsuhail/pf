@@ -51,44 +51,64 @@ const sectionProgressStops = [0, 0.22, 0.56, 0.69, 0.81, 0.92];
 // a distinct "universe" (no per-section imagery exists, so these are drawn).
 type MotifType = "earth" | "orb" | "nodes" | "worlds" | "timeline" | "network" | "calm";
 
+// The flight's colour journey, one entry per card, indexed by card index.
+//
+// Cold the whole way, because the sky it travels through is: body is
+// `linear-gradient(180deg, #002d54, #00101f)` and the brand accent is sky-300.
+// The old run put an amber card (#fbbf24) and a near-neutral slate one
+// (#94a3b8) in the middle of that, which read as a highway sign and a dead
+// patch rather than as two more universes.
+//
+// The hues now sweep outward and come home: sky 199° -> teal 172° -> blue
+// 217° -> violet 255° -> sky 199°. Experience's violet is the exact colour of
+// the `violet` space region that follows it at 0.81, so the card bleeds into
+// the stretch of sky after it instead of ending at its own edge. Contact
+// returns to the departure accent, which is also where the flight's loop
+// sends you.
+//
+// One entry per card, and no more: this array used to carry six, with a
+// `resume` entry at index 4 for a card that no longer exists in `cards`.
+// Since the lookup is `atmospheres[index]`, that handed Contact the slate
+// "branching network" grade and left the sky "calm arrival" one at index 5
+// permanently unreachable. Adding a card means adding an entry here, in the
+// same order as `cards`.
 const atmospheres: { overlay: string; motif: MotifType; accent: string }[] = [
   {
-    // 0 home — identity
+    // 0 home — identity, departure. The overlay was a dark red
+    // (rgba(87,22,35)) left over from an earlier palette; it is the sky the
+    // flight actually launches from now.
     overlay:
-      "linear-gradient(180deg, rgba(87, 22, 35, 0.55) 0%, rgba(6, 20, 81, 0.15) 45%, rgba(0, 15, 49, 0.35) 100%)",
+      "linear-gradient(180deg, rgba(7, 89, 133, 0.42) 0%, rgba(6, 20, 81, 0.15) 45%, rgba(0, 15, 49, 0.35) 100%)",
     motif: "earth",
     accent: "#7dd3fc",
   },
   {
-    // 1 skills — technology constellation
+    // 1 skills — technology constellation. Teal rather than emerald: the same
+    // idea a step colder, so it belongs to the blue family the rest of the
+    // journey lives in.
     overlay:
-      "linear-gradient(180deg, rgba(4, 120, 87, 0.3) 0%, rgba(6, 78, 59, 0.15) 45%, rgba(2, 20, 25, 0.4) 100%)",
+      "linear-gradient(180deg, rgba(13, 148, 136, 0.3) 0%, rgba(17, 94, 89, 0.15) 45%, rgba(2, 20, 25, 0.4) 100%)",
     motif: "nodes",
-    accent: "#34d399",
+    accent: "#2dd4bf",
   },
   {
-    // 2 projects — floating worlds
+    // 2 projects — floating worlds. Already on-theme; unchanged.
     overlay:
       "linear-gradient(180deg, rgba(3, 105, 161, 0.3) 0%, rgba(12, 74, 110, 0.15) 45%, rgba(2, 15, 35, 0.4) 100%)",
     motif: "worlds",
     accent: "#60a5fa",
   },
   {
-    // 3 experience — timeline through the journey
+    // 3 experience — timeline through the journey. The deepest point of the
+    // trip, and the handover into the violet region at 0.81.
     overlay:
-      "linear-gradient(180deg, rgba(180, 83, 9, 0.26) 0%, rgba(120, 53, 15, 0.14) 45%, rgba(20, 12, 4, 0.4) 100%)",
+      "linear-gradient(180deg, rgba(109, 40, 217, 0.26) 0%, rgba(76, 29, 149, 0.14) 45%, rgba(12, 6, 26, 0.4) 100%)",
     motif: "timeline",
-    accent: "#fbbf24",
+    accent: "#a78bfa",
   },
   {
-    // 4 resume — branching network
-    overlay:
-      "linear-gradient(180deg, rgba(51, 65, 85, 0.34) 0%, rgba(30, 41, 59, 0.18) 45%, rgba(8, 10, 15, 0.4) 100%)",
-    motif: "network",
-    accent: "#94a3b8",
-  },
-  {
-    // 5 contact — calm arrival
+    // 4 contact — calm arrival. Back on the departure accent: the flight ends
+    // on the colour it began with, which is also what its loop returns to.
     overlay:
       "linear-gradient(180deg, rgba(3, 105, 161, 0.2) 0%, rgba(8, 47, 73, 0.12) 45%, rgba(2, 10, 25, 0.35) 100%)",
     motif: "calm",
@@ -96,61 +116,138 @@ const atmospheres: { overlay: string; motif: MotifType; accent: string }[] = [
   },
 ];
 
-// Every non-entry portal draws the same illustration. It used to be five
-// separate files (a3-a7), four of which never existed — /a3.svg, /a5.svg,
-// /a6.svg and /a7.svg all 404'd, so four of the five portals silently fell
-// back to a broken image while only /a4.svg ever resolved. One file, hued
-// per card, is both what actually ships and the more coherent idea: the
-// flight passes through one universe seen five ways, not five unrelated
-// pictures.
-// a3-planet.svg is a3.svg with its 21 sparkle polygons stripped out. The
-// artwork ships four-point stars scattered across the frame, which landed on
-// top of Space's real, drifting starfield as a second, static, differently
-// shaped set of stars — the flat squares that made the portal read as clipart.
-// The planet and its rings are untouched; a3.svg is kept as the original.
-const PORTAL_ILLUSTRATION = "/images/a3-planet.svg";
-
-// Where the planet's centre sits inside the artwork's box (its viewBox is
-// 370.4x261.6 and the globe is left of centre). Everything that has to agree
-// with the planet rather than with the frame — the halo, the spin origin, the
-// mask — is anchored here.
-const ILLUSTRATION_FOCUS = "44% 47%";
-
-// Dissolves the artwork's rectangle into the starfield: fully opaque across
-// the globe, gone well before the frame edge.
-const ILLUSTRATION_MASK = `radial-gradient(circle at ${ILLUSTRATION_FOCUS}, #000 44%, transparent 82%)`;
-
-// a3.svg ships in a coral/plum palette with a saturation-weighted dominant
-// hue of ~0°. Each non-entry card rotates that onto its own atmosphere
-// accent (see `atmospheres` above) so the illustration arrives already
-// belonging to the colour of the space around it.
+// --- The cast -----------------------------------------------------------
 //
-// Keyed by card index, 1-based after the entry/earth card at index 0;
-// indices without an entry fall back to the drawn PortalMotif below.
+// Every non-entry portal used to draw the same ringed planet
+// (/images/a3-planet.svg), hue-rotated onto each section's accent. That file
+// is gone, so the four portals were rendering a 404 — but the reason to
+// replace it rather than restore it is that a planet seen five times is a
+// backdrop, not a story. The flight is a comic (see AGENTS.md), and a panel
+// needs someone in it.
 //
-// The rotations are measured, not arithmetic. CSS hue-rotate is a matrix
-// approximation of an HSL rotation, so it neither lands where subtraction
-// says it will (the naive "accent minus 313°" put the emerald card on blue)
-// nor preserves saturation across the sweep. Each value below was picked by
-// sampling the filtered artwork and choosing the rotation whose dominant hue
-// sits nearest that card's accent — every one lands within 2°. The paired
-// saturate() then pulls intensity back to the artwork's native 0.71, which
-// is what keeps the amber and emerald cards from reading washed out next to
-// the blue ones rather than being a stylistic flourish.
-const illustrationFilterByIndex: Record<number, string> = {
-  // 1 skills — emerald #34d399 (lands 162°)
-  1: "hue-rotate(160deg) saturate(1.5)",
-  // 2 projects — blue #60a5fa (lands 216°)
-  2: "hue-rotate(225deg) saturate(1.05)",
-  // 3 experience — amber #fbbf24 (lands 44°)
-  3: "hue-rotate(55deg) saturate(1.5)",
-  // 4 resume — slate #94a3b8. The one accent that is near-neutral, so this
-  // shares the blue card's rotation and desaturates instead of chasing a
-  // hue no amount of rotation can reach.
-  4: "hue-rotate(225deg) saturate(0.4)",
-  // 5 contact — sky #7dd3fc (lands 200°)
-  5: "hue-rotate(205deg) saturate(1.25)",
+// So each portal now looks out at one beat of a single continuous scene,
+// acted by a fixed cast: the astronaut who opens the story in the loader
+// (/space/oastr.svg, the same figure), and the aliens he meets on the way.
+//
+//   02 skills      rocket   — the astronaut under power, alone in the frame
+//   03 projects    saucer   — another crew, another craft, passing close
+//   04 experience  crew     — the two of them side by side, flag between
+//   05 contact     landing  — touched down, flag planted, both waving out
+//
+// Read in order they are a departure, an encounter, a partnership and an
+// arrival, which is the shape the sections already have. Home is not in the
+// table: panel 01 carries the US mark and the astronaut's own entrance, and
+// its window is the one place the traveller is the subject rather than the
+// scene.
+//
+// The art is full-colour cartoon work and is composited *normally*, unlike
+// the planet it replaces, which was screen-blended so the starfield could
+// carry through it. Screening a figure drawn with black outlines dissolves
+// exactly those outlines and leaves a ghost; the cast has to read as solid
+// bodies in the window. What ties them to the section colour instead is
+// `tint` below — the accent, masked to the figure's own silhouette and
+// screened over it, so the region's light falls on them (rule 3: art is a
+// window onto the scene the traveller is passing, tinted to that accent).
+type Scene = {
+  src: string;
+  // Where the figure sits in the window, as object-position. These are not
+  // all centred on purpose: the rocket climbs through the middle, the moon
+  // in `landing` has to sit on the portal's floor for its curve to read as
+  // ground, and the saucer passes high.
+  position: string;
+  // How much of the window the figure occupies. Inset rather than a width so
+  // the same value works for the tall desktop portal and the wide phone
+  // letterbox, where nothing inside is laid out in percentages of the box.
+  inset: string;
+  // Idle life. These are the same ambient classes the drawn motifs use, and
+  // they are disabled under prefers-reduced-motion in globals.css.
+  float: string;
+  // Strength of the accent light on the figure. The pale suit and the white
+  // moon take colour readily; the darker saucer needs more to belong to its
+  // blue.
+  tint: number;
+  // The line the figure travels across the window as the card is approached
+  // and left, in percent of the window, plus the angle it holds while doing
+  // it. A rocket parked in the middle of a portal is a photograph of a
+  // rocket; the same rocket crossing the frame corner to corner, at the speed
+  // you scroll, is under power. Figures that are standing somewhere — the
+  // crew, the landing — get a short path instead of a long one, because they
+  // are not going anywhere.
+  travel: { from: [number, number]; to: [number, number]; lean: number };
 };
+
+// Keyed by card index, 1-based after the entry card at index 0. An index
+// without a scene falls back to the drawn PortalMotif — which is also what
+// sits *behind* every scene, so a panel never loses its own signature.
+// The entry card has no scene; its hooks still have to run, and they need a
+// path to read.
+const IDLE_TRAVEL = { from: [0, 0], to: [0, 0], lean: 0 } as const;
+
+const scenes: Record<number, Scene> = {
+  1: {
+    src: "/space/rocket.svg",
+    position: "center",
+    inset: "inset-[12%]",
+    float: "motif-float-slow",
+    tint: 0.3,
+    // Bottom-left to top-right, leaning into the climb: the artwork's nose
+    // points straight up, so it has to be rotated onto its own flight path or
+    // it reads as a rocket sliding sideways.
+    travel: { from: [-32, 40], to: [32, -40], lean: 34 },
+  },
+  2: {
+    src: "/space/saucer.svg",
+    position: "center 36%",
+    inset: "inset-[14%]",
+    float: "motif-float-med",
+    tint: 0.34,
+    // Crossing the other way, so two consecutive panels do not pan the same
+    // direction and read as one long move.
+    travel: { from: [34, -20], to: [-34, 20], lean: -8 },
+  },
+  3: {
+    src: "/space/crew.svg",
+    position: "center 45%",
+    inset: "inset-[15%]",
+    float: "motif-float-slow",
+    tint: 0.32,
+    // Standing still, being passed: a drift, not a crossing.
+    travel: { from: [-11, 5], to: [11, -5], lean: 0 },
+  },
+  4: {
+    src: "/space/landing.svg",
+    // The moon is the bottom two-thirds of this artwork. Anchored to the
+    // window's floor it reads as ground the flight has landed on; centred it
+    // reads as a ball floating in the middle of the frame.
+    position: "center bottom",
+    inset: "inset-x-[12%] bottom-0 top-[10%]",
+    float: "motif-float-med",
+    tint: 0.26,
+    // The moon is ground. Ground does not fly across the window — it only
+    // slides a little as you pass over it.
+    travel: { from: [-7, 3], to: [7, -1], lean: 0 },
+  },
+};
+
+// The accent light, painted through the figure's own alpha. mask-image with
+// the same file means the tint stops exactly at the silhouette — no
+// rectangle, no halo bleeding past the art — and mask-size/position have to
+// mirror the <Image>'s object-contain/object-position or the light slides off
+// the body it is supposed to be falling on.
+function sceneTintStyle(scene: Scene, accent: string) {
+  return {
+    background: `linear-gradient(200deg, ${accent} 0%, ${accent}00 78%)`,
+    maskImage: `url("${scene.src}")`,
+    WebkitMaskImage: `url("${scene.src}")`,
+    maskSize: "contain",
+    WebkitMaskSize: "contain",
+    maskPosition: scene.position,
+    WebkitMaskPosition: scene.position,
+    maskRepeat: "no-repeat",
+    WebkitMaskRepeat: "no-repeat",
+    opacity: scene.tint,
+  };
+}
 
 function PortalMotif({ motif, accent }: { motif: MotifType; accent: string }) {
   switch (motif) {
@@ -284,6 +381,9 @@ export function CardPortal({
   // rather than state).
   const isNearRef = useRef(isEntry);
   const atmosphere = atmospheres[index % atmospheres.length];
+  // The beat of the story this panel looks out at, if it has one (see
+  // `scenes` above). Home does not: its window is the traveller himself.
+  const scene = scenes[index];
   // Space (this card's starfield backdrop) mounts once per card — six of
   // them exist at once — and only stops drawing on its own when it's
   // geometrically outside the viewport. A card that's just faded to
@@ -304,9 +404,37 @@ export function CardPortal({
   // Other cards: their motif fades and settles in instead of rising.
   const motifOpacity = useMotionValue(0);
   const motifScale = useMotionValue(0.85);
-  // Per-section globe spin, on its own motion value so it never fights the
-  // opacity/scale tweens above.
-  const spinRotate = useMotionValue(index * 40);
+  // The scene crosses the window as the flight approaches and leaves the
+  // card, along the path that scene declares. Derived straight from scroll —
+  // no timer, no tween — so it freezes the moment scrolling does and reverses
+  // when the visitor does: the rocket is flying because *you* are moving, and
+  // it stops when you stop, which a looping animation could never do.
+  //
+  // The window is the card's own visible life, not an arbitrary span around
+  // its stop — the same reveal start and depart end the fade effect below
+  // uses. Mapped onto anything wider, the figure spends the card's whole
+  // appearance crossing the middle third of its path and never reaches either
+  // corner; mapped onto this, it enters as the card fades up and exits as the
+  // card fades out.
+  const scenePath = scenes[index]?.travel ?? IDLE_TRAVEL;
+  const sceneStop = sectionProgressStops[index] ?? 0;
+  const scenePrevious = index > 0 ? sectionProgressStops[index - 1] : 0;
+  const sceneApproach = Math.max(sceneStop - scenePrevious, 0.08) * 0.3;
+  const sceneWindow = [sceneStop - sceneApproach, sceneStop + 0.11];
+  const sceneX = useTransform(scrollYProgress, sceneWindow, [
+    `${scenePath.from[0]}%`,
+    `${scenePath.to[0]}%`,
+  ]);
+  const sceneY = useTransform(scrollYProgress, sceneWindow, [
+    `${scenePath.from[1]}%`,
+    `${scenePath.to[1]}%`,
+  ]);
+  // A few degrees of roll either side of the held lean, so the crossing has
+  // some life in it rather than being a rigid slide.
+  const sceneTilt = useTransform(scrollYProgress, sceneWindow, [
+    scenePath.lean - 4,
+    scenePath.lean + 4,
+  ]);
   // Traces the card's rounded-corner ring in/out as it comes into and
   // leaves focus.
   const progressDashOffset = useMotionValue(100);
@@ -336,8 +464,8 @@ export function CardPortal({
     // Past its own stop the camera is pushing through the card, and because
     // every card's z is set so it sits at the camera plane exactly at its own
     // stop, the card balloons toward CSS perspective's singularity at roughly
-    // stop + 0.131 (1100px perspective / 8400px camera travel; mobile's
-    // shorter 7800px travel puts it a touch later, ~0.141, so 0.131 is the
+    // stop + 0.107 (1100px perspective / 10267px camera travel; mobile's
+    // shorter 9533px travel puts it a touch later, ~0.115, so 0.107 is the
     // earlier, safer bound to fade against on both). That's much sooner than
     // the old +0.1..+0.29 window — the fade had barely started by the time
     // the globe was blowing up to fill the frame, reading as a huge image
@@ -427,35 +555,6 @@ export function CardPortal({
     motifScale,
     progressDashOffset,
   ]);
-
-  // Scroll-driven spin for the per-section globes, mirroring the distant
-  // a1.png earth at the end of the flight: rotation tracks how far the
-  // visitor has travelled rather than a wall-clock timer, so the globes are
-  // already mid-turn when a card comes into view and freeze when scrolling
-  // stops. Lives on its own motion value so it never fights the
-  // opacity/scale tweens already driving the motif.
-  useEffect(() => {
-    if (isEntry) return;
-
-    // Staggered start angle so the globes aren't all locked in unison
-    const offset = index * 40;
-    let lastAngle = Number.NEGATIVE_INFINITY;
-    const update = (progress: number) => {
-      const angle = offset + progress * 260;
-      // Sub-degree steps are invisible on a globe this size but still cost a
-      // full MotionValue notification. Keep the scroll-bound rotation direct:
-      // scroll is already the easing source, and allocating tweens for every
-      // portal during a wheel gesture is exactly the work that made the Z
-      // flight feel late.
-      if (Math.abs(angle - lastAngle) < 0.35) return;
-      lastAngle = angle;
-      spinRotate.set(angle);
-    };
-
-    update(scrollYProgress.get());
-    const unsubscribe = scrollYProgress.on("change", update);
-    return () => unsubscribe();
-  }, [index, isEntry, scrollYProgress, spinRotate]);
 
   const cancelActivation = () => {
     const token = activationRef.current;
@@ -734,6 +833,12 @@ export function CardPortal({
                         src="/astr.svg"
                         alt=""
                         fill
+                        // Required, not optional: /_next/image answers 400 for
+                        // any SVG unless `dangerouslyAllowSVG` is enabled in
+                        // next.config, so without this the optimizer refuses
+                        // the file and the astronaut renders as nothing at
+                        // all. alt="" meant that failed silently.
+                        unoptimized
                         sizes="(min-width: 600px) 24vw, 32vh"
                         // Drifts up and grows very slightly on hover, as if
                         // pushing off toward the visitor. Slower than the
@@ -755,63 +860,73 @@ export function CardPortal({
                 opacity: motifOpacity,
                 scale: motifScale,
                 willChange: "opacity, transform",
-                // Screen rather than normal: the artwork is pastel fills on a
-                // transparent ground, and laid over the starfield opaquely it
-                // read as a sticker pasted on the window. Screening it lets
-                // the stars carry through the planet and makes its light the
-                // same light as the space around it. It has to live on THIS
-                // element, not on a child: this one already carries an
-                // animated opacity, which isolates its subtree, so a child's
-                // blend mode would have nothing but transparency to blend
-                // against and would silently render as normal.
-                ...(illustrationFilterByIndex[index]
-                  ? { mixBlendMode: "screen" as const }
-                  : null),
+                // No mixBlendMode here. The planet this replaced was pastel
+                // fills on a transparent ground and was screened so the
+                // starfield carried through it; the cast is drawn with black
+                // outlines, and screening dissolves exactly those outlines
+                // and leaves a ghost. The figures are solid bodies in the
+                // window — it is the accent light below, not the whole
+                // figure, that blends.
               }}
             >
-              {illustrationFilterByIndex[index] ? (
+              {/* The drawn motif stays, underneath: it is the section's own
+                 signature and now reads as the space the scene is happening
+                 in rather than as the only thing in the window. */}
+              <PortalMotif motif={atmosphere.motif} accent={atmosphere.accent} />
+
+              {scene && (
                 <>
-                  {/* Ambient halo in this section's accent, centred on the
-                     planet. Faint and tight on purpose — wide or strong, it
-                     hazes the whole portal to flat blue and the deep-space
-                     falloff disappears. */}
+                  {/* Ambient accent behind the figure, so it is lit from the
+                     region it is flying through and does not sit on the
+                     starfield as a cut-out. Faint and tight on purpose —
+                     wide or strong, it hazes the whole portal flat and the
+                     deep-space falloff disappears. */}
                   <div
                     className="absolute inset-0"
                     style={{
-                      background: `radial-gradient(circle at ${ILLUSTRATION_FOCUS}, ${atmosphere.accent}38 0%, ${atmosphere.accent}14 26%, transparent 46%)`,
+                      background: `radial-gradient(circle at 50% 46%, ${atmosphere.accent}30 0%, ${atmosphere.accent}12 30%, transparent 56%)`,
                     }}
                   />
                   <motion.div
-                    // Inset from the frame so the rings can't be sliced by the
-                    // portal's edge, and masked to a soft circle around the
-                    // planet so the artwork's bounding box dissolves into the
-                    // starfield instead of ending on a hard rectangle.
-                    className="absolute inset-[14%]"
+                    className={`absolute ${scene.inset}`}
                     style={{
-                      rotate: spinRotate,
-                      // The spin used to swing the whole frame, so the
-                      // off-centre planet orbited the portal and clipped its
-                      // edges. Pinning the origin to the planet turns the same
-                      // scroll-driven rotation into the globe turning in place.
-                      // The mask is radially symmetric about this same point,
-                      // so it stays put while the art rotates under it.
-                      transformOrigin: ILLUSTRATION_FOCUS,
-                      maskImage: ILLUSTRATION_MASK,
-                      WebkitMaskImage: ILLUSTRATION_MASK,
+                      x: sceneX,
+                      y: sceneY,
+                      rotate: sceneTilt,
+                      willChange: "transform",
                     }}
                   >
-                    <Image
-                      src={PORTAL_ILLUSTRATION}
-                      alt=""
-                      fill
-                      sizes="(min-width: 1024px) 30vw, 30vh"
-                      className="object-contain opacity-[0.88]"
-                      style={{ filter: illustrationFilterByIndex[index] }}
-                    />
+                    {/* The idle float gets its own layer. Both it and the
+                       scroll drift above animate `transform`, and a CSS
+                       animation outranks an inline style — on one element the
+                       keyframes would simply erase framer's x/rotate and the
+                       scene would stop reacting to scroll entirely. */}
+                    <div className={`absolute inset-0 ${scene.float}`}>
+                      <Image
+                        src={scene.src}
+                        alt=""
+                        fill
+                        // Required, not optional: /_next/image answers 400 for
+                        // any SVG unless `dangerouslyAllowSVG` is set, so
+                        // without this every scene renders as nothing — and
+                        // alt="" would let it fail silently.
+                        unoptimized
+                        sizes="(min-width: 1024px) 30vw, 60vw"
+                        className="object-contain"
+                        style={{ objectPosition: scene.position }}
+                      />
+                      {/* This section's light, painted through the figure's own
+                         alpha and screened onto it. Screen over the art (not
+                         over the starfield) only lifts what is already there,
+                         so the suit and the moon take the accent while the
+                         outlines stay black. */}
+                      <div
+                        className="pointer-events-none absolute inset-0 mix-blend-screen"
+                        style={sceneTintStyle(scene, atmosphere.accent)}
+                      />
+                    </div>
                   </motion.div>
                 </>
-              ) : (
-                <PortalMotif motif={atmosphere.motif} accent={atmosphere.accent} />
               )}
             </motion.div>
           )}

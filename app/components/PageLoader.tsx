@@ -1,108 +1,91 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
-// The opening film is also useful loading time: the app renders underneath
-// this overlay, and the reveal waits for both the film and window load.
+// The first frame of the story, not a splash screen.
+//
+// The old loader played /bg.mp4 in a rounded preview card over a #020617
+// backdrop. Two problems beyond the 1.1MB on the critical path: the video
+// owned 90% of the progress meter, so the reveal was gated on a *film*
+// finishing rather than on the app being ready — a fast connection still sat
+// through the clip — and #020617 is not the page's colour. body is
+// `linear-gradient(180deg, #002d54, #00101f)`, so lifting the overlay was a
+// visible cut from near-black to navy.
+//
+// The artwork already carries Umar's name and role in dimensional lettering,
+// so it is the title rather than a texture behind a second title. The loader
+// leaves that plate unobscured, places the recurring astronaut in its empty
+// upper space, and keeps readiness feedback at the bottom edge.
 const EXIT_DURATION_MS = 700;
-const END_FRAME_HOLD_MS = 2000;
-const RADIUS = 26;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-// Sweeps from sky-blue to violet as progress climbs, instead of a fixed accent
-const ringColor = (progress: number) => `hsl(${190 + progress * 1.7}, 85%, 65%)`;
+// Long enough that a warm cache does not flash the card for three frames,
+// short enough that it is never the reason anyone waits.
+const MIN_VISIBLE_MS = 900;
+// Where the synthetic meter creeps to while the app is still loading. It must
+// never reach 100 on its own — arriving at 100 and sitting there is worse than
+// arriving at 92 and finishing.
+const CREEP_CEILING = 92;
+const CREEP_TAU = 850;
+
+// Tied to progress rather than to a timer, so the words are reporting
+// something real: each line is the band of the meter it belongs to.
+const STATUS_STEPS = [
+  { at: 0, text: "Initializing thrusters…" },
+  { at: 30, text: "Setting up React state…" },
+  { at: 60, text: "Bootstrapping environment." },
+  { at: 90, text: "Loading his world. Thanks for visiting." },
+] as const;
 
 export default function PageLoader() {
-  const videoRef = useRef<HTMLVideoElement>(null);
   const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const rafRef = useRef(0);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
 
     let cancelled = false;
-    let detachVideo = () => {};
+    let loaded = document.readyState === "complete";
+    let loadedAt = loaded ? performance.now() : 0;
+    const started = performance.now();
     let detachWindow = () => {};
-    let appLoaded = document.readyState === "complete";
-    let videoRatio = 0;
 
-    // The video owns 90% of the meter and normal app loading owns the final
-    // 10%. The application keeps loading underneath this fixed overlay, but
-    // the reveal is gated on both jobs so a fast app never cuts the film off.
-    const updateProgress = () => {
+    // One rAF drives both the creep and the finish, so the number never jumps
+    // between two authorities — it eases to the ceiling while waiting, then
+    // eases the rest of the way once the app is actually up.
+    const frame = (now: number) => {
       if (cancelled) return;
-      setProgress(
-        Math.min(100, Math.round(videoRatio * 90 + (appLoaded ? 10 : 0))),
-      );
+      const creep = CREEP_CEILING * (1 - Math.exp(-(now - started) / CREEP_TAU));
+
+      if (loaded) {
+        const t = Math.min(1, (now - loadedAt) / 450);
+        const eased = 1 - (1 - t) ** 3;
+        setProgress(Math.min(100, Math.round(creep + (100 - creep) * eased)));
+        if (t >= 1 && now - started >= MIN_VISIBLE_MS) {
+          setReady(true);
+          return;
+        }
+      } else {
+        setProgress(Math.round(creep));
+      }
+      rafRef.current = requestAnimationFrame(frame);
     };
 
-    const videoFinished = new Promise<void>((resolve) => {
-      const video = videoRef.current;
-      if (!video || video.error || video.ended) {
-        videoRatio = 1;
-        updateProgress();
-        resolve();
-        return;
-      }
-
-      let settled = false;
-      let endHoldTimeout = 0;
-      const onTimeUpdate = () => {
-        if (!Number.isFinite(video.duration) || video.duration <= 0) return;
-        videoRatio = Math.min(1, video.currentTime / video.duration);
-        updateProgress();
+    if (!loaded) {
+      const onLoad = () => {
+        loaded = true;
+        loadedAt = performance.now();
       };
-      const settle = () => {
-        if (settled) return;
-        settled = true;
-        videoRatio = 1;
-        updateProgress();
-        detachVideo();
-        resolve();
-      };
-      const onEnded = () => {
-        videoRatio = 1;
-        updateProgress();
-        endHoldTimeout = window.setTimeout(settle, END_FRAME_HOLD_MS);
-      };
-      detachVideo = () => {
-        window.clearTimeout(endHoldTimeout);
-        video.removeEventListener("timeupdate", onTimeUpdate);
-        video.removeEventListener("ended", onEnded);
-        video.removeEventListener("error", settle);
-      };
+      detachWindow = () => window.removeEventListener("load", onLoad);
+      window.addEventListener("load", onLoad, { once: true });
+    }
 
-      video.addEventListener("timeupdate", onTimeUpdate);
-      video.addEventListener("ended", onEnded, { once: true });
-      video.addEventListener("error", settle, { once: true });
-      video.currentTime = 0;
-      void video.play().catch(settle);
-    });
-
-    const windowLoaded = new Promise<void>((resolve) => {
-      if (appLoaded) {
-        updateProgress();
-        resolve();
-      } else {
-        const onLoad = () => {
-          appLoaded = true;
-          updateProgress();
-          resolve();
-        };
-        detachWindow = () => window.removeEventListener("load", onLoad);
-        window.addEventListener("load", onLoad, { once: true });
-      }
-    });
-
-    Promise.all([videoFinished, windowLoaded]).then(() => {
-      if (cancelled) return;
-      setProgress(100);
-      setReady(true);
-    });
+    rafRef.current = requestAnimationFrame(frame);
 
     return () => {
       cancelled = true;
-      detachVideo();
+      cancelAnimationFrame(rafRef.current);
       detachWindow();
       document.body.style.overflow = "";
     };
@@ -117,70 +100,222 @@ export default function PageLoader() {
 
   if (hidden) return null;
 
+  const stepIndex = STATUS_STEPS.reduce(
+    (found, step, i) => (progress >= step.at ? i : found),
+    0,
+  );
+  const orbitAngle = (progress / 100) * Math.PI * 2 - Math.PI / 2;
+  const orbitDotX = 80 + Math.cos(orbitAngle) * 62;
+  const orbitDotY = 80 + Math.sin(orbitAngle) * 62;
+
   return (
     <div
       role="status"
       aria-live="polite"
       aria-busy={!ready}
-      className={`fixed inset-0 z-100 flex items-center justify-center bg-background transition-[opacity,transform,filter] ease-out ${
+      aria-label={ready ? "Ready" : `${STATUS_STEPS[stepIndex].text} ${progress} percent`}
+      // Only opacity and a hair of scale on the way out: both compositor-only,
+      // so the handover cannot compete for the main thread with the flight
+      // mounting underneath it.
+      className={`fixed inset-0 z-100 overflow-hidden transition-[opacity,transform] ease-out ${
         ready
-          ? "pointer-events-none scale-110 opacity-0 blur-md duration-700"
-          : "scale-100 opacity-100 blur-none duration-500"
+          ? "pointer-events-none scale-[1.02] opacity-0 duration-700"
+          : "scale-100 opacity-100 duration-300"
       }`}
+      // Matches the concrete plate while bg.jpg is decoding, avoiding a dark
+      // flash before the image appears.
+      style={{ background: "#e8e8e6" }}
     >
-      {/* Stays a landscape-shaped preview card on phones — a 70vh × 70vw box
-         in portrait would be an awkward tall crop of the background video. */}
-      <div className="relative aspect-16/10 w-[86vw] overflow-hidden rounded-2xl shadow-2xl shadow-black/60 lg:aspect-auto lg:h-[70vh] lg:w-[70vw] lg:rounded-3xl">
-        <video
-          ref={videoRef}
-          aria-hidden="true"
-          autoPlay
-          muted
-          playsInline
-          preload="auto"
-          disablePictureInPicture
-          className="absolute inset-0 h-full w-full object-cover object-center"
-        >
-          <source src="/bg.mp4" type="video/mp4" />
-        </video>
-        {/* Blue/steel ambient glow, drifting and screen-blended so it reads
-           as light moving across the card rather than a flat color wash. */}
-        <div aria-hidden="true" className="loader-card-glow absolute inset-0" />
-      </div>
+      <style>{`
+        @keyframes plFloat {
+          0%, 100% { transform: translate3d(0, 0, 0) rotate(-1.5deg); }
+          50%      { transform: translate3d(0, -14px, 0) rotate(1.5deg); }
+        }
+        @keyframes plSheen {
+          from { transform: translateX(-100%); }
+          to   { transform: translateX(320%); }
+        }
+        @keyframes plOrbit {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes plPulse {
+          0%, 100% { opacity: 0.65; transform: scale(0.78); }
+          50%      { opacity: 1; transform: scale(1.25); }
+        }
+        .pl-bg     { object-fit: cover; object-position: 50% 45%; }
+        .pl-float  { animation: plFloat 7s ease-in-out infinite; }
+        .pl-sheen  { animation: plSheen 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+        .pl-orbit  { animation: plOrbit 18s linear infinite; transform-origin: 80px 80px; }
+        .pl-pulse  { animation: plPulse 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+        @media (orientation: portrait) {
+          .pl-bg { object-fit: contain; object-position: center; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .pl-float, .pl-sheen, .pl-orbit, .pl-pulse { animation: none; }
+        }
+      `}</style>
 
-      <div className="absolute inset-x-0 bottom-12 flex flex-col items-center gap-6">
-        <div className="relative flex h-16 w-16 items-center justify-center">
-          <svg width="64" height="64" viewBox="0 0 64 64" className="-rotate-90">
+      {/* Landscape fills the viewport and crops only the plate's empty upper/
+          lower concrete. Portrait contains the full 1.32:1 artwork because
+          cropping its sides would crop the name itself. No tint or scrim: the
+          background's lettering is the intro title. */}
+      <Image
+        src="/bg.jpg"
+        alt="Umar Suhail — UI/UX Engineer and Frontend Developer"
+        fill
+        priority
+        sizes="100vw"
+        className="pl-bg"
+      />
+
+      <div className="relative h-full w-full px-6">
+        {/* The astronaut the cards carry, drifting. `unoptimized` is required:
+            /_next/image returns 400 for SVG unless dangerouslyAllowSVG is on,
+            so an optimized <Image> here would silently render nothing. */}
+        <div className="absolute left-1/2 top-[6%] aspect-square h-[clamp(10rem,24vh,13.5rem)] -translate-x-1/2">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 160 160"
+            className="absolute inset-0 h-full w-full overflow-visible drop-shadow-[0_8px_20px_rgba(14,165,233,0.18)]"
+          >
+            <defs>
+              <linearGradient id="loader-orbit-gradient" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#38bdf8" />
+                <stop offset="55%" stopColor="#7dd3fc" />
+                <stop offset="100%" stopColor="#2dd4bf" />
+              </linearGradient>
+            </defs>
             <circle
-              cx="32"
-              cy="32"
-              r={RADIUS}
+              cx="80"
+              cy="80"
+              r="62"
               fill="none"
-              stroke="rgba(255,255,255,0.15)"
-              strokeWidth="2"
+              stroke="rgba(15, 23, 42, 0.12)"
+              strokeWidth="1.5"
             />
             <circle
-              cx="32"
-              cy="32"
-              r={RADIUS}
+              cx="80"
+              cy="80"
+              r="72"
               fill="none"
-              stroke={ringColor(progress)}
-              strokeWidth="2"
+              stroke="rgba(15, 23, 42, 0.16)"
+              strokeWidth="1"
+              strokeDasharray="2 9"
+              className="pl-orbit"
+            />
+            <circle
+              cx="80"
+              cy="80"
+              r="62"
+              pathLength="100"
+              fill="none"
+              stroke="url(#loader-orbit-gradient)"
+              strokeWidth="4"
               strokeLinecap="round"
-              strokeDasharray={CIRCUMFERENCE}
-              strokeDashoffset={CIRCUMFERENCE * (1 - progress / 100)}
-              style={{
-                transition: "stroke-dashoffset 300ms ease-out, stroke 300ms ease-out",
-              }}
+              strokeDasharray="100"
+              strokeDashoffset={100 - progress}
+              transform="rotate(-90 80 80)"
+              style={{ transition: "stroke-dashoffset 220ms cubic-bezier(0.22,1,0.36,1)" }}
+            />
+            <circle
+              cx={orbitDotX}
+              cy={orbitDotY}
+              r="4"
+              fill="#e0f2fe"
+              stroke="#0ea5e9"
+              strokeWidth="2"
+              className="pl-pulse"
             />
           </svg>
-          <span className="absolute text-xs font-semibold text-sky-100">
+
+          <div className="pl-float absolute inset-[22%]">
+            <Image
+              src="/space/oastr.svg"
+              alt=""
+              fill
+              unoptimized
+              priority
+              className="object-contain drop-shadow-[0_10px_30px_rgba(2,8,23,0.35)]"
+              aria-hidden="true"
+            />
+          </div>
+
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-sky-300/25 bg-slate-950 px-3 py-1 text-[10px] font-bold tabular-nums tracking-[0.14em] text-sky-100 shadow-[0_8px_24px_rgba(2,8,23,0.28)]">
             {progress}%
-          </span>
+          </div>
         </div>
-        <p className="px-6 text-center text-xs font-semibold uppercase tracking-[0.32em] text-sky-100/80">
-          Loading his world. thanks for visiting.
-        </p>
+
+        {/* A compact telemetry console anchors the loading state without
+            covering the artwork's name or role. */}
+        <div className="absolute bottom-[clamp(1.25rem,4vh,3rem)] left-1/2 w-[min(88vw,540px)] -translate-x-1/2 rounded-2xl border border-sky-300/20 bg-slate-950/[0.92] px-5 py-4 shadow-[0_24px_70px_rgba(2,8,23,0.28)] backdrop-blur-md sm:px-6">
+          <div className="mb-3 flex items-center gap-4">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-300 opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-300" />
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-[0.34em] text-sky-100/80">
+                Lost in Space
+              </span>
+            </div>
+          </div>
+
+          <div className="relative h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="absolute inset-y-0 left-0 overflow-hidden rounded-full"
+              style={{
+                width: `${progress}%`,
+                background: "linear-gradient(90deg, #38bdf8, #7dd3fc 55%, #34d399)",
+                boxShadow: "0 0 14px rgba(56,189,248,0.72)",
+                transition: "width 220ms cubic-bezier(0.22,1,0.36,1)",
+              }}
+            />
+            {/* A travelling highlight, so the rail reads as live even during
+                the flat stretch where the meter waits on the network. */}
+            <div
+              aria-hidden="true"
+              className="pl-sheen absolute inset-y-0 w-1/3 rounded-full"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, rgba(226,240,255,0.5), transparent)",
+              }}
+            />
+          </div>
+
+          <div className="mt-3 flex items-center gap-3">
+            <div className="flex gap-1.5" aria-hidden="true">
+              {STATUS_STEPS.map((step) => (
+                <span
+                  key={step.at}
+                  className="h-1.5 w-1.5 rounded-full transition-[background-color,box-shadow] duration-500"
+                  style={{
+                    background:
+                      progress >= step.at ? "#7dd3fc" : "rgba(255,255,255,0.14)",
+                    boxShadow:
+                      progress >= step.at
+                        ? "0 0 8px rgba(125,211,252,0.65)"
+                        : "none",
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* All lines stay mounted so the status can crossfade without the
+                console changing height as copy lengths change. */}
+            <div className="relative h-4 flex-1">
+              {STATUS_STEPS.map((step, i) => (
+                <p
+                  key={step.text}
+                  aria-hidden="true"
+                  className="absolute inset-0 truncate text-right text-[9px] font-semibold uppercase tracking-[0.18em] text-sky-100/65 transition-opacity duration-500"
+                  style={{ opacity: i === stepIndex ? 1 : 0 }}
+                >
+                  {step.text}
+                </p>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
