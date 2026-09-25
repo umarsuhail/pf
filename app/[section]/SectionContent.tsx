@@ -457,6 +457,17 @@ export function SectionContent({
                           </span>
                         ))}
                       </div>
+                      {project.href && (
+                        <a
+                          href={project.href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-5 inline-flex items-center gap-2 rounded-full border border-purple-300/30 bg-purple-400/10 px-4 py-2 text-xs font-semibold text-purple-100 transition hover:bg-purple-400/20"
+                        >
+                          Launch ATS Studio
+                          <ArrowRightIcon size={13} aria-hidden="true" />
+                        </a>
+                      )}
                     </div>
                   </motion.div>
                 );

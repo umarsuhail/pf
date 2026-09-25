@@ -1,15 +1,23 @@
 {
-  "name": "efr",
+  "name": "pf",
   "version": "0.1.0",
   "private": true,
+  "workspaces": ["apps/*"],
   "scripts": {
     "predev": "node scripts/index-resume.mjs",
     "prebuild": "node scripts/index-resume.mjs",
     "rag:index": "node scripts/index-resume.mjs",
     "dev": "next dev",
+    "dev:portfolio": "next dev",
+    "dev:ats": "npm run dev --workspace=@pf/ats-resume-studio",
     "build": "next build",
+    "build:portfolio": "next build",
+    "build:ats": "npm run build --workspace=@pf/ats-resume-studio",
     "start": "next start",
-    "lint": "eslint"
+    "start:portfolio": "next start",
+    "start:ats": "npm run start --workspace=@pf/ats-resume-studio",
+    "lint": "eslint",
+    "lint:ats": "npm run lint --workspace=@pf/ats-resume-studio"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.59",

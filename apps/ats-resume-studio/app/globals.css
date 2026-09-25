@@ -1,0 +1,2 @@
+@import "tailwindcss";
+html,body{height:100%}body{margin:0;background:#f6f7f9;color:#111827}*{box-sizing:border-box}.monaco-editor,.overflow-guard{border-radius:12px}.scrollbar::-webkit-scrollbar{width:8px;height:8px}.scrollbar::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:8px}
