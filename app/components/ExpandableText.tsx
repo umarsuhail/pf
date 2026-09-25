@@ -15,6 +15,7 @@ export default function ExpandableText({
   className = "",
   forceExpanded = false,
   scrollExpanded = false,
+  resetKey,
   onExpandedChange,
 }: {
   children: ReactNode;
@@ -27,6 +28,11 @@ export default function ExpandableText({
   // visitor mid-flight) — after it fires, expansion reverts to ordinary
   // click-driven state, so the visitor can still collapse it again.
   forceExpanded?: boolean;
+  // Changing this collapses the text back to its preview, whoever opened it.
+  // forceExpanded only has a rising edge, so without this a bio opened by
+  // the narration (or by hand) stays open for the rest of the session — the
+  // flight looping back to its first panel included.
+  resetKey?: number;
   // Lets a parent react to the real expanded state (manual toggle or
   // forceExpanded alike) instead of just the one-way forceExpanded trigger.
   onExpandedChange?: (expanded: boolean) => void;
@@ -41,6 +47,11 @@ export default function ExpandableText({
   if (forceExpanded !== prevForceExpanded) {
     setPrevForceExpanded(forceExpanded);
     if (forceExpanded) setExpanded(true);
+  }
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey);
+    setExpanded(false);
   }
 
   useEffect(() => {

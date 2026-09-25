@@ -15,8 +15,17 @@ import {
   PointsMaterial,
   Scene,
   Texture,
+  Vector3,
   WebGLRenderer,
 } from "three";
+import {
+  STARFIELD,
+  STARFIELD_GATHER_EVENT,
+  STARFIELD_RELEASE_EVENT,
+  STARFIELD_SEED_EVENT,
+  type StarfieldGatherDetail,
+  type StarfieldSeedDetail,
+} from "../lib/starfield";
 
 // A THREE.Points field is a single draw call no matter how many points are
 // in it, so the count here is a purely visual decision, not a performance
@@ -27,9 +36,11 @@ import {
 // particles for the eye, which is the opposite of what it is for.
 const PARTICLE_COUNT = 620;
 const INITIAL_PARTICLES = 240;
-const FIELD_DEPTH = 60;
+// Shared with the loader and the closing mark (lib/starfield), which hand
+// particles to and from this field and have to agree with it to the pixel.
+const FIELD_DEPTH = STARFIELD.depth;
 const FIELD_WIDTH = 44;
-const CAMERA_Z = 18;
+const CAMERA_Z = STARFIELD.cameraZ;
 const PHASE_SCROLL_SCREENS = 3;
 const MOBILE_BREAKPOINT = 768;
 
@@ -62,7 +73,7 @@ export default function SpaceParticles() {
 
     const scene = new Scene();
     const camera = new PerspectiveCamera(
-      60,
+      STARFIELD.fovDeg,
       window.innerWidth / window.innerHeight,
       0.1,
       200
@@ -104,11 +115,11 @@ export default function SpaceParticles() {
       // pale tint is where the field ends up late in the flight (see the
       // lerp toward skyBlue/white below), so starting there meant the colour
       // journey had nowhere to travel from.
-      color: new Color("#3b82f6"),
-      size: 0.26,
+      color: new Color(STARFIELD.color),
+      size: STARFIELD.pointSize,
       sizeAttenuation: true,
       transparent: true,
-      opacity: 0.4,
+      opacity: STARFIELD.opacity,
       depthWrite: false,
     });
     const field = new Points(geometry, material);
@@ -161,6 +172,14 @@ export default function SpaceParticles() {
       const currentY = window.scrollY;
       const deltaY = currentY - lastScrollY;
       lastScrollY = currentY;
+      // A jump, not travel: the loop wrapping from the end to the top (or any
+      // instant scrollTo). Read as a delta it is a scroll of tens of screens
+      // backwards and flung the whole field the wrong way; the loop brings
+      // its own forward rush (flight-loop-rush) instead.
+      if (Math.abs(deltaY) > window.innerHeight * 2) {
+        blueProgress = getBlueProgress(currentY);
+        return;
+      }
       if (isAutopilotRunning) {
         scrollVelocity = 0;
         return;
@@ -204,6 +223,96 @@ export default function SpaceParticles() {
       camera.updateProjectionMatrix();
       renderer.setSize(width, height);
     };
+
+    // --- Hand-offs ---------------------------------------------------------
+    // The field is where the loader's shattered US ends up, and where the
+    // closing US is gathered from. See lib/starfield.
+    const handoffPoint = new Vector3();
+    const halfHeightAt = (distance: number) =>
+      Math.tan(MathUtils.degToRad(camera.fov / 2)) * distance;
+
+    // Seed: put stars exactly where the loader's dots are, at the depth each
+    // was drawn for. Built in camera space and taken into the field's own
+    // (rotated) space, so the mouse tilt and the slow roll do not shift them.
+    const handleSeed = (event: Event) => {
+      const stars = (event as CustomEvent<StarfieldSeedDetail>).detail?.stars;
+      if (!stars?.length) return;
+      field.updateMatrixWorld();
+      const count = Math.min(stars.length, finalCount);
+      for (let i = 0; i < count; i++) {
+        const star = stars[i];
+        const halfH = halfHeightAt(star.distance);
+        const halfW = halfH * camera.aspect;
+        handoffPoint.set(
+          (star.nx * 2 - 1) * halfW,
+          (1 - star.ny * 2) * halfH,
+          CAMERA_Z - star.distance,
+        );
+        field.worldToLocal(handoffPoint);
+        posArray[i * 3] = handoffPoint.x;
+        posArray[i * 3 + 1] = handoffPoint.y;
+        posArray[i * 3 + 2] = handoffPoint.z;
+      }
+      posAttr.needsUpdate = true;
+      currentParticleCount = Math.max(currentParticleCount, count);
+      geometry.setDrawRange(0, currentParticleCount);
+      // The loader takes its canvas away on the next frames; this one has
+      // to be drawn by then, idle throttle or not.
+      material.opacity = STARFIELD.opacity;
+      lastActivity = performance.now();
+      renderer.render(scene, camera);
+    };
+
+    // Gather: hand the closing mark the stars on screen right now, and take
+    // them out of the field while they are the mark. Parked far to the side
+    // (the drift loop only moves z) and remembered for release.
+    const gathered: { index: number; x: number }[] = [];
+    const PARKED_X = 1e5;
+    const handleGather = (event: Event) => {
+      const detail = (event as CustomEvent<StarfieldGatherDetail>).detail;
+      if (!detail) return;
+      field.updateMatrixWorld();
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const points: { x: number; y: number }[] = [];
+      for (let i = 0; i < currentParticleCount && points.length < detail.count; i++) {
+        if (posArray[i * 3] === PARKED_X) continue;
+        handoffPoint.set(posArray[i * 3], posArray[i * 3 + 1], posArray[i * 3 + 2]);
+        field.localToWorld(handoffPoint);
+        if (handoffPoint.z > CAMERA_Z - 1) continue;
+        handoffPoint.project(camera);
+        const x = ((handoffPoint.x + 1) / 2) * width;
+        const y = ((1 - handoffPoint.y) / 2) * height;
+        const { within } = detail;
+        if (x < within.left || x > within.right || y < within.top || y > within.bottom) {
+          continue;
+        }
+        points.push({ x, y });
+        gathered.push({ index: i, x: posArray[i * 3] });
+        posArray[i * 3] = PARKED_X;
+      }
+      posAttr.needsUpdate = true;
+      detail.respond(points);
+    };
+
+    const handleRelease = () => {
+      for (const star of gathered) posArray[star.index * 3] = star.x;
+      gathered.length = 0;
+      posAttr.needsUpdate = true;
+    };
+
+    // The loop arriving back at the beginning: a hard forward warp that
+    // decays on the usual 0.87/frame, held at the clamp for the first beat.
+    const handleLoopRush = () => {
+      if (isAutopilotRunning) return;
+      scrollVelocity = 5;
+      lastActivity = performance.now();
+    };
+
+    window.addEventListener(STARFIELD_SEED_EVENT, handleSeed);
+    window.addEventListener("flight-loop-rush", handleLoopRush);
+    window.addEventListener(STARFIELD_GATHER_EVENT, handleGather);
+    window.addEventListener(STARFIELD_RELEASE_EVENT, handleRelease);
 
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("wheel", handleWheel, { passive: true });
@@ -303,6 +412,10 @@ export default function SpaceParticles() {
 
     return () => {
       cancelAnimationFrame(rafId);
+      window.removeEventListener(STARFIELD_SEED_EVENT, handleSeed);
+      window.removeEventListener("flight-loop-rush", handleLoopRush);
+      window.removeEventListener(STARFIELD_GATHER_EVENT, handleGather);
+      window.removeEventListener(STARFIELD_RELEASE_EVENT, handleRelease);
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("wheel", handleWheel);
       window.removeEventListener("scroll", handleScroll);

@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
 // The intro is the one leg of the tour that does not run on a timer: home
-// holds until intro.wav has actually finished speaking (see the
+// holds until intro.aac has actually finished speaking (see the
 // `waitForNarration` leg in MultiverseFlight). That is right for a first
 // visit and wrong for every one after it, where the tour appears to have
 // stalled on the first card with no way past.

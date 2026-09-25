@@ -432,7 +432,9 @@ export function SectionContent({
                         alt=""
                         fill
                         sizes="(max-width: 640px) calc(100vw - 2rem), (max-width: 1024px) calc(50vw - 2rem), (max-width: 1536px) calc(33vw - 2rem), 25vw"
-                        className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                        className={`${
+                          project.imageFit === "contain" ? "object-contain p-3" : "object-cover"
+                        } transition-transform duration-500 ease-out group-hover:scale-105`}
                       />
                       <span
                         className={`absolute left-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-xl border ${accent}`}

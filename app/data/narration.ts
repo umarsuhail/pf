@@ -7,11 +7,21 @@
 export const NARRATION_SPANS = [
   {
     text: "Hi, I'm Umar Suhail, a Senior Frontend Developer with over seven years of experience building modern, scalable web applications. My experience spans frontend development, application architecture, UI engineering, and building data-driven and interactive digital experiences using a wide range of modern technologies and tools. I enjoy turning complex ideas into intuitive, high-performance products, from enterprise dashboards and business applications to AI-powered and interactive experiences. Welcome to my portfolio. Explore my work and see what I've been building.",
-    src: "/music/intro.wav",
+    // AAC, not the original WAV: the uncompressed master (48kHz stereo,
+    // ~7 MB) was by far the heaviest thing the site could ask anyone to
+    // download. This is a raw ADTS .aac stream (128 kbps, ~35s, ~630 KB),
+    // which every browser's <audio> plays. One caveat of the raw stream: it
+    // carries no duration header, so the browser estimates the length —
+    // the word sync reads currentTime/duration, so if the highlighted words
+    // ever drift from the voice, re-wrap it as .m4a (same audio, exact
+    // duration) rather than re-encoding it.
+    //
+    // Re-encode from the lossless master, never from this copy.
+    src: "/music/intro.aac",
     // Real duration comes from the loaded <audio> element the moment it's
     // available (see CockpitTray's onNarrationProgress) — this is only the
     // guess used before that, roughly the sum of the old four clips.
-    fallbackDuration: 33,
+    fallbackDuration: 35,
   },
 ] as const;
 

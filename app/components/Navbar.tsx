@@ -4,6 +4,13 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { BotIcon } from "./icons/bot";
+// Imported, never copied. This file used to hold its own duplicate of the
+// map, frozen at the pre-layover layout (skills 0.22, projects 0.56), so
+// clicking "Projects" in the nav flew to 0.56 — by then a coordinate inside
+// the technology layover, nowhere near the Projects card. A second copy of a
+// moving number is a bug with a delay on it; AGENTS.md rule 2 is that the
+// numbering is shared.
+import { sectionProgressMap } from "../data/sections";
 
 const navLinks = [
   {
@@ -75,14 +82,6 @@ function navigateToSection(id: string) {
     new CustomEvent("navigate-flight-section", { detail: { id } }),
   );
 }
-
-const sectionProgressMap: Record<string, number> = {
-  home: 0,
-  skills: 0.22,
-  projects: 0.56,
-  experience: 0.69,
-  contact: 0.92,
-};
 
 // Framer's `layout` measures with getBoundingClientRect, so it only behaves
 // on elements outside a 3D perspective context — this pill is fixed to the
