@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { MAIN_FLIGHT_STOPS } from "../data/flightStops";
+import { scrollFromProgress } from "../data/flightTimeline";
 
 type RouteStop = {
   id: string;
@@ -8,14 +10,18 @@ type RouteStop = {
   progress: number;
 };
 
-const stops: RouteStop[] = [
-  { id: "home", label: "Hello", progress: 0 },
-  { id: "skills", label: "Skills", progress: 0.22 },
-  { id: "projects", label: "Projects", progress: 0.56 },
-  { id: "experience", label: "Experience", progress: 0.69 },
-  { id: "resume", label: "Resume Builder", progress: 0.81 },
-  { id: "contact", label: "Contact", progress: 0.92 },
-];
+// The drum's bands are the flight's own landings, not a transcription of
+// them. The hand-written list this replaces had drifted twice over: it was
+// still on the pre-layover coordinates (skills 0.22, projects 0.56), and it
+// carried a sixth band, "Resume Builder" at 0.81, for a card that no longer
+// exists — a stop on the map with no place behind it.
+//
+// MAIN_FLIGHT_STOPS also lands on each card's *readable slot* rather than
+// its raw progress stop, which is where the nav and the dial already fly to
+// (getNavTargetProgress). The three instruments now agree. Labels come from
+// the panels' own `eyebrow` strings, so rule 2's shared numbering holds by
+// construction: Hello, Skills, Projects, Experience, Contact.
+const stops: RouteStop[] = MAIN_FLIGHT_STOPS;
 
 // A watch date-wheel, not a straight track: each stop sits on its own band
 // of a vertical cylinder, evenly spaced by ANGLE_STEP regardless of how
@@ -59,7 +65,14 @@ function scrollToProgress(p: number) {
   const doc = document.documentElement;
   const max = doc.scrollHeight - window.innerHeight;
   if (max <= 0) return;
-  window.scrollTo({ top: max * clamp(p, 0, 1), behavior: "instant" });
+  // The drum's stops are flight progress; the document is scroll. They are
+  // different clocks (data/flightTimeline.ts), so a stop dropped straight
+  // into a scroll position lands somewhere else entirely on any leg whose
+  // scroll length has been retimed.
+  window.scrollTo({
+    top: max * scrollFromProgress(clamp(p, 0, 1)),
+    behavior: "auto",
+  });
 }
 
 export default function RouteMap() {
@@ -81,11 +94,10 @@ export default function RouteMap() {
   const stopRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const labelRefs = useRef<(HTMLSpanElement | null)[]>([]);
 
-  const applyIndexPosition = (x: number) => {
-    indexPositionRef.current = x;
-    const rounded = Math.round(x);
-    setCenteredIndex((prev) => (prev === rounded ? prev : rounded));
-
+  // The drum's angles, written straight to the DOM. Split out from
+  // applyIndexPosition so the after-render pass below can re-assert the
+  // position without also touching state.
+  const writeStops = useCallback((x: number) => {
     stops.forEach((_stop, i) => {
       const angle = (i - x) * ANGLE_STEP;
       const el = stopRefs.current[i];
@@ -102,7 +114,34 @@ export default function RouteMap() {
       const label = labelRefs.current[i];
       if (label) label.style.transform = `scale(${0.82 + facing * 0.18})`;
     });
-  };
+  }, []);
+
+  // Stable across renders, because the scroll-progress listener below is
+  // registered once and would otherwise hold the first render's copy.
+  const applyIndexPosition = useCallback(
+    (x: number) => {
+      indexPositionRef.current = x;
+      const rounded = Math.round(x);
+      setCenteredIndex((prev) => (prev === rounded ? prev : rounded));
+      writeStops(x);
+    },
+    [writeStops],
+  );
+
+  // React renders the drum at the nearest stop; this puts it back on the
+  // exact angle it was on.
+  //
+  // The fractional position lives in a ref, and a render cannot read a ref —
+  // React may throw the render away, and the rule that forbids it is the lint
+  // error this replaced. So the markup is rendered from `centeredIndex`, which
+  // is only ever the *rounded* stop, and every re-render that comes from
+  // something other than scrolling (a drag starting, the rail being toggled)
+  // would otherwise snap the drum up to half a step away from where it sits.
+  // A layout effect runs before the browser paints, so the correction is
+  // never seen.
+  useLayoutEffect(() => {
+    writeStops(indexPositionRef.current);
+  });
 
   // Shown/hidden from the cockpit tray's own toggle, not owned locally —
   // kept mounted (opacity/pointer-events only) so scroll position isn't
@@ -139,7 +178,7 @@ export default function RouteMap() {
         "flight-progress-update",
         handleProgressUpdate as EventListener,
       );
-  }, []);
+  }, [applyIndexPosition]);
 
   const navigate = (id: string) => {
     const targetIndex = stops.findIndex((stop) => stop.id === id);
@@ -239,13 +278,12 @@ export default function RouteMap() {
           style={{ transformStyle: "preserve-3d" }}
         >
           {stops.map((stop, i) => {
-            // These derive from the ref (not the throttled `centeredIndex`
-            // state) so a re-render triggered by anything else — dragging,
-            // isVisible — still reflects exactly where the drum currently
-            // sits, matching the imperative per-frame writes in
-            // applyIndexPosition rather than snapping back to a stale value.
-            const x = indexPositionRef.current;
-            const angle = (i - x) * ANGLE_STEP;
+            // The rounded stop, not the drum's real angle: the exact position
+            // is a ref, which a render is not allowed to read, so these are
+            // the starting values the layout effect above immediately
+            // corrects. Rendering them at all still matters — they are what a
+            // first paint and a React-driven re-render lay down.
+            const angle = (i - centeredIndex) * ANGLE_STEP;
             const rad = (angle * Math.PI) / 180;
             const facing = Math.cos(rad); // 1 = dead centre, 0 = edge-on
             const isCentered = i === centeredIndex;

@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Umar Suhail Portfolio",
-    short_name: "Umar Suhail",
+    name: "LOST IN SPACE",
+    short_name: "LOST IN SPACE",
     description:
-      "The interactive portfolio of Umar Suhail, Lead Frontend Engineer and Application Developer.",
+      "LOST IN SPACE — the interactive portfolio of Umar Suhail, Lead Frontend Engineer and Application Developer.",
     start_url: "/",
     scope: "/",
     display: "standalone",

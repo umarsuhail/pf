@@ -294,6 +294,46 @@ html {
   }
 }
 
+/* Ambient shooting stars are created at randomized intervals by
+   ShootingStars.tsx. Each instance gets its own lane, scale and duration;
+   CSS only handles the composited top-left to bottom-right flight. */
+@keyframes ambientShootingStarPass {
+  0% {
+    opacity: 0;
+    transform: translate3d(-10vw, -9vh, 0) scale(var(--shoot-start-scale));
+  }
+
+  9% {
+    opacity: 0.96;
+  }
+
+  82% {
+    opacity: 0.9;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--shoot-end-x), var(--shoot-end-y), 0)
+      scale(var(--shoot-end-scale));
+  }
+}
+
+.ambient-shooting-star {
+  animation-name: ambientShootingStarPass;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.22, 0.62, 0.3, 1);
+  filter: drop-shadow(0 0 8px rgba(152, 205, 239, 0.42));
+  transform-origin: 100% 100%;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-shooting-star {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* Per-section portal motifs (About/Skills/Projects/Experience/Open Source/Contact) */
 @keyframes motifBreathe {
 
@@ -356,42 +396,52 @@ html {
   animation-delay: -0.8s;
 }
 
-/* Ambient glow drifting across the loading card's background video — two
-   soft blobs, blue and steel, that slowly swap emphasis and dominant
-   position so it reads as light moving through the scene rather than a
-   static tint. Screen-blended and kept faint so the footage stays the subject. */
-/* Speed streaks on the loader's corridor: thin slivers thrown out of the
-   vanishing point, each starting at its own offset so they read as passing
-   debris rather than a pulsing ring. Transform and opacity only, so they
-   stay on the compositor while the page loads underneath. */
-@keyframes loaderStreak {
-  0% {
-    opacity: 0;
-    transform: rotate(var(--angle)) translateY(-18px) scaleY(0.5);
-  }
-
-  18% {
-    opacity: 0.9;
-  }
-
-  100% {
-    opacity: 0;
-    transform: rotate(var(--angle)) translateY(-56vmin) scaleY(2.4);
-  }
+/* The loader's sky: two slow nebula washes drifting against each other over a
+   near-black ground, and a star layer that breathes. Transform and opacity
+   only, so they stay on the compositor while the page loads underneath —
+   the particle mark is the one thing on this screen that should be working. */
+@keyframes loaderNebulaB {
+  0% { transform: translate3d(5%, 4%, 0) scale(1.08); opacity: 0.9; }
+  50% { transform: translate3d(-4%, -5%, 0) scale(0.96); opacity: 0.6; }
+  100% { transform: translate3d(5%, 4%, 0) scale(1.08); opacity: 0.9; }
 }
 
-.loader-streak {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 2px;
-  height: 46px;
-  margin: -23px 0 0 -1px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, transparent, rgba(125, 211, 252, 0.85), transparent);
-  opacity: 0;
-  animation: loaderStreak 1.9s linear infinite;
-  animation-delay: var(--delay);
+@keyframes loaderStars {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes loaderGalaxy {
+  0% { transform: translate(-50%, -50%) rotate(-31deg); }
+  50% { transform: translate(-50%, -50%) rotate(-27deg); }
+  100% { transform: translate(-50%, -50%) rotate(-31deg); }
+}
+
+@keyframes loaderPhoto {
+  0%, 100% { transform: scale(1.02) translate3d(0, 0, 0); }
+  50% { transform: scale(1.07) translate3d(-1.2%, 0.8%, 0); }
+}
+
+.loader-photo {
+  animation: loaderPhoto 48s ease-in-out infinite;
+}
+
+.loader-galaxy {
+  transform: translate(-50%, -50%) rotate(-31deg);
+  animation: loaderGalaxy 60s ease-in-out infinite;
+}
+
+.loader-nebula-b {
+  animation: loaderNebulaB 18s ease-in-out infinite;
+}
+
+.loader-stars {
+  animation: loaderStars 4.5s ease-in-out infinite;
+}
+
+.loader-stars-late {
+  animation: loaderStars 6s ease-in-out infinite;
+  animation-delay: -2.2s;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -404,11 +454,13 @@ html {
     animation: none;
   }
 
-  /* The loader's corridor and streaks are motion by definition — there is no
-     still version of flying down a tunnel. The HUD readout underneath still
-     reports progress, so hiding them loses nothing but the rush. */
-  .loader-corridor,
-  .loader-streak {
-    display: none;
+  /* The loader's sky holds still; the mark still assembles, since that is
+     the progress report rather than decoration. */
+  .loader-galaxy,
+  .loader-photo,
+  .loader-nebula-b,
+  .loader-stars,
+  .loader-stars-late {
+    animation: none;
   }
 }

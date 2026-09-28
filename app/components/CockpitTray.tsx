@@ -31,7 +31,7 @@ const TRAY_SPRING = {
 const CONSOLE_OPEN = { duration: 0.42, ease: [0.22, 1, 0.36, 1] } as const;
 const CONSOLE_CLOSE = { duration: 0.24, ease: [0.4, 0, 1, 1] } as const;
 
-// The soundtrack is a two-act programme, not a loop. intro.wav is the
+// The soundtrack is a two-act programme, not a loop. intro.aac is the
 // narration with its own background music already mixed in (see
 // data/narration.ts — still played through the "span" machinery below in
 // case it's ever split back into multiple clips, but there's just the one
@@ -297,12 +297,12 @@ export default function CockpitTray() {
     );
   };
 
-  // Bring tomoon.wav (looping) up under intro.wav and fade the intro out.
+  // Bring tomoon.mp3 (looping) up under intro.aac and fade the intro out.
   // Declared first since playNextSpan's own fallback (no more spans left,
   // or the browser refused the asset) skips straight here.
   const handOverToMain = useCallback(() => {
     // The intro has ended even if the looping track cannot start. Emitting
-    // this before main.play() keeps the autopilot tied to intro.wav itself.
+    // this before main.play() keeps the autopilot tied to intro.aac itself.
     emitNarration(NARRATION_SPANS.length, 0, 0, false);
     const main = mainRef.current;
     if (!main || !main.paused) return;
@@ -356,7 +356,7 @@ export default function CockpitTray() {
   });
 
   // "Skip intro", from SkipIntroPrompt. The autopilot's home leg waits on
-  // intro.wav finishing rather than on a clock, and handOverToMain emits
+  // intro.aac finishing rather than on a clock, and handOverToMain emits
   // exactly the narration-complete event it is waiting for — so ending the
   // narration here is all it takes to release the tour. Nothing needs to
   // reach into the autopilot's legs.
@@ -459,13 +459,14 @@ export default function CockpitTray() {
       .catch(() => {});
   }, [runRamp, track]);
 
+  // The one mute for everything the flight plays — the soundtrack decks
+  // here, and the engine hum (EngineHum listens for "flight-sound-mute").
   const toggleMute = () => {
-    setIsMuted((prev) => {
-      const next = !prev;
-      if (narrationRef.current) narrationRef.current.muted = next;
-      if (mainRef.current) mainRef.current.muted = next;
-      return next;
-    });
+    const next = !isMuted;
+    setIsMuted(next);
+    if (narrationRef.current) narrationRef.current.muted = next;
+    if (mainRef.current) mainRef.current.muted = next;
+    window.dispatchEvent(new CustomEvent("flight-sound-mute", { detail: { muted: next } }));
   };
 
   // Fullscreen rides along with the tour. Engaging is a real user gesture —

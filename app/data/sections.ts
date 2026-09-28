@@ -13,7 +13,13 @@ export type FlightCard = {
   cta: string;
   align: "left" | "right";
   x: number;
-  z: number;
+  /**
+   * No `z`. A card's depth is not authorable — it is fixed by its reading
+   * slot and the camera's travel (`cardDepthFor` in lib/camera.ts), and the
+   * two times it was authored by hand it disagreed with them: Skills and
+   * Contact were parked past where the camera ever reached and were read at
+   * ~0.6x and ~0.73x while their neighbours arrived at 1.1x.
+   */
   width: string;
   tone: "light" | "dark";
   // Optional hero art for the standalone /[section] detail page
@@ -24,6 +30,10 @@ export type FlightCard = {
     title: string;
     description: string;
     image: string;
+    /** "contain" for cut-out art on a transparent ground (the floating
+     *  dashboard panels): shown whole on the card's dark frame instead of
+     *  cropped to fill it. Photos and screenshots leave it unset. */
+    imageFit?: "contain";
     category: string;
     stack: string[];
   }[];
@@ -52,7 +62,6 @@ export const cards: FlightCard[] = [
     cta: "Profile Details",
     align: "left",
     x: -80,
-    z: 0,
     width: "clamp(420px, 58vw, 900px)",
     tone: "light",
   },
@@ -86,7 +95,6 @@ export const cards: FlightCard[] = [
     cta: "Skill Details",
     align: "left",
     x: -250,
-    z: -1850,
     width: "clamp(400px, 54vw, 840px)",
     tone: "light",
   },
@@ -107,7 +115,6 @@ export const cards: FlightCard[] = [
     cta: "Project Details",
     align: "right",
     x: 260,
-    z: -4700,
     width: "clamp(420px, 60vw, 950px)",
     tone: "dark",
     projects: [
@@ -115,10 +122,19 @@ export const cards: FlightCard[] = [
         title: "Enterprise Dashboard — Transaction & Revenue Monitoring",
         description:
           "A multi-tenant analytics dashboard for real-time transaction monitoring, revenue tracking, and advanced reporting.",
-        // TODO: swap for the real project screenshot
-        image: "/images/pro1.png",
+        image: "/1.png",
+        imageFit: "contain",
         category: "Dashboards",
         stack: ["Next.js", "React", "TypeScript", "Node.js"],
+      },
+      {
+        title: "Telecom Transaction Monitoring Dashboard",
+        // TODO(Umar): confirm the description and stack — placeholder copy.
+        description:
+          "A real-time dashboard for monitoring telecom transactions — live volumes, sales and revenue trends, and at-a-glance operational KPIs.",
+        image: "/sales-dashboard.png",
+        category: "Dashboards",
+        stack: ["React", "TypeScript", "Data Visualization"],
       },
       {
         title: "Biometric Identity & Recognition Platform",
@@ -140,7 +156,8 @@ export const cards: FlightCard[] = [
         title: "Tenant & Configuration Management Platform",
         description:
           "A dynamic platform for tenant onboarding, configuration workflows, and role-based access management.",
-        image: "/images/pro1.png",
+        image: "/3.png",
+        imageFit: "contain",
         category: "Enterprise",
         stack: ["Next.js", "TypeScript", "Node.js"],
       },
@@ -148,7 +165,8 @@ export const cards: FlightCard[] = [
         title: "AI Chatbot & Monitoring Systems",
         description:
           "AI-powered chatbot interfaces paired with a real-time monitoring dashboard for operational reporting.",
-        image: "/images/pro1.png",
+        image: "/2.png",
+        imageFit: "contain",
         category: "Productivity",
         stack: ["React.js", "JavaScript", "Socket.io"],
       },
@@ -179,7 +197,6 @@ export const cards: FlightCard[] = [
     cta: "View Timeline",
     align: "left",
     x: -290,
-    z: -5750,
     width: "clamp(390px, 52vw, 800px)",
     tone: "dark",
     timeline: [
@@ -217,7 +234,7 @@ export const cards: FlightCard[] = [
   },
   {
     id: "contact",
-    eyebrow: "06 / Contact",
+    eyebrow: "05 / Contact",
     title: "Ready to Build Something Amazing?",
     description:
       "Have a project in mind or just want to talk frontend? I'm based in Abu Dhabi, open to new opportunities, and always happy to connect.",
@@ -233,17 +250,60 @@ export const cards: FlightCard[] = [
     cta: "Get In Touch",
     align: "left",
     x: -220,
-    z: -7728,
     width: "clamp(420px, 58vw, 940px)",
     tone: "dark",
   },
 ];
 
+// Where each panel sits on the *flight*, normalised 0..1. Progress is flight
+// time, not scroll distance: how much scrolling a leg takes is decided
+// separately, in app/data/flightTimeline.ts.
+//
+// That separation is load-bearing. Every tuned constant in the flight — the
+// card slot lead, reveal and depart windows, the closing beat's arming
+// thresholds, each card's depth — is expressed in this progress. When the
+// Skills-to-Projects leg needed more room for the technology helix, the first
+// attempt lengthened the track and moved Skills to 0.18, which silently
+// re-priced all of those: a card read from 22% further away, fades spread
+// over 22% more depth, the whole flight subtly wrong everywhere. The timeline
+// gives that leg more scroll without any panel moving.
 export const sectionProgressMap: Record<string, number> = {
   home: 0,
-  skills: 0.22,
-  projects: 0.56,
-  experience: 0.69,
+  // Skills lands earlier and Projects later than they used to (0.22 and 0.56)
+  // for one reason: the technology layover between them needs to be a stretch
+  // of its own, with the Skills billboard fully gone before the first tool
+  // lights and the Projects billboard not yet arriving when the last one
+  // fades. At the old spacing the Skills card's departure fade ran to 0.509 —
+  // it was still on screen, at pass-through size, over most of the toolkit.
+  //
+  // Widened again to put real distance between Skills and Projects. Progress
+  // is the only thing that buys depth — the camera crosses (gap x travel) over
+  // a leg, so a longer leg is a longer corridor — and the total is fixed at
+  // 1, which means the room has to come from a neighbour. It comes from the
+  // two that could spare it: home->skills (0.17 -> 0.14) and
+  // experience->contact (0.18 -> 0.15). Projects->Experience is held at 0.12
+  // because it is the binding constraint: at 0.08 the Projects departure
+  // (start 0.688) overruns its own end (0.684, clamped to the Experience
+  // slot) and the card snaps off instead of passing.
+  //
+  //   skills -> projects   0.45 -> 0.51   corridor 3780 -> 4284
+  //   the layover inside it 0.16 -> 0.22   ~103 depth per tool, was ~75
+  //
+  // The approach into Skills then wanted the same treatment, and paying for
+  // it out of home->skills (which is what the first pass did) was robbing the
+  // wrong leg: that *is* the approach. Skills went back to 0.17 and the whole
+  // run after it shifted to keep the leg widths, so the room comes from
+  // experience->contact instead — the one stretch that is pure travel, with
+  // the card-less `dusk` region in it and nothing to crowd.
+  //
+  //   home -> skills         0.14 -> 0.17   corridor 1176 -> 1428
+  //   experience -> contact  0.15 -> 0.12   (0.12 is the floor, see above)
+  skills: 0.17,
+  projects: 0.68,
+  experience: 0.8,
+  // Contact does not move. The closing beat is tuned against it in progress
+  // units (END_ARM, END_RELEASE, LAST_CARD_CLEARED, the void fade, the
+  // receding earth), and every one of those would have to be re-derived.
   contact: 0.92,
 };
 
@@ -251,7 +311,7 @@ export const cardGradients = [
   "radial-gradient(120% 120% at 15% 20%, rgba(0,108,159,0.85) 0%, rgba(0,108,159,0.25) 55%, rgba(0,108,159,0) 100%), linear-gradient(135deg, #00273f 0%, #003f5f 50%, #006c9f 100%)",
   "linear-gradient(160deg, #111827 0%, #1e3a5f 55%, #00294a 100%)",
   "linear-gradient(120deg, #0f172a 0%, #25397c 52%, #1d4ed8 115%)",
-  "linear-gradient(150deg, #1f2937 0%, #0e3a5c 42%, #540615 96%)",
+  "linear-gradient(150deg, #243a4b 0%, #153055 48%, #11334f 100%)",
   "linear-gradient(125deg, #0b1120 0%, #155e75 58%, #10427a 100%)",
   "linear-gradient(165deg, #1e293b 0%, #50260b 46%, #1e40af 112%)",
   "linear-gradient(140deg, #111827 8%, #0f3d5c 50%, #41272a 108%)",

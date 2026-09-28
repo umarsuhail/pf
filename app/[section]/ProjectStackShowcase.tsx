@@ -40,7 +40,9 @@ function ProjectPreview({
             alt=""
             fill
             sizes="(max-width: 640px) 82vw, (max-width: 1024px) 66vw, 18vw"
-            className="object-cover opacity-80 saturate-[0.85] transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+            className={`${
+              project.imageFit === "contain" ? "object-contain p-2" : "object-cover"
+            } opacity-80 saturate-[0.85] transition-transform duration-500 ease-out group-hover:scale-[1.04]`}
           />
           <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(15,23,42,0.05),rgba(2,6,23,0.5))]" />
           <span className="absolute left-2.5 top-2.5 rounded-full border border-white/15 bg-slate-950/70 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.2em] text-sky-100/75">

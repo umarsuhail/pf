@@ -20,6 +20,17 @@ import { ArrowUpRightIcon } from "./icons/arrow-up-right";
 import type { AnimatedIconHandle } from "./icons/card-icon";
 import Space from "./Space";
 import SignatureName from "./SignatureName";
+// A scene's travel is timed against its card's own stop, so it has to be the
+// *same* stop the flight uses. This was a literal copy stuck at the old
+// layout, and one entry too long: it still carried the deleted `resume`
+// card's 0.81, which shifted every index past Projects and left Contact
+// timing its scene against 0.81 instead of 0.92. Exactly the failure the
+// `atmospheres` array is warned about for in AGENTS.md, in a second array.
+import {
+  getCardLifeWindow,
+  getDepartWindow,
+  sectionProgressStops,
+} from "../data/flightStops";
 
 // Pure GSAP-style Quart-out curve (gsap.parseEase("power3.out")) used to
 // shape the reveal progress itself — not an animation, just math applied to
@@ -45,51 +56,70 @@ interface CardPortalProps {
   letterbox?: boolean;
 }
 
-const sectionProgressStops = [0, 0.22, 0.56, 0.69, 0.81, 0.92];
-
 // Home / Identity Space keeps its original overlay; every other section gets
 // its own atmosphere — a color grade plus an abstract motif standing in for
 // a distinct "universe" (no per-section imagery exists, so these are drawn).
 type MotifType = "earth" | "orb" | "nodes" | "worlds" | "timeline" | "network" | "calm";
 
+// The flight's colour journey, one entry per card, indexed by card index.
+//
+// Cold the whole way, because the sky it travels through is: body is
+// `linear-gradient(180deg, #002d54, #00101f)` and the brand accent is sky-300.
+// The old run put an amber card (#fbbf24) and a near-neutral slate one
+// (#94a3b8) in the middle of that, which read as a highway sign and a dead
+// patch rather than as two more universes.
+//
+// The hues now sweep outward and come home: sky 199° -> teal 172° -> blue
+// 217° -> steel 205° -> sky 199°. Experience's steel blue is the exact colour
+// of the `steel` space region that follows it, so the card bleeds into
+// the stretch of sky after it instead of ending at its own edge. Contact
+// returns to the departure accent, which is also where the flight's loop
+// sends you.
+//
+// One entry per card, and no more: this array used to carry six, with a
+// `resume` entry at index 4 for a card that no longer exists in `cards`.
+// Since the lookup is `atmospheres[index]`, that handed Contact the slate
+// "branching network" grade and left the sky "calm arrival" one at index 5
+// permanently unreachable. Adding a card means adding an entry here, in the
+// same order as `cards`.
 const atmospheres: { overlay: string; motif: MotifType; accent: string }[] = [
   {
-    // 0 home — identity
+    // 0 home — identity, departure. The overlay was a dark red
+    // (rgba(87,22,35)) left over from an earlier palette; it is the sky the
+    // flight actually launches from now.
     overlay:
-      "linear-gradient(180deg, rgba(87, 22, 35, 0.55) 0%, rgba(6, 20, 81, 0.15) 45%, rgba(0, 15, 49, 0.35) 100%)",
+      "linear-gradient(180deg, rgba(7, 89, 133, 0.42) 0%, rgba(6, 20, 81, 0.15) 45%, rgba(0, 15, 49, 0.35) 100%)",
     motif: "earth",
     accent: "#7dd3fc",
   },
   {
-    // 1 skills — technology constellation
+    // 1 skills — technology constellation. Teal rather than emerald: the same
+    // idea a step colder, so it belongs to the blue family the rest of the
+    // journey lives in.
     overlay:
-      "linear-gradient(180deg, rgba(4, 120, 87, 0.3) 0%, rgba(6, 78, 59, 0.15) 45%, rgba(2, 20, 25, 0.4) 100%)",
+      "linear-gradient(180deg, rgba(13, 148, 136, 0.3) 0%, rgba(17, 94, 89, 0.15) 45%, rgba(2, 20, 25, 0.4) 100%)",
     motif: "nodes",
-    accent: "#34d399",
+    accent: "#2dd4bf",
   },
   {
-    // 2 projects — floating worlds
+    // 2 projects — floating worlds. Already on-theme; unchanged.
     overlay:
       "linear-gradient(180deg, rgba(3, 105, 161, 0.3) 0%, rgba(12, 74, 110, 0.15) 45%, rgba(2, 15, 35, 0.4) 100%)",
     motif: "worlds",
     accent: "#60a5fa",
   },
   {
-    // 3 experience — timeline through the journey
+    // 3 experience — timeline through the journey. The deepest point of the
+    // trip, and the handover into the steel region. Umar's palette:
+    // #5b8db1 light over #153055, settling into a deep #0b1a2b.
     overlay:
-      "linear-gradient(180deg, rgba(180, 83, 9, 0.26) 0%, rgba(120, 53, 15, 0.14) 45%, rgba(20, 12, 4, 0.4) 100%)",
+      "linear-gradient(180deg, rgba(91, 141, 177, 0.26) 0%, rgba(21, 48, 85, 0.2) 45%, rgba(11, 26, 43, 0.45) 100%)",
     motif: "timeline",
-    accent: "#fbbf24",
+    accent: "#5b8db1",
   },
   {
-    // 4 resume — branching network
-    overlay:
-      "linear-gradient(180deg, rgba(51, 65, 85, 0.34) 0%, rgba(30, 41, 59, 0.18) 45%, rgba(8, 10, 15, 0.4) 100%)",
-    motif: "network",
-    accent: "#94a3b8",
-  },
-  {
-    // 5 contact — calm arrival
+    // 4 contact — calm arrival. Back on the departure accent: the flight ends
+    // on the colour it began with, which is also what its loop returns to.
     overlay:
       "linear-gradient(180deg, rgba(3, 105, 161, 0.2) 0%, rgba(8, 47, 73, 0.12) 45%, rgba(2, 10, 25, 0.35) 100%)",
     motif: "calm",
@@ -97,61 +127,223 @@ const atmospheres: { overlay: string; motif: MotifType; accent: string }[] = [
   },
 ];
 
-// Every non-entry portal draws the same illustration. It used to be five
-// separate files (a3-a7), four of which never existed — /a3.svg, /a5.svg,
-// /a6.svg and /a7.svg all 404'd, so four of the five portals silently fell
-// back to a broken image while only /a4.svg ever resolved. One file, hued
-// per card, is both what actually ships and the more coherent idea: the
-// flight passes through one universe seen five ways, not five unrelated
-// pictures.
-// a3-planet.svg is a3.svg with its 21 sparkle polygons stripped out. The
-// artwork ships four-point stars scattered across the frame, which landed on
-// top of Space's real, drifting starfield as a second, static, differently
-// shaped set of stars — the flat squares that made the portal read as clipart.
-// The planet and its rings are untouched; a3.svg is kept as the original.
-const PORTAL_ILLUSTRATION = "/images/a3-planet.svg";
+type Scene = {
+  src: string;
+  
+  position: string;
 
-// Where the planet's centre sits inside the artwork's box (its viewBox is
-// 370.4x261.6 and the globe is left of centre). Everything that has to agree
-// with the planet rather than with the frame — the halo, the spin origin, the
-// mask — is anchored here.
-const ILLUSTRATION_FOCUS = "44% 47%";
+  inset: string;
 
-// Dissolves the artwork's rectangle into the starfield: fully opaque across
-// the globe, gone well before the frame edge.
-const ILLUSTRATION_MASK = `radial-gradient(circle at ${ILLUSTRATION_FOCUS}, #000 44%, transparent 82%)`;
+  float: string;
 
-// a3.svg ships in a coral/plum palette with a saturation-weighted dominant
-// hue of ~0°. Each non-entry card rotates that onto its own atmosphere
-// accent (see `atmospheres` above) so the illustration arrives already
-// belonging to the colour of the space around it.
-//
-// Keyed by card index, 1-based after the entry/earth card at index 0;
-// indices without an entry fall back to the drawn PortalMotif below.
-//
-// The rotations are measured, not arithmetic. CSS hue-rotate is a matrix
-// approximation of an HSL rotation, so it neither lands where subtraction
-// says it will (the naive "accent minus 313°" put the emerald card on blue)
-// nor preserves saturation across the sweep. Each value below was picked by
-// sampling the filtered artwork and choosing the rotation whose dominant hue
-// sits nearest that card's accent — every one lands within 2°. The paired
-// saturate() then pulls intensity back to the artwork's native 0.71, which
-// is what keeps the amber and emerald cards from reading washed out next to
-// the blue ones rather than being a stylistic flourish.
-const illustrationFilterByIndex: Record<number, string> = {
-  // 1 skills — emerald #34d399 (lands 162°)
-  1: "hue-rotate(160deg) saturate(1.5)",
-  // 2 projects — blue #60a5fa (lands 216°)
-  2: "hue-rotate(225deg) saturate(1.05)",
-  // 3 experience — amber #fbbf24 (lands 44°)
-  3: "hue-rotate(55deg) saturate(1.5)",
-  // 4 resume — slate #94a3b8. The one accent that is near-neutral, so this
-  // shares the blue card's rotation and desaturates instead of chasing a
-  // hue no amount of rotation can reach.
-  4: "hue-rotate(225deg) saturate(0.4)",
-  // 5 contact — sky #7dd3fc (lands 200°)
-  5: "hue-rotate(205deg) saturate(1.25)",
+  tint: number;
+  
+  travel: { from: [number, number]; to: [number, number]; lean: number };
+  /**
+   * "cover" crops the art to fill its box instead of fitting inside it —
+   * for art that is texture edge to edge (the binary rain) rather than a
+   * figure with a transparent ground. Defaults to "contain".
+   */
+  fit?: "contain" | "cover";
+  /**
+   * Fades the box's lower edge out, so art cropped at the box's bottom
+   * dissolves into the window instead of stopping on a hard line.
+   */
+  fadeBottom?: boolean;
+  /**
+   * A full-window image the figure crosses in front of — the place, where
+   * `src` is the traveller. Covers the window, so it stands in for the drawn
+   * motif (which would only be painted underneath it), and gets the
+   * section's overlay laid back over it so it still takes the panel's light.
+   */
+  backdrop?: string;
+  /** Shooting stars crossing the window as the flight passes. */
+  streaks?: Streak[];
 };
+
+// A shooting star, crossing the window top-left to bottom-right. Driven by
+// scroll like the scene itself: it streaks across while you are moving and
+// hangs mid-flight when you stop.
+type Streak = {
+  src: string;
+  /** Width of the streak, as a share of the window's width. */
+  width: string;
+  /**
+   * When it crosses, in the card's own life: 0 is the panel lighting, 1 the
+   * reading slot, 2 the panel flown past — the same three stops the scene's
+   * crossing is pinned to (see sceneWindow).
+   */
+  at: [number, number];
+  /**
+   * Vertical start and end, as a share of the window's height. The
+   * horizontal run is always off the left edge to off the right; these are
+   * picked so the path's slope matches the streak's drawn ~27° angle, or it
+   * reads as sliding sideways rather than falling along its own tail.
+   */
+  y: [number, number];
+  /** Behind the scene's figure instead of in front of it. */
+  behind?: boolean;
+};
+
+// Keyed by card index, 1-based after the entry card at index 0. An index
+// without a scene falls back to the drawn PortalMotif — which is also what
+// sits *behind* every scene, so a panel never loses its own signature.
+// The entry card has no scene; its hooks still have to run, and they need a
+// path to read.
+const IDLE_TRAVEL = { from: [0, 0], to: [0, 0], lean: 0 } as const;
+
+const scenes: Record<number, Scene> = {
+  1: {
+    src: "/space/rocket.svg",
+    // A little left of centre: a narrow window only fits ~64% of the art's
+    // width. Centred, the fins were cut; at 20% the nose was. 35% keeps the
+    // nose clear with the moon's edge behind it and the flames trailing off
+    // the left edge, where they run in the art anyway.
+    position: "35% center",
+    // The art is a whole scene — an arched window with the rocket, the moon
+    // and its own night sky — so it *is* the window: it covers it, with a 6%
+    // overhang so the drift and the ±4° roll never show an edge.
+    inset: "-inset-[6%]",
+    fit: "cover",
+    float: "motif-float-slow",
+    // Held low: the art has its own colours (orange flames, a red moon) and
+    // a full-strength teal wash turned them muddy. Enough to sit it in the
+    // section's light, not enough to recolour it.
+    tint: 0.14,
+    // A drift, not a crossing: it fills the frame, so it can only move as
+    // far as its overhang allows.
+    travel: { from: [0, 2], to: [0, -2], lean: 0 },
+  },
+  2: {
+    // Another crew passes: a ship crossing in front of the Earth. The planet
+    // is the window itself; the ship comes in from the left, is centred at
+    // the reading slot, and carries on out to the right as the panel is
+    // flown past. Nose-first — the artwork's thrusters are on its left.
+    src: "/space/ship.png",
+    backdrop: "/space/earth.jpg",
+    position: "center",
+    inset: "inset-x-[10%] top-[34%] bottom-[34%]",
+    float: "motif-float-med",
+    tint: 0.2,
+    travel: { from: [-120, 4], to: [120, -4], lean: 0 },
+  },
+  3: {
+    src: "/space/crew.svg",
+    position: "center",
+    // Covers the whole window. The 4% overhang on every side is what the
+    // ±4° roll and the drift below need to never show an edge.
+    inset: "-inset-[4%]",
+    fit: "cover",
+    float: "motif-float-slow",
+    tint: 0.32,
+    // Standing still, being passed: a drift, not a crossing — and a small
+    // one, since the art is edge to edge.
+    travel: { from: [-2, 1], to: [2, -1], lean: 0 },
+    // Some in front of the art, some behind it. The art is a ringed planet
+    // on a transparent ground, so a star behind it only *reads* as behind if
+    // its path actually crosses the planet: the two `behind` paths are aimed
+    // so each head vanishes into the planet or ring mid-crossing and comes
+    // out the other side. Aimed anywhere else they pass above or below it
+    // and look like any other star. Re-aim them if the art changes.
+    //
+    // Speed is how much of the card's life a crossing is spread over — the
+    // wider `at`, the slower it falls for the same scroll. Each takes well
+    // over half the panel's life, and they overlap so there is always one in
+    // the sky. The same file can appear more than once: vary its size, path
+    // and timing and it reads as another star.
+    streaks: [
+      { src: "/space/star3.svg", width: "70%", at: [0, 1.3], y: [-0.46, 0.29], behind: true },
+      { src: "/space/star3.svg", width: "50%", at: [0.9, 2], y: [-0.17, 0.58], behind: true },
+      { src: "/space/star1.svg", width: "55%", at: [0.2, 1.5], y: [-0.15, 0.6] },
+      { src: "/space/star2.svg", width: "30%", at: [0.5, 1.8], y: [0.05, 0.8] },
+      { src: "/space/star1.svg", width: "38%", at: [0.8, 2], y: [0.3, 1.05] },
+      { src: "/space/star2.svg", width: "22%", at: [1.1, 2], y: [-0.1, 0.65] },
+    ],
+  },
+  4: {
+    src: "/space/landing.svg",
+    // The moon is the bottom two-thirds of this artwork. Anchored to the
+    // window's floor it reads as ground the flight has landed on; centred it
+    // reads as a ball floating in the middle of the frame.
+    position: "center bottom",
+    inset: "inset-x-[12%] bottom-0 top-[10%]",
+    float: "motif-float-med",
+    tint: 0.26,
+    // The moon is ground. Ground does not fly across the window — it only
+    // slides a little as you pass over it.
+    travel: { from: [-7, 3], to: [7, -1], lean: 0 },
+  },
+};
+
+// The accent light, painted through the figure's own alpha. mask-image with
+// the same file means the tint stops exactly at the silhouette — no
+// rectangle, no halo bleeding past the art — and mask-size/position have to
+// mirror the <Image>'s object-contain/object-position or the light slides off
+// the body it is supposed to be falling on.
+function sceneTintStyle(scene: Scene, accent: string) {
+  return {
+    background: `linear-gradient(200deg, ${accent} 0%, ${accent}00 78%)`,
+    maskImage: `url("${scene.src}")`,
+    WebkitMaskImage: `url("${scene.src}")`,
+    maskSize: scene.fit ?? "contain",
+    WebkitMaskSize: scene.fit ?? "contain",
+    maskPosition: scene.position,
+    WebkitMaskPosition: scene.position,
+    maskRepeat: "no-repeat",
+    WebkitMaskRepeat: "no-repeat",
+    opacity: scene.tint,
+  };
+}
+
+// Life units (0 lit, 1 reading slot, 2 flown past) to flight progress.
+function lifeToProgress(
+  life: { start: number; slot: number; end: number },
+  t: number,
+) {
+  return t <= 1
+    ? life.start + (life.slot - life.start) * t
+    : life.slot + (life.end - life.slot) * (t - 1);
+}
+
+function ShootingStar({
+  streak,
+  life,
+  progress,
+}: {
+  streak: Streak;
+  life: { start: number; slot: number; end: number };
+  progress: MotionValue<number>;
+}) {
+  const span = [
+    lifeToProgress(life, streak.at[0]),
+    lifeToProgress(life, streak.at[1]),
+  ];
+  // The wrapper is window-sized, so translate percentages are percentages of
+  // the window. From just off the left edge (its own width back) to past
+  // the right one.
+  const x = useTransform(progress, span, ["-100%", "110%"]);
+  const y = useTransform(progress, span, [
+    `${streak.y[0] * 100}%`,
+    `${streak.y[1] * 100}%`,
+  ]);
+  return (
+    <motion.div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0"
+      style={{ x, y, willChange: "transform" }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- a few hundred
+         bytes of SVG; next/image would only add a wrapper and a 400 without
+         `unoptimized`. */}
+      <img
+        src={streak.src}
+        alt=""
+        className="absolute left-0 top-0 h-auto"
+        style={{ width: streak.width }}
+      />
+    </motion.div>
+  );
+}
 
 function PortalMotif({ motif, accent }: { motif: MotifType; accent: string }) {
   switch (motif) {
@@ -286,6 +478,9 @@ export function CardPortal({
   // rather than state).
   const isNearRef = useRef(isEntry);
   const atmosphere = atmospheres[index % atmospheres.length];
+  // The beat of the story this panel looks out at, if it has one (see
+  // `scenes` above). Home does not: its window is the traveller himself.
+  const scene = scenes[index];
   // Space (this card's starfield backdrop) mounts once per card — six of
   // them exist at once — and only stops drawing on its own when it's
   // geometrically outside the viewport. A card that's just faded to
@@ -306,9 +501,59 @@ export function CardPortal({
   // Other cards: their motif fades and settles in instead of rising.
   const motifOpacity = useMotionValue(0);
   const motifScale = useMotionValue(0.85);
-  // Per-section globe spin, on its own motion value so it never fights the
-  // opacity/scale tweens above.
-  const spinRotate = useMotionValue(index * 40);
+  // The scene crosses the window as the flight approaches and leaves the
+  // card, along the path that scene declares. Derived straight from scroll —
+  // no timer, no tween — so it freezes the moment scrolling does and reverses
+  // when the visitor does: the rocket is flying because *you* are moving, and
+  // it stops when you stop, which a looping animation could never do.
+  //
+  // The window is the card's own visible life, not an arbitrary span around
+  // its stop — the same reveal start and depart end the fade effect below
+  // uses. Mapped onto anything wider, the figure spends the card's whole
+  // appearance crossing the middle third of its path and never reaches either
+  // corner; mapped onto this, it enters as the card fades up and exits as the
+  // card fades out.
+  const scenePath = scenes[index]?.travel ?? IDLE_TRAVEL;
+  // The crossing is timed against the card's whole visible life, which is
+  // the only window that matches what the viewer sees: the figure is in its
+  // starting corner as the panel lights, mid-crossing at the reading slot,
+  // and leaving the far corner as the panel is flown past.
+  //
+  // It used to be `[stop - span * 0.3, stop + 0.11]`, built out of the card's
+  // raw progress *stop*. A stop is not where its card is read — the slot is,
+  // and the slot leads the stop by up to CARD_SLOT_LEAD. For Skills that put
+  // the window at 0.098..0.25 against a card read at 0.122 and gone by 0.28:
+  // the rocket sat clamped in its bottom-left corner, mostly outside
+  // `inset-[12%]`, for the entire time the panel was legible, and then did
+  // its whole climb while the card was fading out. The window looked empty
+  // because the scene was parked off the edge of it.
+  // Three stops, not two, and the middle one is the reading slot. A card's
+  // life is not symmetric about the slot — the approach is long and the
+  // departure is now a short depth event — so mapping the path linearly
+  // across [start, end] put the figure 79% of the way across by the time the
+  // panel was readable. Pinning the slot to the midpoint of the path keeps
+  // the promise the travel values are written to: starting corner as the
+  // panel lights, mid-crossing while you read it, far corner as it passes.
+  const sceneLife = getCardLifeWindow(index);
+  const sceneWindow = [sceneLife.start, sceneLife.slot, sceneLife.end];
+  const mid = (a: number, b: number) => (a + b) / 2;
+  const sceneX = useTransform(scrollYProgress, sceneWindow, [
+    `${scenePath.from[0]}%`,
+    `${mid(scenePath.from[0], scenePath.to[0])}%`,
+    `${scenePath.to[0]}%`,
+  ]);
+  const sceneY = useTransform(scrollYProgress, sceneWindow, [
+    `${scenePath.from[1]}%`,
+    `${mid(scenePath.from[1], scenePath.to[1])}%`,
+    `${scenePath.to[1]}%`,
+  ]);
+  // A few degrees of roll either side of the held lean, so the crossing has
+  // some life in it rather than being a rigid slide.
+  const sceneTilt = useTransform(scrollYProgress, sceneWindow, [
+    scenePath.lean - 4,
+    scenePath.lean,
+    scenePath.lean + 4,
+  ]);
   // Traces the card's rounded-corner ring in/out as it comes into and
   // leaves focus.
   const progressDashOffset = useMotionValue(100);
@@ -332,22 +577,39 @@ export function CardPortal({
     const previousStop = index > 0 ? sectionProgressStops[index - 1] : 0;
     const approachSpan = Math.max(currentStop - previousStop, 0.08);
 
-    // Reveals only when very close to the card's focus point
-    const revealStart = Math.max(currentStop - approachSpan * 0.3, 0);
-    const revealPeak = currentStop;
+    // The window's art is there from the moment the card is. It used to
+    // reveal over [stop - 30% of the approach, stop], but a card is read at
+    // its slot, which leads the stop — so at reading distance the motif and
+    // scene were still mostly transparent and the window looked empty until
+    // the card was nearly flown through. The card's own opacity already
+    // handles the approach; the art only needs a short settle at the start
+    // of the card's life so it does not pop. The entry card keeps its own
+    // rising-earth reveal below.
+    const life = getCardLifeWindow(index);
+    const revealStart = isEntry
+      ? Math.max(currentStop - approachSpan * 0.3, 0)
+      : life.start;
+    const revealPeak = isEntry
+      ? currentStop
+      : life.start + (life.slot - life.start) * 0.2;
     // Past its own stop the camera is pushing through the card, and because
     // every card's z is set so it sits at the camera plane exactly at its own
     // stop, the card balloons toward CSS perspective's singularity at roughly
-    // stop + 0.131 (1100px perspective / 8400px camera travel; mobile's
-    // shorter 7800px travel puts it a touch later, ~0.141, so 0.131 is the
+    // stop + 0.107 (1100px perspective / 10267px camera travel; mobile's
+    // shorter 9533px travel puts it a touch later, ~0.115, so 0.107 is the
     // earlier, safer bound to fade against on both). That's much sooner than
     // the old +0.1..+0.29 window — the fade had barely started by the time
     // the globe was blowing up to fill the frame, reading as a huge image
     // stuck at full opacity rather than dissolving as it passed. Finishing
     // the fade well before the singularity means the globe is gone before it
     // would otherwise explode in size.
-    const departFadeStart = currentStop + 0.03;
-    const departFadeEnd = currentStop + 0.11;
+    // Fade out with the card's own departure rather than a fixed offset
+    // from its stop, so the art leaves when the card does — not before.
+    const depart = getDepartWindow(index);
+    const departFadeStart = isEntry ? currentStop + 0.03 : depart.start;
+    const departFadeEnd = isEntry
+      ? currentStop + 0.11
+      : Math.max(depart.end, depart.start + 0.001);
     let lastReveal = -1;
     let lastFade = -1;
 
@@ -429,35 +691,6 @@ export function CardPortal({
     motifScale,
     progressDashOffset,
   ]);
-
-  // Scroll-driven spin for the per-section globes, mirroring the distant
-  // a1.png earth at the end of the flight: rotation tracks how far the
-  // visitor has travelled rather than a wall-clock timer, so the globes are
-  // already mid-turn when a card comes into view and freeze when scrolling
-  // stops. Lives on its own motion value so it never fights the
-  // opacity/scale tweens already driving the motif.
-  useEffect(() => {
-    if (isEntry) return;
-
-    // Staggered start angle so the globes aren't all locked in unison
-    const offset = index * 40;
-    let lastAngle = Number.NEGATIVE_INFINITY;
-    const update = (progress: number) => {
-      const angle = offset + progress * 260;
-      // Sub-degree steps are invisible on a globe this size but still cost a
-      // full MotionValue notification. Keep the scroll-bound rotation direct:
-      // scroll is already the easing source, and allocating tweens for every
-      // portal during a wheel gesture is exactly the work that made the Z
-      // flight feel late.
-      if (Math.abs(angle - lastAngle) < 0.35) return;
-      lastAngle = angle;
-      spinRotate.set(angle);
-    };
-
-    update(scrollYProgress.get());
-    const unsubscribe = scrollYProgress.on("change", update);
-    return () => unsubscribe();
-  }, [index, isEntry, scrollYProgress, spinRotate]);
 
   const cancelActivation = () => {
     const token = activationRef.current;
@@ -622,7 +855,23 @@ export function CardPortal({
                       // the shape of the art it holds.
                       width={300}
                       height={255}
-                      sizes="(min-width: 1024px) 30vw, 60vw"
+                      // This is the LCP element — the mark is the largest
+                      // thing painted on the landing view — and without
+                      // `priority` next/image marks it `loading="lazy"`, so
+                      // the browser does not begin fetching it until after
+                      // layout, and never preloads it. It is also sitting
+                      // behind the loader while that is up, which pushes it
+                      // further down the queue. Priority puts a preload in
+                      // the head and fetches it at high priority alongside
+                      // the loader's own background.
+                      priority
+                      // The element is never wider than its 300px box, but
+                      // this said 30vw — 576px on a 1920 viewport — so Next
+                      // was asked for a variant with about four times the
+                      // pixels the mark ever shows. The phone case is the
+                      // letterbox portal, capped by max-h, which is smaller
+                      // still.
+                      sizes="(min-width: 1024px) 300px, 40vw"
                       // Answers a hover anywhere on the billboard (the card
                       // owns `group/card`): the mark comes up out of the
                       // starfield and leans a little closer. Opacity and
@@ -732,9 +981,10 @@ export function CardPortal({
                         }}
                       >
                         <Image
-                          src="/astr.svg"
+                          src="/astr2.svg"
                           alt=""
                           fill
+                          loading="eager"
                           sizes="(min-width: 600px) 24vw, 32vh"
                           // Drifts up and grows very slightly on hover, as if
                           // pushing off toward the visitor. Slower than the
@@ -756,63 +1006,129 @@ export function CardPortal({
                   opacity: motifOpacity,
                   scale: motifScale,
                   willChange: "opacity, transform",
-                  // Screen rather than normal: the artwork is pastel fills on a
-                  // transparent ground, and laid over the starfield opaquely it
-                  // read as a sticker pasted on the window. Screening it lets
-                  // the stars carry through the planet and makes its light the
-                  // same light as the space around it. It has to live on THIS
-                  // element, not on a child: this one already carries an
-                  // animated opacity, which isolates its subtree, so a child's
-                  // blend mode would have nothing but transparency to blend
-                  // against and would silently render as normal.
-                  ...(illustrationFilterByIndex[index]
-                    ? { mixBlendMode: "screen" as const }
-                    : null),
+                  // No mixBlendMode here. The planet this replaced was pastel
+                  // fills on a transparent ground and was screened so the
+                  // starfield carried through it; the cast is drawn with black
+                  // outlines, and screening dissolves exactly those outlines
+                  // and leaves a ghost. The figures are solid bodies in the
+                  // window — it is the accent light below, not the whole
+                  // figure, that blends.
                 }}
               >
-                {illustrationFilterByIndex[index] ? (
+                {/* The drawn motif stays, underneath: it is the section's own
+                   signature and now reads as the space the scene is happening
+                   in rather than as the only thing in the window. */}
+                {scene?.backdrop ? (
                   <>
-                    {/* Ambient halo in this section's accent, centred on the
-                     planet. Faint and tight on purpose — wide or strong, it
-                     hazes the whole portal to flat blue and the deep-space
-                     falloff disappears. */}
+                    <Image
+                      src={scene.backdrop}
+                      alt=""
+                      fill
+                      loading="eager"
+                      sizes="(min-width: 1024px) 30vw, 60vw"
+                      className="object-cover"
+                    />
                     <div
                       className="absolute inset-0"
-                      style={{
-                        background: `radial-gradient(circle at ${ILLUSTRATION_FOCUS}, ${atmosphere.accent}38 0%, ${atmosphere.accent}14 26%, transparent 46%)`,
-                      }}
+                      style={{ background: atmosphere.overlay }}
                     />
-                    <motion.div
-                      // Inset from the frame so the rings can't be sliced by the
-                      // portal's edge, and masked to a soft circle around the
-                      // planet so the artwork's bounding box dissolves into the
-                      // starfield instead of ending on a hard rectangle.
-                      className="absolute inset-[14%]"
-                      style={{
-                        rotate: spinRotate,
-                        // The spin used to swing the whole frame, so the
-                        // off-centre planet orbited the portal and clipped its
-                        // edges. Pinning the origin to the planet turns the same
-                        // scroll-driven rotation into the globe turning in place.
-                        // The mask is radially symmetric about this same point,
-                        // so it stays put while the art rotates under it.
-                        transformOrigin: ILLUSTRATION_FOCUS,
-                        maskImage: ILLUSTRATION_MASK,
-                        WebkitMaskImage: ILLUSTRATION_MASK,
-                      }}
-                    >
-                      <Image
-                        src={PORTAL_ILLUSTRATION}
-                        alt=""
-                        fill
-                        sizes="(min-width: 1024px) 30vw, 30vh"
-                        className="object-contain opacity-[0.88]"
-                        style={{ filter: illustrationFilterByIndex[index] }}
-                      />
-                    </motion.div>
                   </>
                 ) : (
                   <PortalMotif motif={atmosphere.motif} accent={atmosphere.accent} />
+                )}
+
+                {scene && (
+                  <>
+                    {/* Ambient accent behind the figure, so it is lit from the
+                       region it is flying through and does not sit on the
+                       starfield as a cut-out. Faint and tight on purpose —
+                       wide or strong, it hazes the whole portal flat and the
+                       deep-space falloff disappears. */}
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        background: `radial-gradient(circle at 50% 46%, ${atmosphere.accent}30 0%, ${atmosphere.accent}12 30%, transparent 56%)`,
+                      }}
+                    />
+                    {scene.streaks
+                      ?.map((streak, i) => ({ streak, i }))
+                      .filter(({ streak }) => streak.behind)
+                      .map(({ streak, i }) => (
+                        <ShootingStar
+                          // By position, not file: a star can be reused.
+                          key={i}
+                          streak={streak}
+                          life={sceneLife}
+                          progress={scrollYProgress}
+                        />
+                      ))}
+                    <motion.div
+                      className={`absolute ${scene.inset}`}
+                      style={{
+                        x: sceneX,
+                        y: sceneY,
+                        rotate: sceneTilt,
+                        willChange: "transform",
+                        ...(scene.fadeBottom && {
+                          maskImage:
+                            "linear-gradient(180deg, #000 0%, #000 62%, transparent 100%)",
+                          WebkitMaskImage:
+                            "linear-gradient(180deg, #000 0%, #000 62%, transparent 100%)",
+                        }),
+                      }}
+                    >
+                      {/* The idle float gets its own layer. Both it and the
+                         scroll drift above animate `transform`, and a CSS
+                         animation outranks an inline style — on one element the
+                         keyframes would simply erase framer's x/rotate and the
+                         scene would stop reacting to scroll entirely. */}
+                      <div className={`absolute inset-0 ${scene.float}`}>
+                        <Image
+                          src={scene.src}
+                          alt=""
+                          fill
+                          // Required, not optional: /_next/image answers 400 for
+                          // any SVG unless `dangerouslyAllowSVG` is set, so
+                          // without this every scene renders as nothing — and
+                          // alt="" would let it fail silently.
+                          unoptimized
+                          // Eager, not the default lazy. Lazy loading waits
+                          // for the browser to decide the image is near the
+                          // viewport, and a card parked deep in the corridor
+                          // (scaled down, faded, or visibility: hidden) does
+                          // not look near to it until the card is almost on
+                          // top of you — so every scene arrived late. These
+                          // are four small SVGs; fetch them up front.
+                          loading="eager"
+                          sizes="(min-width: 1024px) 30vw, 60vw"
+                          className={
+                            scene.fit === "cover" ? "object-cover" : "object-contain"
+                          }
+                          style={{ objectPosition: scene.position }}
+                        />
+                        {/* This section's light, painted through the figure's own
+                           alpha and screened onto it. Screen over the art (not
+                           over the starfield) only lifts what is already there,
+                           so the suit and the moon take the accent while the
+                           outlines stay black. */}
+                        <div
+                          className="pointer-events-none absolute inset-0 mix-blend-screen"
+                          style={sceneTintStyle(scene, atmosphere.accent)}
+                        />
+                      </div>
+                    </motion.div>
+                    {scene.streaks
+                      ?.map((streak, i) => ({ streak, i }))
+                      .filter(({ streak }) => !streak.behind)
+                      .map(({ streak, i }) => (
+                        <ShootingStar
+                          key={i}
+                          streak={streak}
+                          life={sceneLife}
+                          progress={scrollYProgress}
+                        />
+                      ))}
+                  </>
                 )}
               </motion.div>
             )}
