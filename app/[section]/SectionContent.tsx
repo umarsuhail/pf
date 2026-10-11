@@ -3,22 +3,17 @@
 import { motion, stagger, type Variants } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import { ArrowLeftIcon } from "../components/icons/arrow-left";
 import { ArrowRightIcon } from "../components/icons/arrow-right";
 import { ActivityIcon } from "../components/icons/activity";
 import { BotIcon } from "../components/icons/bot";
-import { BotMessageSquareIcon } from "../components/icons/bot-message-square";
-import { BriefcaseBusinessIcon } from "../components/icons/briefcase-business";
 import { CardIcon } from "../components/icons/card-icon";
 import { CpuIcon } from "../components/icons/cpu";
-import { FileTextIcon } from "../components/icons/file-text";
 import { FolderKanbanIcon } from "../components/icons/folder-kanban";
 import { DownloadIcon } from "../components/icons/download";
 import { HistoryIcon } from "../components/icons/history";
-import { RocketIcon } from "../components/icons/rocket";
 import { SparklesIcon } from "../components/icons/sparkles";
-import { UserIcon } from "../components/icons/user";
 import { BrandIcon } from "../components/icons/brand-icon";
 import type { AnimatedIconHandle } from "../components/icons/card-icon";
 import { cards as allCards } from "../data/sections";
@@ -27,7 +22,7 @@ import { getSkillGroups } from "../data/skillGroups";
 import CallbackForm from "../components/CallbackForm";
 import NarratedText from "../components/NarratedText";
 import HandwritingText from "../components/TypoGraphyHand";
-import { ProjectStackShowcase } from "./ProjectStackShowcase";
+import { ProjectMissionLog } from "./ProjectMissionLog";
 import { SkillsShowcase } from "./SkillsShowcase";
 
 const RESUME_PDF_URL = "/umar-suhail-resume-2026.pdf";
@@ -89,47 +84,6 @@ function parseContactLine(line: string): { label: string; value: string } {
   return { label: line.slice(0, separator), value: line.slice(separator + 2) };
 }
 
-const ALL_PROJECTS = "All Projects";
-
-// One badge icon + accent per project card, keyed by title so it's easy to
-// extend when a new project is added to the data.
-const PROJECT_ICONS: Record<string, { Icon: typeof ActivityIcon; accent: string }> = {
-  "Enterprise Dashboard — Transaction & Revenue Monitoring": {
-    Icon: ActivityIcon,
-    accent: "border-indigo-400/30 bg-indigo-500/15 text-indigo-300",
-  },
-  "Biometric Identity & Recognition Platform": {
-    Icon: UserIcon,
-    accent: "border-emerald-400/30 bg-emerald-500/15 text-emerald-300",
-  },
-  "AI-Powered Visual Assistant": {
-    Icon: BotIcon,
-    accent: "border-amber-400/30 bg-amber-500/15 text-amber-300",
-  },
-  "Tenant & Configuration Management Platform": {
-    Icon: CpuIcon,
-    accent: "border-sky-400/30 bg-sky-500/15 text-sky-300",
-  },
-  "AI Chatbot & Monitoring Systems": {
-    Icon: BotMessageSquareIcon,
-    accent: "border-blue-400/30 bg-blue-500/15 text-blue-300",
-  },
-  "Resume & Career Tools": {
-    Icon: FileTextIcon,
-    accent: "border-purple-400/30 bg-purple-500/15 text-purple-300",
-  },
-};
-const DEFAULT_PROJECT_ICON = { Icon: FolderKanbanIcon, accent: "border-white/15 bg-white/10 text-slate-200" };
-
-function projectStats(count: number) {
-  return [
-    { Icon: HistoryIcon, value: "7+", label: "Years Experience" },
-    { Icon: FolderKanbanIcon, value: `${count}`, label: "Projects Delivered" },
-    { Icon: BriefcaseBusinessIcon, value: "Enterprise", label: "Scale Solutions" },
-    { Icon: CpuIcon, value: "Modern", label: "Tech Stack" },
-  ];
-}
-
 export function SectionContent({
   card,
   gradient,
@@ -146,15 +100,6 @@ export function SectionContent({
   const nextArrowRef = useRef<AnimatedIconHandle>(null);
 
   const projects = useMemo(() => card.projects ?? [], [card.projects]);
-  const [activeCategory, setActiveCategory] = useState(ALL_PROJECTS);
-  const categories = useMemo(
-    () => [ALL_PROJECTS, ...Array.from(new Set(projects.map((p) => p.category)))],
-    [projects],
-  );
-  const visibleProjects =
-    activeCategory === ALL_PROJECTS
-      ? projects
-      : projects.filter((p) => p.category === activeCategory);
 
   // Flat list (no group headings) for the home page's "Tech I Work With"
   // preview — same source (`skillGroups.ts`) the standalone /skills page and
@@ -200,7 +145,7 @@ export function SectionContent({
         // the viewport empty on either side. Tighter gutters on phones
         // (px-4) buy back real reading width where it is scarcest, and the
         // 8xl ceiling keeps line length sane on ultrawide monitors.
-        className="relative z-10 mx-auto w-full max-w-[110rem] px-4 pb-20 pt-24 sm:px-8 sm:pb-24 sm:pt-28 lg:px-12 xl:px-16"
+        className="detail-page relative z-10 mx-auto w-full max-w-[110rem] px-4 pb-20 pt-24 sm:px-8 sm:pb-24 sm:pt-28 lg:px-12 xl:px-16"
       >
         <motion.div variants={itemVariants}>
           <Link
@@ -358,144 +303,10 @@ export function SectionContent({
           </motion.header>
         )}
 
-        {/* PROJECTS — display hero with stats + project collage visual */}
         {card.id === "projects" && (
-          <motion.header
-            variants={itemVariants}
-            className="mt-12 grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16"
-          >
-            <div>
-              <Eyebrow card={card} />
-              <h1 className="mt-6 text-4xl font-semibold leading-[1.1] text-sky-50 sm:text-5xl">
-                <HandwritingText className="text-4xl font-semibold sm:text-5xl">{card.title}</HandwritingText>
-              </h1>
-              <p className="mt-6 max-w-[62ch] text-lg leading-relaxed text-slate-100/80 sm:text-xl lg:text-[1.375rem]">
-                <NarratedText id={card.id} text={card.description} />
-              </p>
-              <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {projectStats(projects.length).map(({ Icon, value, label }) => (
-                  <div
-                    key={label}
-                    className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4"
-                  >
-                    <Icon size={18} className="text-sky-300" aria-hidden="true" />
-                    <p className="mt-2 text-lg font-semibold text-sky-50">{value}</p>
-                    <p className="text-xs text-slate-100/60">{label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <ProjectStackShowcase projects={projects} />
-          </motion.header>
-        )}
-
-        {/* PROJECTS — filterable grid of project cards */}
-        {card.id === "projects" && (
-          <motion.section variants={itemVariants} className="mt-16">
-            <div className="flex flex-wrap items-center gap-4">
-              <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.32em] text-sky-100/60">
-                <FolderKanbanIcon size={14} aria-hidden="true" />
-                Featured Projects
-              </span>
-              <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
-              <div className="flex flex-wrap gap-2">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => setActiveCategory(category)}
-                    className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                      activeCategory === category
-                        ? "border-sky-300/40 bg-sky-400/15 text-sky-50"
-                        : "border-white/10 bg-white/[0.03] text-slate-100/60 hover:bg-white/[0.06]"
-                    }`}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-              {visibleProjects.map((project) => {
-                const { Icon, accent } = PROJECT_ICONS[project.title] ?? DEFAULT_PROJECT_ICON;
-                return (
-                  <motion.div
-                    variants={itemVariants}
-                    key={project.title}
-                    className="group relative overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02] transition-colors hover:bg-white/[0.04]"
-                  >
-                    <div className="relative h-40 w-full overflow-hidden border-b border-white/5">
-                      <Image
-                        src={project.image}
-                        alt=""
-                        fill
-                        sizes="(max-width: 640px) calc(100vw - 2rem), (max-width: 1024px) calc(50vw - 2rem), (max-width: 1536px) calc(33vw - 2rem), 25vw"
-                        className={`${
-                          project.imageFit === "contain" ? "object-contain p-3" : "object-cover"
-                        } transition-transform duration-500 ease-out group-hover:scale-105`}
-                      />
-                      <span
-                        className={`absolute left-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-xl border ${accent}`}
-                      >
-                        <Icon size={16} aria-hidden="true" />
-                      </span>
-                    </div>
-                    <div className="relative p-6">
-                      <h3 className="text-base font-semibold text-sky-50 sm:text-lg">
-                        {project.title}
-                      </h3>
-                      <p className="mt-2 text-sm leading-relaxed text-slate-100/80">
-                        {project.description}
-                      </p>
-                      <div className="mt-4 flex flex-wrap gap-1.5">
-                        {project.stack.map((tech) => (
-                          <span
-                            key={tech}
-                            className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[11px] text-slate-100/70"
-                          >
-                            {tech}
-                          </span>
-                        ))}
-                      </div>
-                      {project.href && (
-                        <a
-                          href={project.href}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-5 inline-flex items-center gap-2 rounded-full border border-purple-300/30 bg-purple-400/10 px-4 py-2 text-xs font-semibold text-purple-100 transition hover:bg-purple-400/20"
-                        >
-                          Launch ATS Studio
-                          <ArrowRightIcon size={13} aria-hidden="true" />
-                        </a>
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-
-            {/* CTA banner */}
-            <div className="mt-10 flex flex-col items-start gap-5 rounded-2xl border border-white/10 bg-white/[0.03] p-6 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-4">
-                <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-sky-300/30 bg-sky-400/10 text-sky-300">
-                  <RocketIcon size={18} aria-hidden="true" />
-                </span>
-                <div>
-                  <p className="font-semibold text-sky-50">Interested in working together?</p>
-                  <p className="text-sm text-slate-100/60">Let&apos;s build something great.</p>
-                </div>
-              </div>
-              <Link
-                href="/contact"
-                className="inline-flex items-center gap-2 rounded-full border border-sky-300/30 bg-sky-400/15 px-5 py-2.5 text-sm font-semibold text-sky-50 transition-colors hover:bg-sky-400/25"
-              >
-                Let&apos;s Connect
-                <ArrowRightIcon size={14} aria-hidden="true" />
-              </Link>
-            </div>
-          </motion.section>
+          <motion.div variants={itemVariants} className="mt-12">
+            <ProjectMissionLog projects={projects} />
+          </motion.div>
         )}
 
         {/* EXPERIENCE — vertical timeline */}

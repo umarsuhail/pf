@@ -297,13 +297,13 @@ function TechnologyNode({
         >
           <span
             aria-hidden="true"
-            className={`absolute rounded-full bg-slate-950 shadow-[0_26px_60px_rgba(2,8,23,0.72)] ${
+            className={`flight-tool-back absolute rounded-full ${
               isMobile ? "-inset-[3px]" : "-inset-[5px]"
             }`}
             style={{ transform: `translateZ(${isMobile ? -6 : -11}px)` }}
           />
           <span
-            className={`relative grid place-items-center rounded-full border border-white/15 bg-slate-950/70 shadow-[0_18px_44px_rgba(2,8,23,0.6),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-sm transition-[border-color,box-shadow] duration-300 hover:border-cyan-200/60 hover:shadow-[0_0_34px_rgba(34,211,238,0.4)] ${
+            className={`flight-tool-surface relative grid place-items-center rounded-full border backdrop-blur-sm transition-[border-color,box-shadow] duration-300 ${
               isMobile ? "h-14 w-14" : "h-24 w-24"
             }`}
           >
@@ -320,7 +320,7 @@ function TechnologyNode({
           <motion.span
             aria-hidden="true"
             style={{ opacity: focusGlow }}
-            className="pointer-events-none absolute inset-0 rounded-full border border-cyan-200/70 shadow-[0_0_38px_rgba(34,211,238,0.45),inset_0_1px_0_rgba(255,255,255,0.18)]"
+            className="flight-tool-focus pointer-events-none absolute inset-0 rounded-full border"
           />
           </span>
           {/* The rim, standing proud of the face. Transparent-centred, so it
@@ -330,14 +330,13 @@ function TechnologyNode({
             className="pointer-events-none absolute inset-0 rounded-full"
             style={{
               transform: `translateZ(${isMobile ? 4 : 7}px)`,
-              boxShadow:
-                "inset 0 2px 1px rgba(255,255,255,0.30), inset 2px 0 1px rgba(255,255,255,0.12), inset 0 -2px 1px rgba(2,8,23,0.60), inset -2px 0 1px rgba(2,8,23,0.40)",
+              boxShadow: "var(--flight-card-bezel)",
             }}
           />
         </motion.span>
         <motion.span
           style={{ opacity: labelOpacity }}
-          className="whitespace-nowrap rounded-full bg-slate-950/70 px-2.5 py-1 text-xs font-medium tracking-wide text-sky-50/90 sm:text-base"
+          className="flight-tool-label whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium tracking-wide sm:text-base"
         >
           {technology.label}
         </motion.span>

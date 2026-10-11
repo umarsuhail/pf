@@ -69,7 +69,7 @@ export default function ExpandableText({
       >
         {children}
         {!expanded && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-slate-950/70 to-transparent" />
+          <div className="flight-copy-fade pointer-events-none absolute inset-x-0 bottom-0 h-6" />
         )}
       </div>
       <button
@@ -82,7 +82,7 @@ export default function ExpandableText({
           setExpanded((prev) => !prev);
         }}
         aria-expanded={expanded}
-        className={`relative z-10 mt-1.5 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-200/70 transition-colors hover:text-sky-100 ${toggleClassName}`}
+        className={`flight-copy-toggle relative z-10 mt-1.5 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.2em] transition-colors ${toggleClassName}`}
       >
         {expanded ? "Show less" : "Read more"}
         <svg

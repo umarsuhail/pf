@@ -310,11 +310,11 @@ export const sectionProgressMap: Record<string, number> = {
 };
 
 export const cardGradients = [
-  "radial-gradient(120% 120% at 15% 20%, rgba(0,108,159,0.85) 0%, rgba(0,108,159,0.25) 55%, rgba(0,108,159,0) 100%), linear-gradient(135deg, #00273f 0%, #003f5f 50%, #006c9f 100%)",
-  "linear-gradient(160deg, #111827 0%, #1e3a5f 55%, #00294a 100%)",
-  "linear-gradient(120deg, #0f172a 0%, #25397c 52%, #1d4ed8 115%)",
-  "linear-gradient(150deg, #243a4b 0%, #153055 48%, #11334f 100%)",
-  "linear-gradient(125deg, #0b1120 0%, #155e75 58%, #10427a 100%)",
-  "linear-gradient(165deg, #1e293b 0%, #50260b 46%, #1e40af 112%)",
-  "linear-gradient(140deg, #111827 8%, #0f3d5c 50%, #41272a 108%)",
+  "var(--flight-card-home)",
+  "var(--flight-card-skills)",
+  "var(--flight-card-projects)",
+  "var(--flight-card-experience)",
+  "var(--flight-card-contact)",
+  "var(--flight-card-projects)",
+  "var(--flight-card-experience)",
 ];

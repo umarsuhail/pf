@@ -1,10 +1,17 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import {
+  IBM_Plex_Mono,
+  IBM_Plex_Sans,
+  Saira_Condensed,
+  Saira_Stencil,
+} from "next/font/google";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import "./globals.css";
 import PageLoader from "./components/PageLoader";
 import ChromeBeforeMain from "./components/ChromeBeforeMain";
 import ChromeAfterMain from "./components/ChromeAfterMain";
+import { MISSION_THEME_INIT_SCRIPT } from "./lib/mission-theme";
 import { SpeedInsights } from "@vercel/speed-insights/next"
 
 // Body family, replacing the deleted Grenze variable font.
@@ -76,6 +83,31 @@ const signatureFontVars = [
   signStyleScript.variable,
   passion.variable,
 ].join(" ");
+
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-sans",
+  display: "swap",
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-plex-mono",
+  display: "swap",
+});
+const sairaCondensed = Saira_Condensed({
+  subsets: ["latin"],
+  weight: ["600", "800"],
+  variable: "--font-saira-condensed",
+  display: "swap",
+});
+const sairaStencil = Saira_Stencil({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-saira-stencil",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://umar.website"),
@@ -172,15 +204,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-mission-theme="flight" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: MISSION_THEME_INIT_SCRIPT,
+          }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
       <body
-        className={`${marvel.variable} ${signatureFontVars} relative min-h-screen antialiased`}
+        className={`${marvel.variable} ${plexSans.variable} ${plexMono.variable} ${sairaCondensed.variable} ${sairaStencil.variable} ${signatureFontVars} relative min-h-screen antialiased`}
       >
         <SerwistProvider swUrl="/serwist/sw.js">
           <PageLoader />

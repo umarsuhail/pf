@@ -673,10 +673,8 @@ export default function ScrollDial() {
       <div className={`mb-2 flex ${compact ? "justify-center" : "justify-end"}`}>
         <span
           role={loopReady ? "status" : undefined}
-          className={`whitespace-nowrap rounded-lg border bg-[linear-gradient(160deg,rgba(30,41,59,0.95),rgba(2,6,16,0.95))] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.2em] shadow-[0_6px_18px_rgba(2,8,23,0.5)] transition-colors duration-500 ${
-            loopReady
-              ? "border-teal-300/40 text-teal-100 shadow-[0_0_18px_rgba(45,212,191,0.25)]"
-              : "border-white/12 text-sky-100"
+          className={`mission-dial-label whitespace-nowrap rounded-lg border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.2em] transition-colors duration-500 ${
+            loopReady ? "mission-dial-label-loop" : ""
           }`}
         >
           {activeLabel}
@@ -715,7 +713,7 @@ export default function ScrollDial() {
           width={size}
           height={size}
           viewBox="0 0 120 120"
-          className={`touch-none select-none rounded-full outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+          className={`mission-dial touch-none select-none rounded-full outline-none focus-visible:ring-2 focus-visible:ring-(--flight-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--flight-surface-solid) ${
             dragging ? "cursor-grabbing" : pinching ? "cursor-zoom-in" : "cursor-grab"
           }`}
           style={{
@@ -733,22 +731,22 @@ export default function ScrollDial() {
              what sells a machined ring at this size — a single gradient reads
              as plastic. */}
           <linearGradient id="dial-steel" x1="12%" y1="0%" x2="88%" y2="100%">
-            <stop offset="0%" stopColor="#8a97a8" />
-            <stop offset="18%" stopColor="#59657a" />
-            <stop offset="34%" stopColor="#97a5b6" />
-            <stop offset="52%" stopColor="#4a5568" />
-            <stop offset="70%" stopColor="#8593a6" />
-            <stop offset="86%" stopColor="#495366" />
-            <stop offset="100%" stopColor="#7c8b9e" />
+            <stop offset="0%" stopColor="var(--flight-dial-steel-1)" />
+            <stop offset="18%" stopColor="var(--flight-dial-steel-2)" />
+            <stop offset="34%" stopColor="var(--flight-dial-steel-3)" />
+            <stop offset="52%" stopColor="var(--flight-dial-steel-4)" />
+            <stop offset="70%" stopColor="var(--flight-dial-steel-5)" />
+            <stop offset="86%" stopColor="var(--flight-dial-steel-6)" />
+            <stop offset="100%" stopColor="var(--flight-dial-steel-7)" />
           </linearGradient>
           <linearGradient id="dial-face" x1="30%" y1="0%" x2="70%" y2="100%">
-            <stop offset="0%" stopColor="#101a27" />
-            <stop offset="55%" stopColor="#070d16" />
-            <stop offset="100%" stopColor="#04080f" />
+            <stop offset="0%" stopColor="var(--flight-dial-face-1)" />
+            <stop offset="55%" stopColor="var(--flight-dial-face-2)" />
+            <stop offset="100%" stopColor="var(--flight-dial-face-3)" />
           </linearGradient>
           <linearGradient id="dial-lume" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#7dd3fc" />
-            <stop offset="100%" stopColor="#34d399" />
+            <stop offset="0%" stopColor="var(--flight-dial-mark-1)" />
+            <stop offset="100%" stopColor="var(--flight-dial-mark-2)" />
           </linearGradient>
           {/* Sheen across the top-left of the crystal, so the face reads as
              glass over a dial rather than as a flat hole. */}
@@ -760,7 +758,7 @@ export default function ScrollDial() {
         </defs>
 
         {/* --- Case ------------------------------------------------------ */}
-        <circle cx="60" cy="60" r="59" fill="#0b1019" />
+        <circle cx="60" cy="60" r="59" fill="var(--flight-dial-case)" />
         <circle
           cx="60"
           cy="60"
@@ -817,7 +815,7 @@ export default function ScrollDial() {
               y1={k.y1}
               x2={k.x2}
               y2={k.y2}
-              stroke={k.major ? "rgba(226,240,255,0.85)" : "rgba(12,18,28,0.75)"}
+              stroke={k.major ? "var(--flight-ink)" : "color-mix(in srgb, var(--flight-ink) 42%, transparent)"}
               strokeWidth={k.major ? 1.5 : 0.9}
               strokeLinecap="round"
             />
@@ -828,7 +826,7 @@ export default function ScrollDial() {
           <polygon
             points="60,1.5 64.4,10.5 55.6,10.5"
             fill="url(#dial-lume)"
-            style={{ filter: glow("drop-shadow(0 0 3px rgba(125,211,252,0.9))") }}
+            style={{ filter: glow("drop-shadow(0 0 3px var(--flight-accent))") }}
           />
         </g>
 
@@ -839,7 +837,7 @@ export default function ScrollDial() {
           cy="60"
           r="49"
           fill="none"
-          stroke="rgba(0,0,0,0.8)"
+          stroke="var(--flight-line)"
           strokeWidth="2"
         />
 
@@ -850,7 +848,7 @@ export default function ScrollDial() {
           cy="60"
           r="44"
           fill="none"
-          stroke="rgba(255,255,255,0.09)"
+          stroke="var(--flight-line)"
           strokeWidth="2.5"
         />
         <circle
@@ -863,7 +861,7 @@ export default function ScrollDial() {
           strokeLinecap="round"
           strokeDasharray="8 269"
           transform="rotate(-94 60 60)"
-          style={{ filter: glow("drop-shadow(0 0 3px rgba(56,189,248,0.55))") }}
+          style={{ filter: glow("drop-shadow(0 0 3px var(--flight-accent))") }}
         />
 
         {/* Section indices, printed on the dial rather than on the bezel —
@@ -880,7 +878,7 @@ export default function ScrollDial() {
               y1={inner.y}
               x2={outer.x}
               y2={outer.y}
-              stroke={passed ? "#7dd3fc" : "rgba(226,240,255,0.28)"}
+              stroke={passed ? "var(--flight-accent)" : "var(--flight-dial-tick)"}
               strokeWidth="2"
               strokeLinecap="round"
             />
@@ -907,7 +905,7 @@ export default function ScrollDial() {
         {/* --- Fixed index on the case ----------------------------------- */}
         {/* Outside the rotating group on purpose: a bezel is only legible
            against something that does not move with it. */}
-        <polygon points="60,13 63,7 57,7" fill="#e2f2ff" opacity="0.9" />
+        <polygon points="60,13 63,7 57,7" fill="var(--flight-dial-index)" opacity="0.9" />
 
         {/* The way back: a ring round the case that fills as the visitor
            pushes past the end, full exactly as the loop fires. Written to
@@ -919,7 +917,7 @@ export default function ScrollDial() {
             cy="60"
             r="58"
             fill="none"
-            stroke="rgba(94,234,212,0.16)"
+            stroke="color-mix(in srgb, var(--flight-positive) 22%, transparent)"
             strokeWidth="2.5"
             pointerEvents="none"
           />
@@ -930,7 +928,7 @@ export default function ScrollDial() {
           cy="60"
           r="58"
           fill="none"
-          stroke="#5eead4"
+          stroke="var(--flight-positive)"
           strokeWidth="2.5"
           strokeLinecap="round"
           pathLength={100}
@@ -938,7 +936,7 @@ export default function ScrollDial() {
           strokeDashoffset="100"
           transform="rotate(-90 60 60)"
           pointerEvents="none"
-          style={{ filter: glow("drop-shadow(0 0 4px rgba(45,212,191,0.7))") }}
+          style={{ filter: glow("drop-shadow(0 0 4px var(--flight-positive))") }}
         />
         </svg>
       </div>

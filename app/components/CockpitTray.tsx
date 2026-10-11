@@ -3,9 +3,16 @@
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cards } from "../data/sections";
 import { NARRATION_SPANS } from "../data/narration";
+import {
+  DEFAULT_MISSION_THEME,
+  isMissionTheme,
+  MISSION_THEMES,
+  MISSION_THEME_STORAGE_KEY,
+  type MissionTheme,
+} from "../lib/mission-theme";
 import { CardIcon } from "./icons/card-icon";
 import type { AnimatedIconHandle } from "./icons/card-icon";
 
@@ -44,10 +51,7 @@ const TARGET_VOLUME = 0.42;
 // Brushed steel: a raking light gradient for the body, a hard specular line
 // along the top edge and a dark one along the bottom, so every surface reads
 // as a milled plate rather than a flat panel.
-const METAL_SURFACE =
-  "relative overflow-hidden border border-white/12 " +
-  "bg-[linear-gradient(158deg,#3a4a5f_0%,#1c2734_16%,#0e151f_40%,#0a1017_56%,#1a2430_80%,#0b1119_100%)] " +
-  "shadow-[inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.8),inset_1px_0_0_rgba(255,255,255,0.06),inset_-1px_0_0_rgba(0,0,0,0.5),0_26px_64px_rgba(2,8,23,0.72)]";
+const METAL_SURFACE = "mission-metal-surface relative overflow-hidden border";
 
 // Fine vertical brush lines over the body — cheap, and it kills the flatness
 // of a plain gradient at large panel sizes.
@@ -55,7 +59,7 @@ function BrushedGrain() {
   return (
     <span
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 opacity-[0.55] bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.035)_0px,rgba(255,255,255,0.035)_1px,transparent_1px,transparent_3px)]"
+      className="mission-metal-grain pointer-events-none absolute inset-0 opacity-[0.55]"
     />
   );
 }
@@ -98,7 +102,7 @@ function Rivets({ className = "" }: { className?: string }) {
       {Array.from({ length: 2 }).map((_, i) => (
         <span
           key={i}
-          className="h-1.5 w-1.5 rounded-full bg-[radial-gradient(circle_at_30%_30%,#c9d6e4,#4a5a6d_55%,#0b1119)] shadow-[0_1px_1px_rgba(0,0,0,0.8)]"
+          className="mission-rivet h-1.5 w-1.5 rounded-full shadow-[0_1px_1px_rgba(0,0,0,0.8)]"
         />
       ))}
     </span>
@@ -111,13 +115,12 @@ function Rivets({ className = "" }: { className?: string }) {
 // solid near the notch's corner and fades to nothing away from it, faking
 // a corner that curves the *opposite* way from a normal border-radius.
 const NOTCH_EAR = 14;
-const NOTCH_COLOR = "#1c2734";
 function notchEarStyle(corner: "top right" | "top left") {
   const mask = `radial-gradient(circle at ${corner}, black ${NOTCH_EAR}px, transparent ${NOTCH_EAR}px)`;
   return {
     width: NOTCH_EAR,
     height: NOTCH_EAR,
-    backgroundColor: NOTCH_COLOR,
+    backgroundColor: "var(--flight-metal-ear)",
     WebkitMaskImage: mask,
     maskImage: mask,
   } as const;
@@ -174,11 +177,10 @@ function EquipmentBay({
 
       {/* Empty slot — content goes here */}
       <div
-        className="relative z-10 m-3 mt-3 flex-1 rounded-xl border border-white/8 shadow-[inset_0_2px_12px_rgba(0,0,0,0.7)]"
+        className="mission-console-well relative z-10 m-3 mt-3 flex-1 rounded-xl border"
         style={{
-          backgroundColor: "rgba(2,8,23,0.45)",
           backgroundImage:
-            "linear-gradient(rgba(125,211,252,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(125,211,252,0.05) 1px, transparent 1px)",
+            "linear-gradient(color-mix(in srgb, var(--flight-accent) 6%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--flight-accent) 6%, transparent) 1px, transparent 1px)",
           backgroundSize: "22px 22px",
         }}
       />
@@ -201,6 +203,15 @@ export default function CockpitTray() {
   const [isMuted, setIsMuted] = useState(false);
   const [isSidenavVisible, setIsSidenavVisible] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [missionTheme, setMissionTheme] = useState<MissionTheme>(() => {
+    if (typeof window === "undefined") return DEFAULT_MISSION_THEME;
+    try {
+      const stored = localStorage.getItem(MISSION_THEME_STORAGE_KEY);
+      return isMissionTheme(stored) ? stored : DEFAULT_MISSION_THEME;
+    } catch {
+      return DEFAULT_MISSION_THEME;
+    }
+  });
   // The <audio> elements themselves are expensive to justify keeping around
   // for a visitor who never touches the console — they're only mounted once
   // the tray is actually expanded (or the latch's own play button is
@@ -218,6 +229,33 @@ export default function CockpitTray() {
   // Where each deck's volume is heading; one rAF loop walks both there.
   const levelsRef = useRef({ intro: 0, main: 0 });
   const rampRef = useRef(0);
+
+  // The head script applies the saved palette before first paint. Re-apply it
+  // before this client-only control paints as well, which also survives the
+  // development Strict Mode remount described by Next's theme guidance.
+  useLayoutEffect(() => {
+    document.documentElement.dataset.missionTheme = missionTheme;
+  }, [missionTheme]);
+
+  useEffect(() => {
+    const syncTheme = (event: StorageEvent) => {
+      if (event.key !== MISSION_THEME_STORAGE_KEY) return;
+      setMissionTheme(
+        isMissionTheme(event.newValue) ? event.newValue : DEFAULT_MISSION_THEME,
+      );
+    };
+    window.addEventListener("storage", syncTheme);
+    return () => window.removeEventListener("storage", syncTheme);
+  }, []);
+
+  const selectMissionTheme = (theme: MissionTheme) => {
+    setMissionTheme(theme);
+    try {
+      localStorage.setItem(MISSION_THEME_STORAGE_KEY, theme);
+    } catch {
+      // Storage can be disabled while the live theme still remains usable.
+    }
+  };
 
   useEffect(() => {
     const handleProgressUpdate = (event: Event) => {
@@ -691,7 +729,7 @@ export default function CockpitTray() {
   return (
     <div
       ref={containerRef}
-      className="pointer-events-none fixed inset-x-0 top-0 z-50"
+      className="mission-chrome pointer-events-none fixed inset-x-0 top-0 z-50"
     >
       {/* The fullscreen question. Both answers start the tour — this only
          decides how much of the screen it gets — so neither button is a
@@ -846,10 +884,20 @@ export default function CockpitTray() {
                   <span className="text-[9px] font-semibold uppercase tracking-[0.3em] text-sky-200/60">
                     Nav Console
                   </span>
-                  <span className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.3em] text-emerald-300/70">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300 shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
-                    Systems Online
-                  </span>
+                  <div className="flex items-center gap-1" role="group" aria-label="Interface theme">
+                    {MISSION_THEMES.map((theme) => (
+                      <button
+                        key={theme.id}
+                        type="button"
+                        aria-pressed={missionTheme === theme.id}
+                        onClick={() => selectMissionTheme(theme.id)}
+                        data-theme-option={theme.id}
+                        className="mission-theme-option"
+                      >
+                        {theme.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="relative z-10 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
@@ -865,32 +913,20 @@ export default function CockpitTray() {
                         aria-current={isActive ? "page" : undefined}
                         whileTap={{ scale: 0.97 }}
                         transition={{ duration: 0.14 }}
-                        className={`group relative flex flex-col items-start gap-1 overflow-hidden rounded-lg border px-2.5 py-2 text-left transition-colors ${
-                          isActive
-                            ? "border-sky-300/50 bg-sky-400/15 shadow-[inset_0_0_18px_rgba(125,211,252,0.28),inset_0_1px_0_rgba(255,255,255,0.25)]"
-                            : "border-white/10 bg-white/[0.04] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(0,0,0,0.5)] hover:border-sky-300/35 hover:bg-white/[0.08]"
-                        }`}
+                        className="mission-console-stop group relative flex flex-col items-start gap-1 overflow-hidden rounded-lg border px-2.5 py-2 text-left transition-colors"
                       >
                         <span className="flex w-full items-center justify-between">
                           <span
-                            className={`text-[9px] font-semibold tracking-[0.22em] ${
-                              isActive ? "text-sky-200" : "text-slate-500"
-                            }`}
+                            className="mission-console-code text-[9px] font-semibold tracking-[0.22em]"
                           >
                             {stop.code}
                           </span>
                           <span
-                            className={`h-1.5 w-1.5 rounded-full transition-all ${
-                              isActive
-                                ? "bg-sky-300 shadow-[0_0_10px_rgba(125,211,252,0.9)]"
-                                : "bg-slate-600 group-hover:bg-sky-300/60"
-                            }`}
+                            className="mission-console-dot h-1.5 w-1.5 rounded-full transition-all"
                           />
                         </span>
                         <span
-                          className={`flex items-center gap-1.5 text-[11px] font-semibold uppercase leading-tight tracking-[0.1em] ${
-                            isActive ? "text-sky-50" : "text-slate-300"
-                          }`}
+                          className="mission-console-label flex items-center gap-1.5 text-[11px] font-semibold uppercase leading-tight tracking-[0.1em]"
                         >
                           <CardIcon
                             id={stop.id}
@@ -907,7 +943,7 @@ export default function CockpitTray() {
                 </div>
 
                 {/* Autopilot — one control flies the tour and scores it */}
-                <div className="relative z-10 mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-black/30 px-3 py-2 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
+                <div className="mission-console-well relative z-10 mt-3 flex items-center gap-3 rounded-lg border px-3 py-2">
                   <button
                     type="button"
                     onClick={toggleAutopilot}

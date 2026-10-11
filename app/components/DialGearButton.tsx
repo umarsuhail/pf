@@ -90,7 +90,7 @@ export default function DialGearButton({ compact }: { compact: boolean }) {
       role="button"
       tabIndex={0}
       aria-label={`${gear.label} engaged. ${gear.description} Hold three seconds for the next gear.`}
-      className="cursor-pointer outline-none [&:focus-visible_.gear-face]:stroke-sky-300/70"
+      className="gear-control cursor-pointer outline-none"
       // Every pointer event stops here. The whole dial is a drag surface, and
       // without this, pressing the gear would also grab the bezel and fly the
       // page while the hold ran.
@@ -128,14 +128,14 @@ export default function DialGearButton({ compact }: { compact: boolean }) {
            the top-left and a face gradient running the same way read as
            raised at this size for nothing. */}
         <linearGradient id="gear-face" x1="18%" y1="0%" x2="82%" y2="100%">
-          <stop offset="0%" stopColor="#151b25" />
-          <stop offset="55%" stopColor="#0a0e15" />
-          <stop offset="100%" stopColor="#05070b" />
+          <stop offset="0%" stopColor="var(--flight-gear-face-1)" />
+          <stop offset="55%" stopColor="var(--flight-gear-face-2)" />
+          <stop offset="100%" stopColor="var(--flight-gear-face-3)" />
         </linearGradient>
         <linearGradient id="gear-face-pressed" x1="82%" y1="100%" x2="18%" y2="0%">
-          <stop offset="0%" stopColor="#151b25" />
-          <stop offset="55%" stopColor="#05070b" />
-          <stop offset="100%" stopColor="#02040a" />
+          <stop offset="0%" stopColor="var(--flight-gear-face-1)" />
+          <stop offset="55%" stopColor="var(--flight-gear-face-3)" />
+          <stop offset="100%" stopColor="var(--flight-gear-face-pressed)" />
         </linearGradient>
         {/* The bevel: light where the light is, black where it is not. */}
         <linearGradient id="gear-bevel" x1="20%" y1="0%" x2="80%" y2="100%">
@@ -153,7 +153,7 @@ export default function DialGearButton({ compact }: { compact: boolean }) {
       {/* The button stands on the face: a soft dark seat under it, then the
          cap itself, then the bevel. Held, the whole stack flips its lighting
          so the cap reads as pushed into the dial for the length of the hold. */}
-      <circle cx="60" cy="60" r="24" fill="rgba(0,0,0,0.55)" />
+      <circle cx="60" cy="60" r="24" fill="color-mix(in srgb, var(--flight-dial-case) 72%, black)" />
       <circle
         className="gear-face"
         cx="60"
@@ -179,7 +179,8 @@ export default function DialGearButton({ compact }: { compact: boolean }) {
         x="60"
         y={compact ? 55 : 54.5}
         textAnchor="middle"
-        className={`fill-slate-500 font-semibold ${compact ? "text-[5px]" : "text-[6px]"}`}
+        fill="var(--flight-muted)"
+        className={`font-semibold ${compact ? "text-[5px]" : "text-[6px]"}`}
         style={{ letterSpacing: "0.32em" }}
       >
         GEAR
@@ -188,7 +189,8 @@ export default function DialGearButton({ compact }: { compact: boolean }) {
         x="60"
         y={compact ? 70 : 70}
         textAnchor="middle"
-        className={`fill-sky-100 font-semibold tabular-nums ${
+        fill="var(--flight-ink)"
+        className={`font-semibold tabular-nums ${
           compact ? "text-[17px]" : "text-[20px]"
         }`}
         style={{ letterSpacing: "0.02em" }}
@@ -204,7 +206,7 @@ export default function DialGearButton({ compact }: { compact: boolean }) {
         cy="60"
         r={RING_RADIUS}
         fill="none"
-        stroke="#7dd3fc"
+        stroke="var(--flight-accent)"
         strokeWidth="2"
         strokeLinecap="round"
         strokeDasharray={RING_CIRCUMFERENCE}

@@ -422,7 +422,7 @@ function RotatingHomeHeadline({
                 scale: index === phraseIndex ? 1 : 0.65,
               }}
               transition={{ duration: 0.24, ease: "easeOut" }}
-              className="h-1.5 w-1.5 rounded-full bg-sky-200"
+              className="flight-card-meta-dot h-1.5 w-1.5 rounded-full"
             />
           ))}
         </span>
@@ -434,7 +434,7 @@ function RotatingHomeHeadline({
               animate={{ opacity: 1, y: "0em" }}
               exit={{ opacity: 0, y: "-0.42em" }}
               transition={{ duration: 0.34, ease: "easeOut" }}
-              className="absolute inset-x-0 top-0 block whitespace-nowrap font-normal italic text-sky-200"
+              className="flight-card-accent absolute inset-x-0 top-0 block whitespace-nowrap font-normal italic"
             >
               {phrase}
             </motion.em>
@@ -563,11 +563,11 @@ function BillboardCard({
     : card.align === "left"
       ? "items-start text-left"
       : "items-end text-right";
-  const titleClass = "text-sky-50";
-  const bodyClass = "text-slate-100/90";
-  const panelClass = "border-white/20 shadow-[0_24px_90px_rgba(2,8,23,0.52)]";
-  const badgeClass = "border-emerald-200/20 bg-emerald-200/10 text-emerald-100";
-  const buttonClass = "border-sky-200/25 bg-white/10 text-sky-50 hover:bg-white/16";
+  const titleClass = "flight-card-title";
+  const bodyClass = "flight-card-copy";
+  const panelClass = "mission-flight-card";
+  const badgeClass = "flight-card-badge";
+  const buttonClass = "flight-card-action";
   const cardGradient = cardGradients[index % cardGradients.length];
   const targetCard = cards[index + 1] ?? cards[0];
   const actionLabel = index === cards.length - 1 ? "Restart" : "Next";
@@ -861,23 +861,19 @@ function BillboardCard({
          the top-left like everything else on the billboard. */}
       <motion.span
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-0 rounded-3xl sm:rounded-4xl ${
+        className={`flight-card-bezel pointer-events-none absolute inset-0 rounded-3xl sm:rounded-4xl ${
           isMobile ? "" : "hidden sm:block"
         }`}
         style={{
           translateZ: bezelDepth,
-          boxShadow:
-            "inset 0 2px 1px rgba(255,255,255,0.34), inset 2px 0 1px rgba(255,255,255,0.14), inset 0 -2px 1px rgba(2,8,23,0.62), inset -2px 0 1px rgba(2,8,23,0.42), 0 1px 0 rgba(255,255,255,0.10)",
           willChange: layerWillChange,
         }}
       />
       <motion.span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-[3px] rounded-3xl sm:rounded-4xl"
+        className="flight-card-wall pointer-events-none absolute inset-[3px] rounded-3xl sm:rounded-4xl"
         style={{
           translateZ: wallDepth,
-          boxShadow:
-            "inset 0 -2px 3px rgba(255,255,255,0.10), inset 0 2px 5px rgba(2,8,23,0.55)",
           willChange: layerWillChange,
         }}
       />
@@ -946,11 +942,11 @@ function BillboardCard({
             )}
           </h2>
           {card.id === "home" && (
-            <div className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-100/55 sm:mt-4 sm:text-xs">
+            <div className="flight-card-meta mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] font-semibold uppercase tracking-[0.2em] sm:mt-4 sm:text-xs">
               <span>Frontend systems</span>
-              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-sky-200/75" />
+              <span aria-hidden="true" className="flight-card-meta-dot h-1 w-1 rounded-full" />
               <span>Product craft</span>
-              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-sky-200/75" />
+              <span aria-hidden="true" className="flight-card-meta-dot h-1 w-1 rounded-full" />
               <span>Performance</span>
             </div>
           )}
@@ -1702,7 +1698,18 @@ export default function MultiverseFlight() {
   // field. Only then does the light start, slowly: a teal glow rising from
   // the bottom of an indigo sky, reaching the full sky exactly at LOOP_AT.
   // 0 is the void; 1 is the dawn sky.
-  const endStrain = useTransform(() => Math.min(1, smoothPull.get() / LOOP_AT));
+  // This value has imperative subscribers below (React state and a window
+  // event). It cannot be a useTransform value: Framer Motion refreshes those
+  // synchronously during render, which would notify the subscribers while
+  // MultiverseFlight is still rendering. Mirror the spring after commit so
+  // every notification originates from an effect or an animation frame.
+  const endStrain = useMotionValue(Math.min(1, smoothPull.get() / LOOP_AT));
+  useEffect(() => {
+    const update = (pullValue: number) =>
+      endStrain.set(Math.min(1, pullValue / LOOP_AT));
+    update(smoothPull.get());
+    return smoothPull.on("change", update);
+  }, [endStrain, smoothPull]);
   const dawn = useTransform(endStrain, [DAWN_FROM, 1], [0, 1]);
   const dawnSkyOpacity = useTransform(dawn, [0, 0.7], [0, 1]);
   // Brightens in place from the bottom edge. (It was scaled up from below
@@ -2204,7 +2211,7 @@ export default function MultiverseFlight() {
     // any of the per-card reveal/focus/depart windows.
     <div
       ref={containerRef}
-      className="relative w-full bg-transparent"
+      className="mission-flight relative w-full bg-transparent"
       // Stable viewport height is load-bearing on phones. With `2200vh`,
       // revealing the browser toolbar while scrolling upward changed one vh
       // by roughly 60px and magnified that into a ~1080px track resize. Since
@@ -2445,7 +2452,6 @@ export default function MultiverseFlight() {
               transition={{ duration: 0.7, delay: endMarkShown ? 0.25 : 0, ease: "easeOut" }}
               className="mb-3 text-[9px] font-semibold uppercase tracking-[0.34em] text-sky-200/45 sm:mb-4 sm:tracking-[0.5em] lg:text-[10px]"
             >
-              End of transmission
             </motion.span>
             {/* Sized in vw below the sm breakpoint so the two lines hold
                their shape on a 320px phone instead of wrapping into four —

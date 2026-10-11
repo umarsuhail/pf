@@ -228,7 +228,7 @@ const scenes: Record<number, Scene> = {
     travel: { from: [-120, 4], to: [120, -4], lean: 0 },
   },
   3: {
-    src: "/space/crew.svg",
+    src: "/space/panarama.jpg",
     position: "center",
     // Covers the whole window. The 4% overhang on every side is what the
     // ±4° roll and the drift below need to never show an edge.
@@ -1179,14 +1179,14 @@ export function CardPortal({
             rx="20"
             ry="20"
             fill="none"
-            stroke="#fbbf24"
+            stroke="var(--flight-accent)"
             strokeWidth="2"
             strokeLinecap="round"
             pathLength={100}
             strokeDasharray={100}
             style={{
               strokeDashoffset: progressDashOffset,
-              filter: "drop-shadow(0 0 5px #fbbf24)",
+              filter: "drop-shadow(0 0 5px var(--flight-accent))",
             }}
           />
         </svg>
@@ -1205,7 +1205,7 @@ export function CardPortal({
            sit inside a 3D-transformed card over a scene that repaints every
            scroll frame, forcing a re-blur of its backdrop each time — six
            cards' worth. The darker background reads the same. */}
-        <span className={`inline-flex items-center rounded-full border border-white/25 bg-black/55 text-xs font-medium text-sky-50 ${isMobile ? "min-h-11 gap-1 px-2" : "gap-2 px-4 py-2"}`}>
+        <span className={`flight-card-action inline-flex items-center rounded-full border text-xs font-medium ${isMobile ? "min-h-11 gap-1 px-2" : "gap-2 px-4 py-2"}`}>
           <ArrowUpRightIcon ref={arrowRef} size={14} aria-hidden="true" />
           {actionLabel}
         </span>

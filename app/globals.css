@@ -9,21 +9,17 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-marvel);
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
 }
 
 body {
   background: linear-gradient(180deg, #002d54 0%, #00101f 100%);
   background-attachment: fixed;
   color: var(--foreground);
-  font-family: var(--font-marvel), "Segoe UI", Arial, sans-serif;
-  /* Marvel is a condensed humanist sans with a small x-height, so it reads
-     smaller than a normal-width face at the same declared size. The ~20%
-     size-up across body and headings is there to land back at the same
-     apparent size rather than to make the numbers bigger. */
-  font-size: clamp(1.2rem, 1.1rem + 0.3vw, 1.35rem);
-  line-height: 1.65;
+  font-family: var(--font-plex-sans), "Segoe UI", Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
   letter-spacing: 0.005em;
   font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
   text-rendering: optimizeLegibility;
@@ -60,9 +56,9 @@ li {
   h4,
   h5,
   h6 {
-    font-family: var(--font-marvel), "Segoe UI", Arial, sans-serif;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
+    font-family: var(--font-saira-condensed), "Arial Narrow", sans-serif;
+    line-height: 1.02;
+    letter-spacing: 0.005em;
     text-wrap: balance;
   }
 
@@ -91,6 +87,582 @@ li {
     font-size: clamp(1.35rem, 1.25rem + 0.55vw, 1.8rem);
     font-weight: 700;
   }
+}
+
+/* Mission UI ---------------------------------------------------------------
+   `flight` preserves the portfolio's original blue palette. The two log
+   palettes come from the supplied standalone reference. Components consume
+   semantic variables so a future theme is one new variable block. */
+:root {
+  --mission-space: #020617;
+  --mission-hull: #0f172a;
+  --mission-hull-2: #172554;
+  --mission-line: rgba(125, 211, 252, 0.24);
+  --mission-ink: #f0f9ff;
+  --mission-dim: #94a3b8;
+  --mission-accent: #7dd3fc;
+  --mission-on-accent: #082f49;
+  --mission-positive: #5eead4;
+  --mission-display: var(--font-saira-condensed), "Arial Narrow", sans-serif;
+  --mission-stencil: var(--font-saira-stencil), var(--mission-display);
+  --mission-body: var(--font-plex-sans), system-ui, sans-serif;
+  --mission-mono: var(--font-plex-mono), ui-monospace, monospace;
+  color-scheme: dark;
+
+  /* The windscreen and portal art keep their story palette in every theme.
+     These tokens are the readable cockpit surfaces placed in front of it. */
+  --flight-ink: #f0f9ff;
+  --flight-dim: #cbd5e1;
+  --flight-muted: #94a3b8;
+  --flight-accent: #7dd3fc;
+  --flight-on-accent: #082f49;
+  --flight-positive: #5eead4;
+  --flight-line: rgba(186, 230, 253, 0.24);
+  --flight-surface: rgba(2, 8, 23, 0.76);
+  --flight-surface-solid: #08111e;
+  --flight-surface-raised: #172033;
+  --flight-control: rgba(255, 255, 255, 0.08);
+  --flight-control-hover: rgba(255, 255, 255, 0.14);
+  --flight-card-shadow: 0 24px 90px rgba(2, 8, 23, 0.52);
+  --flight-card-bezel: inset 0 2px 1px rgba(255,255,255,0.34), inset 2px 0 1px rgba(255,255,255,0.14), inset 0 -2px 1px rgba(2,8,23,0.62), inset -2px 0 1px rgba(2,8,23,0.42), 0 1px 0 rgba(255,255,255,0.10);
+  --flight-card-wall: inset 0 -2px 3px rgba(255,255,255,0.10), inset 0 2px 5px rgba(2,8,23,0.55);
+  --flight-card-home: radial-gradient(120% 120% at 15% 20%, rgba(0,108,159,0.85) 0%, rgba(0,108,159,0.25) 55%, rgba(0,108,159,0) 100%), linear-gradient(135deg, #00273f 0%, #003f5f 50%, #006c9f 100%);
+  --flight-card-skills: linear-gradient(160deg, #111827 0%, #1e3a5f 55%, #00294a 100%);
+  --flight-card-projects: linear-gradient(120deg, #0f172a 0%, #25397c 52%, #1d4ed8 115%);
+  --flight-card-experience: linear-gradient(150deg, #243a4b 0%, #153055 48%, #11334f 100%);
+  --flight-card-contact: linear-gradient(125deg, #0b1120 0%, #155e75 58%, #10427a 100%);
+  --flight-metal-surface: linear-gradient(158deg,#3a4a5f 0%,#1c2734 16%,#0e151f 40%,#0a1017 56%,#1a2430 80%,#0b1119 100%);
+  --flight-metal-line: rgba(255, 255, 255, 0.12);
+  --flight-metal-grain: repeating-linear-gradient(90deg,rgba(255,255,255,0.035) 0,rgba(255,255,255,0.035) 1px,transparent 1px,transparent 3px);
+  --flight-metal-ear: #1c2734;
+  --flight-metal-shadow: inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(0,0,0,0.8), inset 1px 0 0 rgba(255,255,255,0.06), inset -1px 0 0 rgba(0,0,0,0.5), 0 26px 64px rgba(2,8,23,0.72);
+  --flight-rivet: radial-gradient(circle at 30% 30%,#c9d6e4,#4a5a6d 55%,#0b1119);
+  --flight-tool-shadow: 0 18px 44px rgba(2,8,23,0.6), inset 0 1px 0 rgba(255,255,255,0.12);
+  --flight-dial-steel-1: #8a97a8;
+  --flight-dial-steel-2: #59657a;
+  --flight-dial-steel-3: #97a5b6;
+  --flight-dial-steel-4: #4a5568;
+  --flight-dial-steel-5: #8593a6;
+  --flight-dial-steel-6: #495366;
+  --flight-dial-steel-7: #7c8b9e;
+  --flight-dial-case: #0b1019;
+  --flight-dial-face-1: #101a27;
+  --flight-dial-face-2: #070d16;
+  --flight-dial-face-3: #04080f;
+  --flight-dial-mark-1: #7dd3fc;
+  --flight-dial-mark-2: #34d399;
+  --flight-dial-index: #e2f2ff;
+  --flight-dial-tick: rgba(226,240,255,0.28);
+  --flight-gear-face-1: #151b25;
+  --flight-gear-face-2: #0a0e15;
+  --flight-gear-face-3: #05070b;
+  --flight-gear-face-pressed: #02040a;
+}
+
+:root[data-mission-theme="dark"] {
+  --mission-space: #0a1022;
+  --mission-hull: #111a33;
+  --mission-hull-2: #1a2549;
+  --mission-line: #2c3a63;
+  --mission-ink: #e7edf8;
+  --mission-dim: #93a0bf;
+  --mission-accent: #ffb238;
+  --mission-on-accent: #1a1200;
+  --mission-positive: #5fd6a3;
+  --flight-ink: #e7edf8;
+  --flight-dim: #b4bfd8;
+  --flight-muted: #93a0bf;
+  --flight-accent: #ffb238;
+  --flight-on-accent: #1a1200;
+  --flight-positive: #5fd6a3;
+  --flight-line: rgba(255, 178, 56, 0.28);
+  --flight-surface: rgba(10, 16, 34, 0.84);
+  --flight-surface-solid: #0a1022;
+  --flight-surface-raised: #1a2549;
+  --flight-control: rgba(255, 178, 56, 0.08);
+  --flight-control-hover: rgba(255, 178, 56, 0.15);
+  --flight-card-shadow: 0 24px 90px rgba(0, 3, 14, 0.66), 0 0 0 1px rgba(255,178,56,0.05);
+  --flight-card-home: radial-gradient(120% 120% at 15% 20%, rgba(14,116,144,0.42) 0%, rgba(17,26,51,0.36) 55%, transparent 100%), linear-gradient(135deg, #111a33 0%, #142a46 55%, #0a1022 100%);
+  --flight-card-skills: radial-gradient(100% 120% at 18% 16%, rgba(45,212,191,0.18), transparent 58%), linear-gradient(150deg, #111a33, #102c38 62%, #0a1022);
+  --flight-card-projects: radial-gradient(100% 120% at 82% 18%, rgba(96,165,250,0.22), transparent 58%), linear-gradient(145deg, #111a33, #172554 58%, #0a1022);
+  --flight-card-experience: radial-gradient(100% 120% at 20% 18%, rgba(91,141,177,0.22), transparent 60%), linear-gradient(145deg, #172238, #1a3049 55%, #0a1022);
+  --flight-card-contact: radial-gradient(100% 120% at 22% 18%, rgba(125,211,252,0.2), transparent 58%), linear-gradient(145deg, #111a33, #12334a 58%, #0a1022);
+  --flight-metal-surface: linear-gradient(158deg,#35415f 0%,#1a2549 18%,#111a33 48%,#0a1022 64%,#1a2549 84%,#0a1022 100%);
+  --flight-metal-line: rgba(255, 178, 56, 0.2);
+  --flight-metal-ear: #1a2549;
+  --flight-metal-shadow: inset 0 1px 0 rgba(255,255,255,0.17), inset 0 -1px 0 rgba(0,0,0,0.78), inset 1px 0 0 rgba(255,178,56,0.05), inset -1px 0 0 rgba(0,0,0,0.48), 0 26px 64px rgba(0,3,14,0.76);
+  --flight-dial-case: #090e1c;
+  --flight-dial-face-1: #1a2549;
+  --flight-dial-face-2: #111a33;
+  --flight-dial-face-3: #080d1b;
+  --flight-dial-mark-1: #ffb238;
+  --flight-dial-mark-2: #5fd6a3;
+  --flight-dial-index: #fff1d5;
+  --flight-dial-tick: rgba(231,237,248,0.3);
+  --flight-gear-face-1: #253154;
+  --flight-gear-face-2: #111a33;
+  --flight-gear-face-3: #080d1b;
+  --flight-gear-face-pressed: #050814;
+  color-scheme: dark;
+}
+
+:root[data-mission-theme="light"] {
+  --mission-space: #e8ebef;
+  --mission-hull: #f5f6f8;
+  --mission-hull-2: #d3d9e2;
+  --mission-line: #b4bdcb;
+  --mission-ink: #121a2e;
+  --mission-dim: #535f7a;
+  --mission-accent: #955200;
+  --mission-on-accent: #ffffff;
+  --mission-positive: #136c49;
+  --flight-ink: #121a2e;
+  --flight-dim: #39455f;
+  --flight-muted: #65708a;
+  --flight-accent: #955200;
+  --flight-on-accent: #ffffff;
+  --flight-positive: #136c49;
+  --flight-line: rgba(83, 95, 122, 0.32);
+  --flight-surface: rgba(245, 246, 248, 0.9);
+  --flight-surface-solid: #f5f6f8;
+  --flight-surface-raised: #d3d9e2;
+  --flight-control: rgba(18, 26, 46, 0.06);
+  --flight-control-hover: rgba(18, 26, 46, 0.11);
+  --flight-card-shadow: 0 24px 90px rgba(2,8,23,0.36), 0 2px 0 rgba(255,255,255,0.72) inset;
+  --flight-card-bezel: inset 0 2px 1px rgba(255,255,255,0.9), inset 2px 0 1px rgba(255,255,255,0.54), inset 0 -2px 1px rgba(71,85,105,0.34), inset -2px 0 1px rgba(71,85,105,0.2), 0 1px 0 rgba(255,255,255,0.8);
+  --flight-card-wall: inset 0 -2px 3px rgba(255,255,255,0.68), inset 0 2px 5px rgba(71,85,105,0.28);
+  --flight-card-home: radial-gradient(120% 120% at 15% 20%, rgba(14,165,233,0.22) 0%, rgba(125,211,252,0.08) 56%, transparent 100%), linear-gradient(135deg, #f8fafc 0%, #dceaf2 54%, #c8dfeb 100%);
+  --flight-card-skills: radial-gradient(105% 120% at 18% 18%, rgba(45,212,191,0.19), transparent 58%), linear-gradient(145deg, #f8fafc, #dff1ef 58%, #c9e1df);
+  --flight-card-projects: radial-gradient(105% 120% at 82% 18%, rgba(96,165,250,0.21), transparent 58%), linear-gradient(145deg, #f8fafc, #e1e9fa 58%, #ccd9f3);
+  --flight-card-experience: radial-gradient(105% 120% at 20% 18%, rgba(91,141,177,0.2), transparent 60%), linear-gradient(145deg, #f8fafc, #e3eaf0 56%, #cbd7df);
+  --flight-card-contact: radial-gradient(105% 120% at 22% 18%, rgba(125,211,252,0.22), transparent 58%), linear-gradient(145deg, #f8fafc, #deedf3 58%, #c9dfe9);
+  --flight-metal-surface: linear-gradient(158deg,#ffffff 0%,#e8ebef 18%,#c8cfda 48%,#f5f6f8 67%,#d3d9e2 86%,#bfc7d2 100%);
+  --flight-metal-line: rgba(83, 95, 122, 0.32);
+  --flight-metal-grain: repeating-linear-gradient(90deg,rgba(255,255,255,0.24) 0,rgba(255,255,255,0.24) 1px,rgba(83,95,122,0.035) 1px,rgba(83,95,122,0.035) 3px);
+  --flight-metal-ear: #e8ebef;
+  --flight-metal-shadow: inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(83,95,122,0.38), inset 1px 0 0 rgba(255,255,255,0.5), inset -1px 0 0 rgba(83,95,122,0.16), 0 22px 58px rgba(2,8,23,0.28);
+  --flight-rivet: radial-gradient(circle at 30% 30%,#ffffff,#97a3b4 55%,#475569);
+  --flight-tool-shadow: 0 18px 44px rgba(2,8,23,0.26), inset 0 1px 0 rgba(255,255,255,0.82);
+  --flight-dial-steel-1: #f8fafc;
+  --flight-dial-steel-2: #9da8b7;
+  --flight-dial-steel-3: #ffffff;
+  --flight-dial-steel-4: #8591a2;
+  --flight-dial-steel-5: #dce2e9;
+  --flight-dial-steel-6: #7d899a;
+  --flight-dial-steel-7: #c9d0da;
+  --flight-dial-case: #9aa5b4;
+  --flight-dial-face-1: #ffffff;
+  --flight-dial-face-2: #e8ebef;
+  --flight-dial-face-3: #c8d0db;
+  --flight-dial-mark-1: #955200;
+  --flight-dial-mark-2: #136c49;
+  --flight-dial-index: #121a2e;
+  --flight-dial-tick: rgba(18,26,46,0.3);
+  --flight-gear-face-1: #ffffff;
+  --flight-gear-face-2: #dce1e8;
+  --flight-gear-face-3: #b7c0cc;
+  --flight-gear-face-pressed: #aab4c2;
+  color-scheme: light;
+}
+
+:root {
+  --background: var(--mission-space);
+  --foreground: var(--mission-ink);
+  --accent: var(--mission-accent);
+}
+
+.mission-flight {
+  color: var(--flight-ink);
+}
+
+.mission-flight-card {
+  border-color: var(--flight-line);
+  box-shadow: var(--flight-card-shadow);
+  color: var(--flight-ink);
+  transition: border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+
+.flight-card-title { color: var(--flight-ink); }
+.flight-card-copy { color: var(--flight-dim); }
+.flight-card-meta { color: var(--flight-muted); }
+.flight-card-accent { color: var(--flight-accent); }
+.flight-card-meta-dot { background: var(--flight-accent); }
+.flight-copy-fade { background: linear-gradient(to top, color-mix(in srgb, var(--flight-surface-solid) 72%, transparent), transparent); }
+.flight-copy-toggle { color: color-mix(in srgb, var(--flight-accent) 78%, var(--flight-ink)); }
+.flight-copy-toggle:hover { color: var(--flight-ink); }
+.flight-card-bezel { box-shadow: var(--flight-card-bezel); }
+.flight-card-wall { box-shadow: var(--flight-card-wall); }
+
+.flight-card-badge {
+  border-color: color-mix(in srgb, var(--flight-positive) 30%, transparent);
+  background: color-mix(in srgb, var(--flight-positive) 12%, transparent);
+  color: var(--flight-positive);
+}
+
+.flight-card-action,
+.flight-tool-label {
+  border-color: var(--flight-line);
+  background: var(--flight-surface);
+  color: var(--flight-ink);
+}
+
+.flight-card-action:hover {
+  border-color: var(--flight-accent);
+  background: var(--flight-control-hover);
+}
+
+.flight-tool-surface {
+  border-color: var(--flight-line);
+  background: var(--flight-surface);
+  box-shadow: var(--flight-tool-shadow);
+}
+
+.flight-tool-surface:hover {
+  border-color: var(--flight-accent);
+  box-shadow: 0 0 34px color-mix(in srgb, var(--flight-accent) 34%, transparent), var(--flight-tool-shadow);
+}
+
+.flight-tool-back {
+  background: var(--flight-surface-solid);
+  box-shadow: 0 26px 60px rgba(2,8,23,.52);
+}
+
+.flight-tool-focus {
+  border-color: color-mix(in srgb, var(--flight-accent) 72%, transparent);
+  box-shadow: 0 0 38px color-mix(in srgb, var(--flight-accent) 38%, transparent), inset 0 1px 0 rgba(255,255,255,.18);
+}
+
+.flight-caption-eyebrow { color: var(--flight-positive); }
+.flight-caption-title { color: var(--flight-ink); }
+.flight-caption-copy { color: var(--flight-dim); }
+.flight-caption-accent { color: var(--flight-accent); }
+
+.mission-metal-surface {
+  border-color: var(--flight-metal-line);
+  background: var(--flight-metal-surface);
+  box-shadow: var(--flight-metal-shadow);
+  color: var(--flight-ink);
+  transition: border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+
+.mission-metal-grain { background-image: var(--flight-metal-grain); }
+.mission-rivet { background: var(--flight-rivet); }
+
+.mission-theme-option {
+  display: inline-flex;
+  min-height: 1.9rem;
+  align-items: center;
+  gap: .38rem;
+  border: 1px solid var(--flight-line);
+  padding-inline: .55rem;
+  color: var(--flight-muted);
+  background: color-mix(in srgb, var(--flight-surface-solid) 46%, transparent);
+  font: 500 .58rem var(--mission-mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.mission-theme-option::before {
+  content: "";
+  width: .45rem;
+  height: .45rem;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+  background: var(--theme-swatch);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-swatch) 14%, transparent);
+}
+
+.mission-theme-option[data-theme-option="flight"] { --theme-swatch: #7dd3fc; }
+.mission-theme-option[data-theme-option="dark"] { --theme-swatch: #ffb238; }
+.mission-theme-option[data-theme-option="light"] { --theme-swatch: #f5f6f8; }
+.mission-theme-option:hover { border-color: var(--flight-accent); color: var(--flight-ink); }
+.mission-theme-option[aria-pressed="true"] {
+  border-color: var(--flight-accent);
+  background: var(--flight-accent);
+  color: var(--flight-on-accent);
+}
+
+.mission-console-stop {
+  border-color: var(--flight-line);
+  background: var(--flight-control);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 16%, transparent), inset 0 -1px 0 rgba(0,0,0,.24);
+}
+
+.mission-console-stop:hover { border-color: var(--flight-accent); background: var(--flight-control-hover); }
+.mission-console-stop[aria-current="page"] {
+  border-color: color-mix(in srgb, var(--flight-accent) 64%, transparent);
+  background: color-mix(in srgb, var(--flight-accent) 16%, transparent);
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--flight-accent) 22%, transparent), inset 0 1px 0 rgba(255,255,255,.22);
+}
+
+.mission-console-code { color: var(--flight-muted); }
+.mission-console-label { color: var(--flight-dim); }
+.mission-console-dot { background: color-mix(in srgb, var(--flight-muted) 70%, transparent); }
+.mission-console-stop:hover .mission-console-dot { background: color-mix(in srgb, var(--flight-accent) 62%, transparent); }
+.mission-console-stop[aria-current="page"] .mission-console-code { color: var(--flight-accent); }
+.mission-console-stop[aria-current="page"] .mission-console-label { color: var(--flight-ink); }
+.mission-console-stop[aria-current="page"] .mission-console-dot {
+  background: var(--flight-accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--flight-accent) 86%, transparent);
+}
+
+.mission-console-well {
+  border-color: var(--flight-line);
+  background: color-mix(in srgb, var(--flight-surface-solid) 72%, transparent);
+  box-shadow: inset 0 2px 8px rgba(0,0,0,.34);
+}
+
+.mission-dial-label {
+  border-color: var(--flight-line);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--flight-surface-raised) 94%, transparent), color-mix(in srgb, var(--flight-surface-solid) 96%, transparent));
+  color: var(--flight-ink);
+  box-shadow: 0 6px 18px rgba(2,8,23,.36);
+}
+
+.mission-dial-label-loop {
+  border-color: color-mix(in srgb, var(--flight-positive) 50%, transparent);
+  color: var(--flight-positive);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--flight-positive) 22%, transparent);
+}
+
+.mission-dial { color: var(--flight-ink); }
+.mission-dial .gear-control:focus-visible .gear-face { stroke: var(--flight-accent); }
+
+.mission-chrome .mission-metal-surface :is(
+  [class~="text-sky-50"],
+  [class~="text-sky-100"],
+  [class~="text-sky-100/90"],
+  [class~="text-slate-300"],
+  [class~="text-slate-300/80"]
+) { color: var(--flight-ink); }
+
+.mission-chrome .mission-metal-surface :is(
+  [class~="text-sky-200"],
+  [class~="text-sky-200/55"],
+  [class~="text-sky-200/60"],
+  [class~="text-sky-200/70"],
+  [class~="text-sky-200/80"],
+  [class~="text-sky-300"]
+) { color: var(--flight-accent); }
+
+.mission-chrome .mission-metal-surface :is(
+  [class~="text-slate-400"],
+  [class~="text-slate-500"],
+  [class~="text-slate-600"]
+) { color: var(--flight-muted); }
+
+.detail-page {
+  color: var(--mission-ink);
+  font-family: var(--mission-body);
+  transition: color 180ms ease;
+}
+
+:root[data-mission-theme="dark"] body,
+:root[data-mission-theme="light"] body {
+  background: var(--mission-space);
+  color: var(--mission-ink);
+}
+
+:root[data-mission-theme="dark"] .detail-page,
+:root[data-mission-theme="light"] .detail-page {
+  --accent: var(--mission-accent);
+}
+
+:root[data-mission-theme="light"] .detail-page :is(.text-sky-50,.text-slate-50\/90,.text-slate-100\/90,.text-slate-100\/80,.text-slate-100\/70,.text-sky-100\/80,.text-sky-100\/60,.text-sky-100\/50,.text-sky-100\/40) {
+  color: var(--mission-ink);
+}
+
+.mission-log {
+  font-family: var(--mission-body);
+}
+
+.mission-log-head {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+  border: 1px solid var(--mission-line);
+  border-top: 10px solid var(--mission-hull-2);
+  background: var(--mission-hull);
+}
+
+.mission-log-head h1,
+.mission-dossier h1,
+.mission-file h2,
+.mission-chapters h2 {
+  color: var(--mission-ink);
+  font-family: var(--mission-display);
+  text-transform: uppercase;
+}
+
+.mission-log-head h1 {
+  margin-top: .35rem;
+  font-size: clamp(3.5rem, 14vw, 7rem);
+  font-weight: 800;
+  line-height: .84;
+}
+
+.mission-log-head > p {
+  max-width: 58ch;
+  color: var(--mission-dim);
+}
+
+.mission-code,
+.mission-button,
+.mission-chapter-no,
+.mission-status,
+.mission-facts,
+.mission-pending,
+.mission-dossier-footer {
+  font-family: var(--mission-mono);
+}
+
+.mission-code,
+.mission-chapter-no {
+  color: var(--mission-accent);
+  font-size: .72rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.mission-filter {
+  display: flex;
+  gap: .5rem;
+  overflow-x: auto;
+  padding-block: 1.25rem .5rem;
+  scrollbar-width: none;
+}
+
+.mission-filter::-webkit-scrollbar { display: none; }
+
+.mission-button {
+  display: inline-flex;
+  min-height: 44px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  border: 1px solid var(--mission-line);
+  padding: .65rem 1rem;
+  color: var(--mission-ink);
+  background: transparent;
+  font-size: .7rem;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+}
+
+.mission-button:hover { border-color: var(--mission-accent); color: var(--mission-accent); }
+.mission-button[aria-pressed="true"],
+.mission-button-hot { border-color: var(--mission-accent); background: var(--mission-accent); color: var(--mission-on-accent); }
+.mission-button-hot:hover { color: var(--mission-on-accent); filter: brightness(1.06); }
+
+.mission-files {
+  display: grid;
+  gap: 2.75rem;
+  padding-top: 2.75rem;
+}
+
+.mission-file {
+  position: relative;
+  display: grid;
+  gap: 1.25rem;
+  border: 1px solid var(--mission-line);
+  padding: 1rem;
+  background: var(--mission-hull);
+}
+
+.mission-file::before {
+  content: attr(data-file);
+  position: absolute;
+  bottom: 100%;
+  left: -1px;
+  display: flex;
+  height: 24px;
+  align-items: center;
+  padding-inline: .8rem 1.8rem;
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 100%, 0 100%);
+  background: var(--mission-line);
+  color: var(--mission-ink);
+  font: 500 .67rem var(--mission-mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.mission-file-visual {
+  position: relative;
+  min-height: 13rem;
+  overflow: hidden;
+  border: 1px solid var(--mission-line);
+  background: var(--mission-space);
+}
+
+.mission-file-body { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: .8rem; }
+.mission-file h2 { font-size: clamp(1.75rem, 7vw, 2.5rem); font-weight: 600; }
+.mission-file-body > p:not(.mission-code) { max-width: 62ch; color: var(--mission-dim); }
+.mission-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+.mission-chips li { border: 1px solid var(--mission-line); padding: .25rem .6rem; color: var(--mission-dim); font: 400 .72rem var(--mission-mono); }
+.mission-file-actions { display: flex; flex-wrap: wrap; gap: .65rem; padding-top: .35rem; }
+
+.mission-dossier {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  background: var(--mission-space);
+  color: var(--mission-ink);
+  font-family: var(--mission-body);
+}
+
+.mission-dossier-bar {
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: .6rem 1rem;
+  border-bottom: 1px solid var(--mission-line);
+  padding: max(.65rem, env(safe-area-inset-top)) 1rem .65rem;
+  background: var(--mission-hull);
+  font: 500 .67rem var(--mission-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.mission-dossier-bar > p { display: none; color: var(--mission-dim); }
+.mission-status { color: var(--mission-positive); }
+.mission-back { justify-self: start; }
+.mission-dossier-scroll { min-height: 0; flex: 1; overflow-y: auto; }
+.mission-dossier-inner { width: min(100%, 76rem); margin-inline: auto; padding: clamp(1.25rem, 5vw, 4rem); }
+.mission-dossier-intro { display: grid; gap: 1rem; }
+.mission-dossier h1 { max-width: 18ch; font-size: clamp(3rem, 12vw, 7rem); font-weight: 800; line-height: .86; }
+.mission-lede { max-width: 64ch; color: var(--mission-dim); font-size: clamp(1rem, 2.5vw, 1.2rem); }
+.mission-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-block: 1px solid var(--mission-line); }
+.mission-facts div { padding: 1rem .75rem 1rem 0; }
+.mission-facts dt { color: var(--mission-dim); font-size: .62rem; letter-spacing: .12em; text-transform: uppercase; }
+.mission-facts dd { margin-top: .25rem; font-size: .78rem; }
+.mission-visual { position: relative; min-height: clamp(18rem, 62vw, 42rem); margin-top: 2rem; border: 1px solid var(--mission-line); background: var(--mission-hull); }
+.mission-chapters { display: grid; }
+.mission-chapters section { min-height: 55svh; display: flex; flex-direction: column; justify-content: center; gap: 1rem; border-bottom: 1px solid var(--mission-line); padding-block: clamp(3rem, 10vw, 7rem); }
+.mission-chapters h2 { max-width: 18ch; font-size: clamp(2.25rem, 8vw, 4.5rem); font-weight: 800; }
+.mission-chapters section > p:last-child { max-width: 62ch; color: var(--mission-dim); }
+.mission-pending { border-left: 3px solid var(--mission-accent); padding: .75rem 1rem; background: color-mix(in srgb, var(--mission-accent) 8%, transparent); }
+.mission-dossier-footer { display: flex; flex-direction: column; align-items: flex-start; gap: 1rem; padding-block: 2rem max(2rem, env(safe-area-inset-bottom)); color: var(--mission-dim); font-size: .7rem; text-transform: uppercase; }
+
+@media (min-width: 720px) {
+  .mission-log-head { grid-template-columns: minmax(0, 1fr) minmax(18rem, .7fr); align-items: end; }
+  .mission-file { grid-template-columns: minmax(13rem, 28%) minmax(0, 1fr); gap: clamp(1.25rem, 4vw, 3rem); padding: clamp(1.25rem, 3vw, 2rem); }
+  .mission-file-visual { min-height: 16rem; }
+  .mission-dossier-bar { grid-template-columns: 1fr auto 1fr; }
+  .mission-dossier-bar > p { display: block; }
+  .mission-status { justify-self: end; }
+  .mission-dossier-footer { flex-direction: row; align-items: center; justify-content: space-between; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mission-button { transition: none; }
 }
 
 a {
