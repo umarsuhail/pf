@@ -883,6 +883,15 @@ export default function ParticleLogo({
             // the entire page. One cheap alpha scan skips all of it until
             // the next reveal actually starts.
             if (!visible) {
+                // Already confirmed empty and cleared: nothing can bring a
+                // particle back but formIn(), and formIn() sets `visible`
+                // first, so there is no need to keep re-scanning every
+                // particle on every frame while the mark is away — which,
+                // for the closing mark, is the entire flight.
+                if (dormantClean) {
+                    animationFrame = requestAnimationFrame(draw);
+                    return;
+                }
                 let anyAlive = false;
                 for (const particle of particles) {
                     if (particle.alpha > 0.004) {

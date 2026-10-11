@@ -9,6 +9,11 @@ const TINTED_STAR_CHANCE = 0.18;
 // Fraction of the canvas box a resize has to move before the star field is
 // rebuilt rather than scaled. See resize() for why this is not zero.
 const RESIZE_TOLERANCE = 0.1;
+// Redraw rate for the twinkle (see the render loop). The slack absorbs vsync
+// jitter so 60Hz lands on every other frame and 120Hz on every fourth.
+const TWINKLE_FPS = 30;
+const TWINKLE_FRAME_MS = 1000 / TWINKLE_FPS;
+const TWINKLE_FRAME_SLACK_MS = 4;
 
 type Star = {
   x: number;
@@ -187,10 +192,18 @@ export default function Space({
     observer.observe(canvas);
 
     let rafId = 0;
+    let lastDraw = -Infinity;
     if (!reduceMotion) {
       const animate = (time: number) => {
         rafId = requestAnimationFrame(animate);
-        if (isVisible && activeRef.current) draw(time);
+        if (!isVisible || !activeRef.current) return;
+        // The twinkle moves a star's alpha by at most ~0.3 a second, so at
+        // TWINKLE_FPS it is indistinguishable from every frame — and every
+        // frame is 120 a second on a ProMotion display, each one a fresh
+        // canvas upload for the compositor.
+        if (time - lastDraw < TWINKLE_FRAME_MS - TWINKLE_FRAME_SLACK_MS) return;
+        lastDraw = time;
+        draw(time);
       };
       rafId = requestAnimationFrame(animate);
     }

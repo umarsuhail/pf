@@ -1001,7 +1001,15 @@ export function CardPortal({
               </motion.div>
             ) : (
               <motion.div
-                className="absolute inset-0"
+                // The motif's own loops (breathe, drift, float) only run while
+                // the window is on screen. Off it, motifOpacity is 0 — and it
+                // is off it for nearly the whole flight — but an infinite CSS
+                // animation still ticks on the compositor every frame, seven
+                // loops across the cards at once, and that is part of what
+                // kept the page from ever going idle. Paused rather than
+                // removed, so a loop resumes where it left off instead of
+                // snapping back to its first frame.
+                className={`absolute inset-0 ${isNear ? "" : "motif-dormant"}`}
                 style={{
                   opacity: motifOpacity,
                   scale: motifScale,

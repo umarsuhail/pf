@@ -302,8 +302,13 @@ function TechnologyNode({
             }`}
             style={{ transform: `translateZ(${isMobile ? -6 : -11}px)` }}
           />
+          {/* No backdrop-blur. What sits behind the face is its own back
+             plate — opaque in every theme, and wider than the face — so the
+             blur only ever softened a solid disc, invisibly. It still cost a
+             backdrop read and a blur pass per tile on every frame the
+             corridor composited, nineteen tiles deep, inside a 3D context. */}
           <span
-            className={`flight-tool-surface relative grid place-items-center rounded-full border backdrop-blur-sm transition-[border-color,box-shadow] duration-300 ${
+            className={`flight-tool-surface relative grid place-items-center rounded-full border transition-[border-color,box-shadow] duration-300 ${
               isMobile ? "h-14 w-14" : "h-24 w-24"
             }`}
           >

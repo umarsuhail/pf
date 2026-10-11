@@ -160,7 +160,11 @@ export default function HoloChat() {
         role="dialog"
         aria-label="VEGA portfolio assistant"
         aria-modal="false"
-        className="relative isolate mb-3 flex h-[min(590px,78dvh)] w-full flex-col overflow-hidden rounded-[1.75rem] border border-sky-200/20 bg-[#020716]/96 shadow-[0_0_0_1px_rgba(56,189,248,0.06),0_30px_100px_rgba(0,0,0,0.72),0_0_80px_rgba(14,165,233,0.11)] sm:mb-5 sm:h-[min(680px,80dvh)] sm:w-[430px] lg:h-[min(720px,82dvh)] lg:w-[470px]"
+        // `vega-dormant` parks the scanline and orbit ring while the panel is
+        // closed — it stays mounted at opacity 0, and their infinite loops
+        // otherwise ticked for the whole visit. The lattice is gated the same
+        // way through SpacetimeField's `active`.
+        className={`${isOpen ? "" : "vega-dormant "}relative isolate mb-3 flex h-[min(590px,78dvh)] w-full flex-col overflow-hidden rounded-[1.75rem] border border-sky-200/20 bg-[#020716]/96 shadow-[0_0_0_1px_rgba(56,189,248,0.06),0_30px_100px_rgba(0,0,0,0.72),0_0_80px_rgba(14,165,233,0.11)] sm:mb-5 sm:h-[min(680px,80dvh)] sm:w-[430px] lg:h-[min(720px,82dvh)] lg:w-[470px]`}
       >
         {/* Lightweight depth layers: the SVG is a warped spacetime navigation
             lattice, while the nebula and frame are composited CSS surfaces. */}

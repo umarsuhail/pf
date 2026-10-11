@@ -790,6 +790,11 @@ html {
   animation: vegaOrbit 18s linear infinite;
 }
 
+/* Set on the chat panel while it is closed (see HoloChat). */
+.vega-dormant :is(.vega-scanline, .vega-orbit-ring) {
+  animation-play-state: paused;
+}
+
 .vega-scrollbar {
   scrollbar-color: rgba(103, 232, 249, 0.35) transparent;
   scrollbar-width: thin;
@@ -966,6 +971,11 @@ html {
 .motif-float-fast {
   animation: motifFloat 3.6s ease-in-out infinite;
   animation-delay: -0.8s;
+}
+
+/* Set by CardPortal while its window is off screen (see isNear there). */
+.motif-dormant :is(.motif-breathe, .motif-drift, .motif-float-slow, .motif-float-med, .motif-float-fast) {
+  animation-play-state: paused;
 }
 
 /* The loader's sky: two slow nebula washes drifting against each other over a

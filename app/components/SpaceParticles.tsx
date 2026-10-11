@@ -43,6 +43,11 @@ const FIELD_WIDTH = 44;
 const CAMERA_Z = STARFIELD.cameraZ;
 const PHASE_SCROLL_SCREENS = 3;
 const MOBILE_BREAKPOINT = 768;
+// The field's frame rate once input has settled (see the idle throttle in
+// the render loop).
+const IDLE_FPS = 20;
+const IDLE_FRAME_MS = 1000 / IDLE_FPS;
+const IDLE_FRAME_SLACK_MS = 4;
 
 function createCircleTexture(): Texture {
   const size = 128;
@@ -338,17 +343,25 @@ export default function SpaceParticles() {
       }
     };
 
-    let frameCount = 0;
     let lastParticleFrame = 0;
 
     const animate = (time: number) => {
       rafId = requestAnimationFrame(animate);
-      frameCount++;
 
-      // Idle throttle — see lastActivity above. 2s after the last input,
-      // only every third frame renders; the slow drift/twinkle is
-      // indistinguishable at 20fps and the other two frames cost nothing.
-      if (time - lastActivity > 2000 && frameCount % 3 !== 0) return;
+      // Idle throttle — see lastActivity above. 2s after the last input the
+      // field renders at IDLE_FPS; the slow drift/twinkle is
+      // indistinguishable at that rate and the skipped frames cost nothing.
+      // Timed, not counted: "every third frame" was 20fps on a 60Hz screen
+      // but 40 on a 120Hz ProMotion one, and every render here is a
+      // full-viewport repaint the whole corridor has to be recomposited over.
+      // The slack absorbs vsync jitter, so 60Hz still lands on every third
+      // frame and 120Hz on every sixth.
+      if (
+        time - lastActivity > 2000 &&
+        time - lastParticleFrame < IDLE_FRAME_MS - IDLE_FRAME_SLACK_MS
+      ) {
+        return;
+      }
 
       // The renderer deliberately idles at 20fps after input settles. Use
       // elapsed time rather than a per-frame increment so the ambient field
