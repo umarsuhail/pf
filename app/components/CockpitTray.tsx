@@ -64,6 +64,9 @@ function BrushedGrain() {
   );
 }
 
+// The pause between two passes of the highlight below.
+const SHEEN_REST_S = 4.2;
+
 // The travelling highlight. Skewed and blend-screened so it reads as light
 // raking across metal instead of a white bar sliding over a box.
 function Sheen({
@@ -76,18 +79,29 @@ function Sheen({
   active?: boolean;
 }) {
   if (!active) return null;
+  // One cycle is the sweep and then the rest before the next one, written
+  // into the keyframes rather than as `repeatDelay`. framer-motion cannot
+  // hand a repeatDelay (or an `x`) to the browser, so that version ran every
+  // frame of every sweep on the main thread for as long as the tray was up —
+  // the one thing still waking the page's frame loop with nobody touching
+  // anything. Animating `transform` itself with the rest in the keyframes
+  // runs as a native animation on the compositor instead; same path, same
+  // timing.
+  const cycle = duration + SHEEN_REST_S;
   return (
     <motion.span
       aria-hidden="true"
       style={{ willChange: "transform" }}
       className="pointer-events-none absolute inset-y-0 -left-[45%] w-[38%] -skew-x-12 bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.05)_35%,rgba(255,255,255,0.2)_50%,rgba(255,255,255,0.05)_65%,transparent_100%)]"
-      animate={{ x: ["0%", "420%"] }}
+      animate={{
+        transform: ["translateX(0%)", "translateX(420%)", "translateX(420%)"],
+      }}
       transition={{
-        duration,
+        duration: cycle,
+        times: [0, duration / cycle, 1],
+        ease: ["easeInOut", "linear"],
         delay,
         repeat: Infinity,
-        repeatDelay: 4.2,
-        ease: "easeInOut",
       }}
     />
   );
