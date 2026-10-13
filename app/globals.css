@@ -978,6 +978,40 @@ html {
   animation-play-state: paused;
 }
 
+/* The toolkit radar (RadarScope). Its face and line art take the theme's
+   accent and its beam the theme's second colour, like every other card. */
+:root {
+  --radar-face: var(--flight-accent);
+  --radar-beam: var(--flight-positive);
+}
+
+/* Day's green is a text colour, dark enough to read on a pale card; screened
+   over the dark scope it barely shows, so the beam takes a lit version. */
+:root[data-mission-theme="light"] {
+  --radar-beam: #34b37a;
+}
+
+@keyframes radarSweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.radar-beam {
+  animation: radarSweep 4.2s linear infinite;
+}
+
+/* Set by RadarCard whenever nothing of the card is on screen. */
+.radar-dormant .radar-beam {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radar-beam {
+    animation: none;
+  }
+}
+
 /* The loader's sky: two slow nebula washes drifting against each other over a
    near-black ground, and a star layer that breathes. Transform and opacity
    only, so they stay on the compositor while the page loads underneath —
@@ -1004,8 +1038,18 @@ html {
   50% { transform: scale(1.07) translate3d(-1.2%, 0.8%, 0); }
 }
 
+@keyframes loaderDarken {
+  0% { transform: translate3d(-6%, -4%, 0) scale(1); }
+  50% { transform: translate3d(6%, 5%, 0) scale(1.18); }
+  100% { transform: translate3d(-6%, -4%, 0) scale(1); }
+}
+
 .loader-photo {
   animation: loaderPhoto 48s ease-in-out infinite;
+}
+
+.loader-darken {
+  animation: loaderDarken 22s ease-in-out infinite;
 }
 
 .loader-galaxy {
@@ -1042,7 +1086,8 @@ html {
   .loader-photo,
   .loader-nebula-b,
   .loader-stars,
-  .loader-stars-late {
+  .loader-stars-late,
+  .loader-darken {
     animation: none;
   }
 }

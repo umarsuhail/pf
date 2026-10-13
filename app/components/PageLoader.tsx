@@ -312,15 +312,13 @@ export default function PageLoader() {
             }}
           />
         </div>
-        {/* A real sky, when there is one: /space/nebula.jpg, drifting very
-           slowly. It sits over the drawn Milky Way above, which is the
-           fallback — until the file exists this layer paints nothing and
-           the drawn sky shows through. Keep the photo small (it is part of
-           what the loader waits for) and dark in the middle, where the US
-           forms. */}
+        {/* The real sky: Umar's /bg.gif, drifting very slowly. It sits over
+           the drawn Milky Way above, which is the fallback for the moment
+           before this paints. Keep the photo small (it is part of what the
+           loader waits for) and dark in the middle, where the US forms. */}
         <div
           className="loader-photo absolute -inset-[6%] bg-cover bg-center"
-          style={{ backgroundImage: "url(/space/nebula.jpg)" }}
+          style={{ backgroundImage: "url(/bg.gif)" }}
         />
         <div
           className="loader-nebula-b absolute -inset-[20%]"
@@ -336,6 +334,20 @@ export default function PageLoader() {
         <div
           className="loader-stars-late absolute inset-0"
           style={{ background: STARS_FAR, backgroundSize: "140px 140px" }}
+        />
+        {/* A slow dark pool blended into the sky under it (mix-blend-mode:
+           darken, not just stacked opacity), so the backdrop keeps its own
+           quiet drift independent of the mark's shatter — and the centre,
+           where the US forms, stays the darkest part of the frame as it
+           wanders. */}
+        <div
+          aria-hidden="true"
+          className="loader-darken absolute -inset-[25%]"
+          style={{
+            background:
+              "radial-gradient(42% 42% at 50% 50%, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.3) 45%, transparent 75%)",
+            mixBlendMode: "darken",
+          }}
         />
       </motion.div>
 

@@ -48,12 +48,6 @@ const starAssets: StarAsset[] = [
     width: "clamp(145px, 17vw, 290px)",
   },
   {
-    src: "/space/star2.svg",
-    intrinsicWidth: 89,
-    intrinsicHeight: 48,
-    width: "clamp(72px, 8vw, 138px)",
-  },
-  {
     src: "/space/star3.svg",
     intrinsicWidth: 213,
     intrinsicHeight: 253,

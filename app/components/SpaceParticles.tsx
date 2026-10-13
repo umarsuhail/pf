@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 // rest of three.js — a wildcard namespace import forces the whole library
 // into the chunk since every property access is reachable.
 import {
+  AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
   CanvasTexture,
@@ -27,13 +28,14 @@ import {
   type StarfieldSeedDetail,
 } from "../lib/starfield";
 
-// A THREE.Points field is a single draw call no matter how many points are
-// in it, so the count here is a purely visual decision, not a performance
+// The base THREE.Points field is a single draw call no matter how many points
+// are in it, so the count here is a purely visual decision, not a performance
 // one — the real per-frame cost is the position rewrite loop below (already
 // gated on actual scroll warp) and fragment shading, which is governed by
-// pixel ratio. This sits deliberately sparse: a denser field read as
-// texture behind the closing mark and competed with the logo's own
-// particles for the eye, which is the opposite of what it is for.
+// pixel ratio. This sits deliberately sparse: a denser field read as texture
+// behind the closing mark and competed with the logo's own particles for the
+// eye, which is the opposite of what it is for. The occasional glaze below is
+// one extra one-point draw call, rather than making every field point heavier.
 const PARTICLE_COUNT = 620;
 const INITIAL_PARTICLES = 240;
 // Shared with the loader and the closing mark (lib/starfield), which hand
@@ -48,6 +50,18 @@ const MOBILE_BREAKPOINT = 768;
 const IDLE_FPS = 20;
 const IDLE_FRAME_MS = 1000 / IDLE_FPS;
 const IDLE_FRAME_SLACK_MS = 4;
+// One random star catches the light roughly once a second. The flare and its
+// short rest both vary, so the frequent glints still avoid a mechanical beat.
+const GLAZE_FIRST_DELAY_MIN_MS = 700;
+const GLAZE_FIRST_DELAY_MAX_MS = 1050;
+const GLAZE_GAP_MIN_MS = 220;
+const GLAZE_GAP_MAX_MS = 360;
+const GLAZE_DURATION_MIN_MS = 600;
+const GLAZE_DURATION_MAX_MS = 760;
+
+function randomBetween(min: number, max: number) {
+  return min + Math.random() * (max - min);
+}
 
 function createCircleTexture(): Texture {
   const size = 128;
@@ -64,6 +78,49 @@ function createCircleTexture(): Texture {
   return new CanvasTexture(canvas);
 }
 
+function createGlazeTexture(): Texture {
+  const size = 128;
+  const centre = size / 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  // A soft bloom plus a fine four-point catch-light. Baking it once into a
+  // tiny texture is much cheaper than a live blur or a full-screen glow pass.
+  const bloom = ctx.createRadialGradient(centre, centre, 0, centre, centre, centre);
+  bloom.addColorStop(0, "rgba(255,255,255,1)");
+  bloom.addColorStop(0.1, "rgba(255,255,255,0.9)");
+  bloom.addColorStop(0.32, "rgba(255,255,255,0.2)");
+  bloom.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = bloom;
+  ctx.fillRect(0, 0, size, size);
+
+  const horizontal = ctx.createLinearGradient(0, centre, size, centre);
+  horizontal.addColorStop(0, "rgba(255,255,255,0)");
+  horizontal.addColorStop(0.38, "rgba(255,255,255,0.04)");
+  horizontal.addColorStop(0.49, "rgba(255,255,255,0.72)");
+  horizontal.addColorStop(0.5, "rgba(255,255,255,1)");
+  horizontal.addColorStop(0.51, "rgba(255,255,255,0.72)");
+  horizontal.addColorStop(0.62, "rgba(255,255,255,0.04)");
+  horizontal.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = horizontal;
+  ctx.fillRect(0, centre - 1.5, size, 3);
+
+  const vertical = ctx.createLinearGradient(centre, 0, centre, size);
+  vertical.addColorStop(0, "rgba(255,255,255,0)");
+  vertical.addColorStop(0.38, "rgba(255,255,255,0.04)");
+  vertical.addColorStop(0.49, "rgba(255,255,255,0.72)");
+  vertical.addColorStop(0.5, "rgba(255,255,255,1)");
+  vertical.addColorStop(0.51, "rgba(255,255,255,0.72)");
+  vertical.addColorStop(0.62, "rgba(255,255,255,0.04)");
+  vertical.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = vertical;
+  ctx.fillRect(centre - 1.5, 0, 3, size);
+
+  return new CanvasTexture(canvas);
+}
+
 export default function SpaceParticles() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -72,6 +129,7 @@ export default function SpaceParticles() {
     if (!canvas) return;
 
     const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const initialCount = isMobile ? 120 : INITIAL_PARTICLES;
     const finalCount = isMobile ? 300 : PARTICLE_COUNT;
     const fieldWidth = isMobile ? 34 : FIELD_WIDTH;
@@ -111,8 +169,11 @@ export default function SpaceParticles() {
     }
     
     const geometry = new BufferGeometry();
-    geometry.setAttribute("position", new BufferAttribute(positions, 3));
+    const posAttr = new BufferAttribute(positions, 3);
+    geometry.setAttribute("position", posAttr);
     geometry.setDrawRange(0, initialCount); // Start with fewer particles
+    const posArray = posAttr.array as Float32Array;
+    let currentParticleCount = initialCount;
     
     const material = new PointsMaterial({
       map: createCircleTexture(),
@@ -129,6 +190,32 @@ export default function SpaceParticles() {
     });
     const field = new Points(geometry, material);
     scene.add(field);
+
+    // A separate one-point layer can brighten and grow one chosen star while
+    // the batched base material remains untouched. Parenting it to the field
+    // makes the catch-light inherit the exact same mouse tilt and slow roll.
+    const glazeGeometry = new BufferGeometry();
+    glazeGeometry.setAttribute(
+      "position",
+      new BufferAttribute(new Float32Array([0, 0, 0]), 3),
+    );
+    const glazeTexture = createGlazeTexture();
+    const glazeMaterial = new PointsMaterial({
+      map: glazeTexture,
+      color: new Color("#eaf8ff"),
+      size: 1,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0,
+      depthTest: false,
+      depthWrite: false,
+      blending: AdditiveBlending,
+    });
+    const glazePoint = new Points(glazeGeometry, glazeMaterial);
+    glazePoint.frustumCulled = false;
+    glazePoint.visible = false;
+    glazePoint.renderOrder = 1;
+    field.add(glazePoint);
 
     const normalColor = new Color("#3b82f6");
     const skyBlueColor = new Color("#9ad6ff");
@@ -233,8 +320,96 @@ export default function SpaceParticles() {
     // The field is where the loader's shattered US ends up, and where the
     // closing US is gathered from. See lib/starfield.
     const handoffPoint = new Vector3();
+    const glazeWorldPoint = new Vector3();
+    const glazeNdcPoint = new Vector3();
     const halfHeightAt = (distance: number) =>
       Math.tan(MathUtils.degToRad(camera.fov / 2)) * distance;
+
+    const PARKED_X = 1e5;
+    const gathered: { index: number; x: number }[] = [];
+    let activeGlazeIndex = -1;
+    let glazeStart = 0;
+    let glazeDuration = 0;
+    let glazeBaseSize = 1;
+    let glazeLastZ = 0;
+    let glazePaused = false;
+    let nextGlazeAt = reduceMotion
+      ? Number.POSITIVE_INFINITY
+      : performance.now() +
+        randomBetween(GLAZE_FIRST_DELAY_MIN_MS, GLAZE_FIRST_DELAY_MAX_MS);
+
+    const scheduleNextGlaze = (time: number) => {
+      nextGlazeAt = time + randomBetween(GLAZE_GAP_MIN_MS, GLAZE_GAP_MAX_MS);
+    };
+
+    const stopGlaze = (time: number, reschedule = true) => {
+      activeGlazeIndex = -1;
+      glazePoint.visible = false;
+      glazeMaterial.opacity = 0;
+      if (reschedule && !reduceMotion && !glazePaused) scheduleNextGlaze(time);
+    };
+
+    const startGlaze = (time: number) => {
+      // Random probes keep this O(1). Restricting the chosen point to the
+      // central viewport and middle depth makes every scheduled glaze visible
+      // and prevents a flare from wrapping from the camera to deep space.
+      field.updateMatrixWorld(true);
+      camera.updateMatrixWorld();
+      const attempts = Math.min(currentParticleCount, 36);
+
+      for (let attempt = 0; attempt < attempts; attempt++) {
+        const index = Math.floor(Math.random() * currentParticleCount);
+        const x = posArray[index * 3];
+        const y = posArray[index * 3 + 1];
+        const z = posArray[index * 3 + 2];
+        if (x === PARKED_X) continue;
+
+        glazeWorldPoint.set(x, y, z);
+        field.localToWorld(glazeWorldPoint);
+        const viewDepth = CAMERA_Z - glazeWorldPoint.z;
+        if (viewDepth < 10 || viewDepth > 55) continue;
+
+        glazeNdcPoint.copy(glazeWorldPoint).project(camera);
+        if (
+          Math.abs(glazeNdcPoint.x) > 0.82 ||
+          Math.abs(glazeNdcPoint.y) > 0.76 ||
+          glazeNdcPoint.z < -1 ||
+          glazeNdcPoint.z > 1
+        ) {
+          continue;
+        }
+
+        const screenX = ((glazeNdcPoint.x + 1) / 2) * window.innerWidth;
+        const screenY = ((1 - glazeNdcPoint.y) / 2) * window.innerHeight;
+        if (
+          document
+            .elementFromPoint(screenX, screenY)
+            ?.closest(".mission-flight-card")
+        ) {
+          continue;
+        }
+
+        activeGlazeIndex = index;
+        glazeStart = time;
+        glazeDuration = randomBetween(GLAZE_DURATION_MIN_MS, GLAZE_DURATION_MAX_MS);
+        // PointsMaterial sizes are world units. Convert the desired on-screen
+        // diameter back through the perspective projection so near and far
+        // stars both flare to a restrained, readable 26–34 CSS pixels.
+        const targetPixels = isMobile ? 26 : 34;
+        glazeBaseSize =
+          (targetPixels * viewDepth) / Math.max(window.innerHeight / 2, 1);
+        glazeLastZ = z;
+        glazePoint.position.set(x, y, z);
+        glazeMaterial.opacity = 0;
+        glazePoint.visible = true;
+        nextGlazeAt = Number.POSITIVE_INFINITY;
+        return;
+      }
+
+      // A tilted field can briefly leave few eligible stars on screen. Retry
+      // soon instead of consuming a full quiet interval on an invisible hit.
+      nextGlazeAt = time + 250;
+    };
 
     // Seed: put stars exactly where the loader's dots are, at the depth each
     // was drawn for. Built in camera space and taken into the field's own
@@ -242,6 +417,12 @@ export default function SpaceParticles() {
     const handleSeed = (event: Event) => {
       const stars = (event as CustomEvent<StarfieldSeedDetail>).detail?.stars;
       if (!stars?.length) return;
+      const now = performance.now();
+      stopGlaze(now, false);
+      if (!reduceMotion) {
+        nextGlazeAt =
+          now + randomBetween(GLAZE_FIRST_DELAY_MIN_MS, GLAZE_FIRST_DELAY_MAX_MS);
+      }
       field.updateMatrixWorld();
       const count = Math.min(stars.length, finalCount);
       for (let i = 0; i < count; i++) {
@@ -271,11 +452,13 @@ export default function SpaceParticles() {
     // Gather: hand the closing mark the stars on screen right now, and take
     // them out of the field while they are the mark. Parked far to the side
     // (the drift loop only moves z) and remembered for release.
-    const gathered: { index: number; x: number }[] = [];
-    const PARKED_X = 1e5;
     const handleGather = (event: Event) => {
       const detail = (event as CustomEvent<StarfieldGatherDetail>).detail;
       if (!detail) return;
+      // The closing US owns the eye once it starts gathering. A white flare
+      // behind it would compete with the exact stars becoming the mark.
+      glazePaused = true;
+      stopGlaze(performance.now(), false);
       field.updateMatrixWorld();
       const width = window.innerWidth;
       const height = window.innerHeight;
@@ -304,6 +487,8 @@ export default function SpaceParticles() {
       for (const star of gathered) posArray[star.index * 3] = star.x;
       gathered.length = 0;
       posAttr.needsUpdate = true;
+      glazePaused = false;
+      if (!reduceMotion) scheduleNextGlaze(performance.now());
     };
 
     // The loop arriving back at the beginning: a hard forward warp that
@@ -327,9 +512,6 @@ export default function SpaceParticles() {
     window.addEventListener("flight-autopilot-launch", handleAutopilotLaunch);
 
     let rafId: number;
-    const posAttr = geometry.getAttribute("position") as BufferAttribute;
-    const posArray = posAttr.array as Float32Array;
-    let currentParticleCount = initialCount;
 
     // Gradually add more particles after initial load
     let lastParticleAddTime = 0;
@@ -419,6 +601,39 @@ export default function SpaceParticles() {
         posAttr.needsUpdate = true;
       }
 
+      if (!reduceMotion && !glazePaused) {
+        if (activeGlazeIndex >= 0) {
+          const x = posArray[activeGlazeIndex * 3];
+          const y = posArray[activeGlazeIndex * 3 + 1];
+          const z = posArray[activeGlazeIndex * 3 + 2];
+          const progress = (time - glazeStart) / glazeDuration;
+
+          // Stop at a wrap instead of letting the catch-light teleport from a
+          // near star to the same particle's recycled position in deep space.
+          if (
+            x === PARKED_X ||
+            progress >= 1 ||
+            Math.abs(z - glazeLastZ) > FIELD_DEPTH / 2
+          ) {
+            stopGlaze(time);
+          } else {
+            glazeLastZ = z;
+            glazePoint.position.set(x, y, z);
+            const pulse = Math.sin(Math.PI * MathUtils.clamp(progress, 0, 1));
+            const brilliance = Math.pow(pulse, 1.25);
+            // Follow the flight's cool colour journey, then lift toward white
+            // at the centre like light sliding over glass. Calm it near the
+            // ending even before gather so it never fights the closing mark.
+            glazeMaterial.color.copy(phaseColor).lerp(endWhiteColor, 0.78);
+            glazeMaterial.opacity =
+              brilliance * MathUtils.lerp(0.92, 0.36, endPhaseMix);
+            glazeMaterial.size = glazeBaseSize * (0.68 + pulse * 0.58);
+          }
+        } else if (time >= nextGlazeAt) {
+          startGlaze(time);
+        }
+      }
+
       renderer.render(scene, camera);
     };
     animate(0);
@@ -437,6 +652,9 @@ export default function SpaceParticles() {
       window.removeEventListener("flight-autopilot-launch", handleAutopilotLaunch);
       renderer.dispose();
       geometry.dispose();
+      glazeGeometry.dispose();
+      glazeTexture.dispose();
+      glazeMaterial.dispose();
       material.map?.dispose();
       material.dispose();
     };

@@ -61,6 +61,29 @@ export const TECHNOLOGY_FOCUS_STOPS = technologies.map(
   }),
 );
 
+// The progress between two neighbouring tools.
+export const TECHNOLOGY_NODE_GAP =
+  (TECHNOLOGY_LAYOVER_END - TECHNOLOGY_LAYOVER_START) /
+  Math.max(TECHNOLOGY_FOCUS_STOPS.length - 1, 1);
+
+// The stretch of flight a single tool owns: half a gap either side of its own
+// stop, which tiles the layover exactly, plus a fast crossfade at each edge.
+//
+// This is what "the tool you are level with" means, and it is a window rather
+// than a number on purpose. An earlier readout tracked the nearest tool in
+// React state and swapped words inside an AnimatePresence — and named Git
+// while the camera was passing React: the state and the exit queue were two
+// more clocks to keep in step with the flight. Everything that names the
+// current tool (the radar, its copy, the history rail) reads this one window
+// instead, so none of them can disagree with each other or with the scroll.
+const TECHNOLOGY_OWN_WINDOW = [-0.5, -0.42, 0.42, 0.5] as const;
+
+export function technologyFocusWindow(stop: number) {
+  return TECHNOLOGY_OWN_WINDOW.map(
+    (multiple) => stop + multiple * TECHNOLOGY_NODE_GAP,
+  ) as [number, number, number, number];
+}
+
 export const TECHNOLOGY_GROUP_STOPS = technologyGroups.map((group) => {
   const firstIndex = technologies.findIndex((item) => item.group === group.name);
   return {

@@ -49,22 +49,32 @@ section means a new region *and* a new atmosphere, or the panel will read as
 belonging to someone else's story.
 
 `dusk` at 0.85 is a region with no card — a stretch of travel between
-Experience and Contact, steel blue (`#5b8db1` / `#153055` over a darkened
-`#243a4b → #11334f`), reading as Experience's steel nebula thinning toward the void. It is deliberate breathing room, not an oversight.
+Experience and Contact, where the sky goes to black and stays there through
+Contact and the tail. It is deliberate breathing room, not an oversight:
+Experience is the last of the panels with a colour of its own, and the void
+beyond it is the rest of the way home.
 
-The stretch between Skills and Projects (0.35–0.57, derived from those two
-stops rather than hard-coded) is travel too, but it is
-lined: `TechnologyLayover.tsx` hangs the toolkit on a helix *inside* the
-corridor's own perspective group, one tool per technology focus stop, each
-parked at the depth its stop occupies. Nothing there scales itself — a tool
-looks bigger because it is nearer — and clicking one flies the flight to it.
-The helix is a spring: consecutive tools step 42° round the barrel, the whole
-coil winds two turns about the flight path across the layover, and each round
-tile spins in and lands upright before it is read — all pure functions of
-progress, so scrolling back unwinds it.
-It has been rebuilt from a screen-space panel three times; if it is ever
-rebuilt again, it stays in the corridor. A section that pauses the journey to
-show a diagram reads as a different website wearing the same colours.
+The stretch between Skills and Projects (0.19–0.57, derived from those two
+stops rather than hard-coded) belongs to the toolkit: `RadarCard.tsx`, a card
+*inside* the corridor's own perspective group whose window is a radar
+(`RadarScope.tsx`, assembled from Umar's artwork in `public/radar/`). It comes
+up out of the distance as the Skills card clears, and at the first tool's
+stop it holds at reading distance — its depth follows the camera, while the
+sky, stars and speed trail keep moving round it — until the last tool's stop,
+where it lets go and the flight passes through it into Projects. The radar
+finds one tool per technology focus stop and the copy beside it names that
+tool; which tool is showing is `technologyFocusWindow` (`flightStops.ts`), a
+pure function of progress shared with the history rail, so the dial, gear
+snapping and the autopilot's per-tool stops all land on the tool on screen,
+and scrolling back steps the list backwards. The bezel and glass are the
+artwork as drawn; the face, its line art (`radar_lines.svg` — `radar_base.svg`
+without its background disc, used as a mask), the beam and the title holder
+take `--radar-face` / `--radar-beam`, i.e. the theme's accent and second
+colour, so NIGHT is the artwork's own amber and green.
+Before the radar, the toolkit was a helix of tool tiles in the corridor, and
+before that a screen-space panel, three times over. Whatever it becomes next,
+it stays in the corridor. A section that pauses the journey to show a diagram
+reads as a different website wearing the same colours.
 
 The layover owns that stretch outright, and the two cards either side are
 clamped out of it — `getDepartWindow` pulls the Skills card's fade forward so
@@ -182,8 +192,8 @@ tuned against.
 The timeline gives a leg more scroll without moving any panel. Skills to
 Projects is 2050vh against the ~680vh it would get from an even split, which
 is ~49vh of scroll per tool; the camera still crosses the same depth there, so
-the tools are the same size and the same distance apart and you simply spend
-longer travelling between them. Every other leg keeps its original length.
+nothing in the corridor changes size or spacing — you simply spend longer with
+each tool on the radar. Every other leg keeps its original length.
 
 The conversion runs one way at the top of `MultiverseFlight` (scroll →
 progress, once) and the other way in everything that *writes* a scroll

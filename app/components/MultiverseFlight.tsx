@@ -30,6 +30,9 @@ import { POWER3_OUT } from "../lib/easings";
 // through the same coordinate system rather than a copy of it.
 import {
   CARD_PASS_THROUGH_Z,
+  CARD_READING_DEPTH,
+  PARKED_OFFSET,
+  PARKED_OPACITY,
   cameraTravelFor,
   cardDepthFor,
 } from "../lib/camera";
@@ -200,10 +203,9 @@ const SPACE_REGIONS: SpaceRegion[] = [
   },
   {
     // The stretch between Experience and Contact — no card sits here, it is
-    // travel. Steel blue: Experience's nebula thinning toward the void. Built
-    // from Umar's palette — #5b8db1 as the light, #153055 as the deeper
-    // second one, over a darkened #243a4b -> #11334f base so the stars and
-    // the approaching Contact card still read against it.
+    // travel. Experience is the last of its own colour; from here the sky
+    // goes to black and stays there through Contact and the tail, rather
+    // than holding a steel-blue wash the whole leg.
     id: "dusk",
     // No card of its own, so it keeps a literal — but it is placed *between*
     // two that do, at the same 0.39 of the way from Experience to Contact it
@@ -212,7 +214,7 @@ const SPACE_REGIONS: SpaceRegion[] = [
     // region it is supposed to be thinning out of.
     at: 0.85,
     background:
-      "radial-gradient(90% 70% at 62% 44%, rgba(91,141,177,0.16) 0%, rgba(21,48,85,0.22) 40%, transparent 68%), linear-gradient(180deg, #16263a 0%, #0a1c2e 55%, #050e18 100%)",
+      "radial-gradient(90% 70% at 62% 44%, rgba(21,48,85,0.1) 0%, transparent 60%), linear-gradient(180deg, #050a12 0%, #000000 100%)",
     drift: -15,
   },
   {
@@ -597,8 +599,12 @@ function BillboardCard({
   // wider than the frame, so nothing is lost by not going further, and the
   // fade is now sized to finish exactly there (getDepartWindow) rather than
   // leaving the card parked at the limit, dissolving in place.
+  //
+  // Past depart.end the card is parked (see below), back at reading depth.
   const cardTranslateZ = useTransform(smoothScrollProgress, (progress) =>
-    Math.min(cardZ, CARD_PASS_THROUGH_Z - progress * cameraTravel),
+    progress >= depart.end
+      ? CARD_READING_DEPTH - progress * cameraTravel
+      : Math.min(cardZ, CARD_PASS_THROUGH_Z - progress * cameraTravel),
   );
 
   // The transition, as it is on develop, minus the blur channel it had —
@@ -674,7 +680,9 @@ function BillboardCard({
 
   const activeReadabilityBoost = useTransform(straightening, [0, 1], [0, 1]);
   const effectiveOpacity = useTransform(() =>
-    Math.min(1, upcomingOpacity.get() + activeReadabilityBoost.get() * 0.38),
+    smoothScrollProgress.get() >= depart.end
+      ? PARKED_OPACITY
+      : Math.min(1, upcomingOpacity.get() + activeReadabilityBoost.get() * 0.38),
   );
   // Faded-out cards are still hit-testable — and since every card is
   // absolutely stacked in the same container, the later ones sit on top and
@@ -684,15 +692,46 @@ function BillboardCard({
   const cardPointerEvents = useTransform(effectiveOpacity, (o) =>
     o > 0.55 ? "auto" : "none",
   );
-  // Opacity alone is not sufficient around a CSS perspective singularity.
-  // Chromium can retain a nearly-transparent promoted layer for a frame as
-  // it crosses the camera plane, then project that cached texture backwards
-  // across the viewport. `visibility` removes a departed layer from painting
-  // after its opacity reaches zero. Upcoming cards remain renderable because
-  // their long, faint approach is an intentional part of the corridor depth.
-  const cardVisibility = useTransform(smoothScrollProgress, (progress) =>
-    progress >= depart.end ? "hidden" : "visible",
+  // A card the camera has flown through is parked, not hidden: past
+  // depart.end it holds PARKED_OPACITY, back at reading depth, three screens
+  // above the frame.
+  //
+  // Hiding it is what broke scrolling back. A layer that stops being drawn
+  // (`visibility: hidden`, or opacity 0) loses its raster, and the next time
+  // it is drawn Chrome rasterises it afresh at whatever scale it has then —
+  // on the way back through a departure, the pass-through, up to 5.6x.
+  // Unpromoted, every layer on the card was re-rasterised at a new scale
+  // each frame; promoted, the raster was taken at 5.6x and locked there.
+  // Either way the card wanted several times the tile memory it uses at
+  // rest, on top of every card queued down the corridor, and Chrome ran out
+  // of its tile budget and drew frames with tiles missing: flat, hard-edged
+  // blocks of gradient where the copy should be, for seconds at a time.
+  // Worst on Home, which has the most layers and every other card ahead.
+  //
+  // Kept drawn, the card keeps the raster it got at reading size, still
+  // locked by `will-change`, and the way back is what the way out always
+  // was: the GPU scaling a texture it already has. Off-screen it is culled,
+  // so staying drawn costs nothing. Reading depth rather than the
+  // pass-through means a card first rendered while parked (a reload part way
+  // down the flight) is rastered at a sane scale too, and nothing parked is
+  // ever near the camera plane. Above the frame, because nothing above a
+  // scroll container can be scrolled to; `inert` keeps focus and screen
+  // readers out, as `visibility: hidden` did.
+  const parkY = useTransform(smoothScrollProgress, (progress) =>
+    progress >= depart.end ? PARKED_OFFSET : "0vh",
   );
+  const [isParked, setIsParked] = useState(
+    () => smoothScrollProgress.get() >= depart.end,
+  );
+  useEffect(() => {
+    const update = (progress: number) =>
+      setIsParked((prev) => {
+        const next = progress >= depart.end;
+        return prev === next ? prev : next;
+      });
+    update(smoothScrollProgress.get());
+    return smoothScrollProgress.on("change", update);
+  }, [smoothScrollProgress, depart.end]);
 
   // `will-change: transform` below promotes the card and *locks its raster
   // scale* — that is the whole point of it, and the reason the flight can
@@ -755,38 +794,11 @@ function BillboardCard({
     hasAutoExpandedHomeRef.current = false;
   }, [originVisit]);
 
-  // The other stale raster, and the one that shows: reversing into a card
-  // the camera has already flown through. Past depart.end the card is ~5.6x,
-  // hidden, and still promoted — its texture locked at a scale and tiling
-  // that belong to the pass-through. Scroll back and it becomes visible with
-  // that texture: flat blocks of card gradient with hard edges where the
-  // copy should be, and it stays that way at rest, because nothing on the
-  // card repaints until something changes its layout (Read more / Show less
-  // clears it, and so did remounting every card at the origin).
-  //
-  // So the promotion goes with the card. Hidden past depart.end costs nothing
-  // to release, and it is not taken back until the card is inside
-  // depart.start again — back near reading size — so the layer is rebuilt
-  // at a sane scale rather than locked at the pass-through one. The gap
-  // between is only ever crossed unpromoted when reversing, and only for
-  // the width of one fade. Forward flight is unchanged: the card stays
-  // promoted all the way to depart.end.
-  const [isPassed, setIsPassed] = useState(
-    () => smoothScrollProgress.get() >= depart.end,
-  );
-  useEffect(() => {
-    const update = (progress: number) =>
-      setIsPassed((prev) => {
-        if (!prev && progress >= depart.end) return true;
-        if (prev && progress <= depart.start) return false;
-        return prev;
-      });
-    update(smoothScrollProgress.get());
-    return smoothScrollProgress.on("change", update);
-  }, [smoothScrollProgress, depart.start, depart.end]);
   // Every promoted layer on the card, not just the panel: the copy, portal
-  // and bezel layers are passed through with it and go just as stale.
-  const layerWillChange = isResizing || isPassed ? "auto" : "transform";
+  // and bezel layers grow with it just the same. Held for the card's whole
+  // life, parked included (see parkY) — releasing it past the pass-through
+  // is what made the way back re-rasterise the card at 5.6x.
+  const layerWillChange = isResizing ? "auto" : "transform";
 
   return (
     <motion.div
@@ -813,7 +825,7 @@ function BillboardCard({
         // frame's rasterization.
         transformStyle: "preserve-3d",
         pointerEvents: cardPointerEvents,
-        visibility: cardVisibility,
+        y: parkY,
         // The flight is a scale animation, and scale is the one transform a
         // compositor cannot fake: without this the card is not a layer of its
         // own, so Chrome re-rasterizes the whole panel — gradient, border,
@@ -824,6 +836,7 @@ function BillboardCard({
         // painted once and the GPU scales the texture.
         willChange: layerWillChange,
       }}
+      inert={isParked}
       initial={false}
       animate={{
         // Narrower than the desktop clamp so there is room either side for the
@@ -2458,9 +2471,9 @@ export default function MultiverseFlight() {
                tracking is part of that budget, so it tightens with the type
                rather than staying at the desktop 0.18em. */}
             <p className="text-[clamp(0.9rem,4.6vw,1.35rem)] font-semibold uppercase leading-[1.35] tracking-[0.1em] text-sky-50 drop-shadow-[0_4px_20px_rgba(2,8,23,0.65)] sm:text-2xl sm:tracking-[0.18em] lg:text-[2rem]">
-              I BUILD. YOU IMAGINE.
+              YOUR IMAGINATION, YOUR IDEAS AND VISION.
               <br />
-              TOGETHER, WE CREATE.
+               CREATED BY 
             </p>
           </motion.div>
 
@@ -2563,6 +2576,7 @@ export default function MultiverseFlight() {
              of being empty. */}
           <TechnologyLayover
             compact={isMobile}
+            stacked={isStacked}
             progress={smoothScrollProgress}
           />
         </motion.div>
@@ -2570,7 +2584,11 @@ export default function MultiverseFlight() {
         {/* The layover's title, which is the only part of it that is still
            screen-space: text this small has to stay on the pixel grid. The
            tools themselves fly in the corridor above. */}
-        <LayoverCaption progress={smoothScrollProgress} isMobile={isMobile} />
+        <LayoverCaption
+          progress={smoothScrollProgress}
+          isMobile={isMobile}
+          isStacked={isStacked}
+        />
 
         {/* Arrival blur (loopRushBlur): over the scene, under the veil, so
            the beginning sharpens into focus as the veil opens on it. */}

@@ -56,6 +56,15 @@ export const CARD_PASS_THROUGH_Z = CSS_PERSPECTIVE_Z * 0.82;
 // enough that the fade is clearly happening to something on its way past.
 export const CARD_DEPART_NEAR_Z = 340;
 
+// Where a card goes once the camera has flown through it: back at reading
+// depth, three screens above the frame, at an opacity too faint to matter
+// even if it were in view. Parked rather than hidden, so its layers stay
+// drawn and keep the raster they were given at reading size; a hidden card
+// is re-rasterised at the pass-through scale on the way back. See
+// BillboardCard in MultiverseFlight.
+export const PARKED_OPACITY = 0.01;
+export const PARKED_OFFSET = "-300vh";
+
 // Once a departing object reaches this depth it recedes at the same rate as
 // the camera instead of continuing toward the singularity. Its largest
 // possible perspective scale is therefore 1100 / (1100 - 440) = 1.67x: enough
