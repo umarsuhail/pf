@@ -9,16 +9,25 @@ import {
   type CSSProperties,
 } from "react";
 
-const MIN_LAUNCH_DELAY_MS = 1_800;
-const MAX_LAUNCH_DELAY_MS = 4_800;
-const MIN_FLIGHT_SECONDS = 3.8;
-const MAX_FLIGHT_SECONDS = 5.4;
+const LAUNCH_INTERVAL_MS = 3_000;
+const MIN_FLIGHT_SECONDS = 1.35;
+const MAX_FLIGHT_SECONDS = 2.15;
 
 type StarAsset = {
   src: string;
   intrinsicWidth: number;
   intrinsicHeight: number;
   width: string;
+};
+
+// A single, separately timed placeholder for the star that approaches along
+// the viewer's depth axis. Replace this source when the final artwork lands;
+// its motion and cadence live on `.ambient-depth-star` in globals.css.
+const depthStarAsset: StarAsset = {
+  src: "/space/star2.svg",
+  intrinsicWidth: 89,
+  intrinsicHeight: 48,
+  width: "clamp(60px, 6vw, 110px)",
 };
 
 type ActiveStar = StarAsset & {
@@ -65,8 +74,8 @@ function createStar(id: number): ActiveStar {
   return {
     ...asset,
     id,
-    // Every pass begins beyond the top-left edge, but the randomized lane
-    // keeps successive meteors from tracing the same diagonal.
+    // Restore the original top-left to bottom-right flight. The lane still
+    // varies so successive stars do not trace one identical diagonal.
     top: `${randomBetween(-42, 8).toFixed(1)}vh`,
     left: `${randomBetween(-48, -20).toFixed(1)}vw`,
     duration: randomBetween(MIN_FLIGHT_SECONDS, MAX_FLIGHT_SECONDS),
@@ -87,7 +96,6 @@ export default function ShootingStars() {
     if (reduceMotion) return;
 
     let disposed = false;
-    let isFirstLaunch = true;
     let launchTimer = 0;
     const cleanupTimers = new Set<number>();
 
@@ -95,10 +103,9 @@ export default function ShootingStars() {
       if (disposed) return;
 
       const star = createStar(nextId.current++);
-      setActiveStars((current) =>
-        isFirstLaunch ? [star] : [...current, star],
-      );
-      isFirstLaunch = false;
+      // One active streak at most. Its flight is deliberately shorter than
+      // the cadence, leaving a quiet beat before the next launch.
+      setActiveStars([star]);
 
       const cleanupTimer = window.setTimeout(() => {
         cleanupTimers.delete(cleanupTimer);
@@ -108,17 +115,10 @@ export default function ShootingStars() {
       }, star.duration * 1_000 + 200);
       cleanupTimers.add(cleanupTimer);
 
-      // The upper bound is deliberately below five seconds, leaving a little
-      // scheduling slack while still meeting the requested maximum interval.
-      launchTimer = window.setTimeout(
-        launch,
-        randomBetween(MIN_LAUNCH_DELAY_MS, MAX_LAUNCH_DELAY_MS),
-      );
+      launchTimer = window.setTimeout(launch, LAUNCH_INTERVAL_MS);
     };
 
-    // Start soon after the flight appears instead of making the first screen
-    // wait for a full random interval.
-    launchTimer = window.setTimeout(launch, 650);
+    launchTimer = window.setTimeout(launch, LAUNCH_INTERVAL_MS);
 
     return () => {
       disposed = true;
@@ -161,6 +161,21 @@ export default function ShootingStars() {
           />
         );
       })}
+      <Image
+        src={depthStarAsset.src}
+        alt=""
+        width={depthStarAsset.intrinsicWidth}
+        height={depthStarAsset.intrinsicHeight}
+        className="ambient-depth-star absolute h-auto max-w-none select-none"
+        style={{
+          left: "68%",
+          top: "16%",
+          width: depthStarAsset.width,
+          maxWidth: "none",
+          zIndex: 2,
+        }}
+        unoptimized
+      />
     </div>
   );
 }

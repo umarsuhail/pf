@@ -67,10 +67,6 @@ function markSizeFor() {
 // up into a visible grid.
 const STARS_NEAR =
   "radial-gradient(1.2px 1.2px at 12% 18%, rgba(224,242,254,0.9), transparent 60%), radial-gradient(1px 1px at 68% 34%, rgba(186,230,253,0.8), transparent 60%), radial-gradient(1.4px 1.4px at 38% 72%, rgba(240,249,255,0.85), transparent 60%), radial-gradient(1px 1px at 86% 82%, rgba(186,230,253,0.7), transparent 60%)";
-// The Milky Way's own star field: a much finer, denser dust than the sky
-// around it, confined to the band by a mask (see the galaxy layer below).
-const STARS_BAND =
-  "radial-gradient(0.7px 0.7px at 8% 22%, rgba(240,249,255,0.9), transparent 60%), radial-gradient(0.6px 0.6px at 31% 64%, rgba(224,242,254,0.8), transparent 60%), radial-gradient(0.9px 0.9px at 57% 12%, rgba(255,247,237,0.85), transparent 60%), radial-gradient(0.6px 0.6px at 74% 48%, rgba(224,242,254,0.75), transparent 60%), radial-gradient(0.7px 0.7px at 92% 81%, rgba(240,249,255,0.8), transparent 60%), radial-gradient(0.5px 0.5px at 46% 91%, rgba(224,242,254,0.7), transparent 60%)";
 
 const STARS_FAR =
   "radial-gradient(0.8px 0.8px at 24% 56%, rgba(186,230,253,0.7), transparent 60%), radial-gradient(0.9px 0.9px at 78% 12%, rgba(224,242,254,0.75), transparent 60%), radial-gradient(0.7px 0.7px at 52% 88%, rgba(186,230,253,0.6), transparent 60%), radial-gradient(0.8px 0.8px at 6% 94%, rgba(224,242,254,0.65), transparent 60%)";
@@ -247,78 +243,20 @@ export default function PageLoader() {
             "radial-gradient(120% 90% at 50% 50%, #04121f 0%, #020a13 55%, #01050a 100%)",
         }}
       >
-        {/* The Milky Way: one band laid diagonally across the sky, drifting
-           so slowly it reads as the sky turning rather than as animation.
-           Built up the way the real thing looks — a broad blue-white glow,
-           a warmer core where it is densest, a dark dust lane splitting it
-           down the middle, and a star field far finer and denser than the
-           sky around it that only exists inside the band. */}
-        <div className="loader-galaxy absolute left-1/2 top-1/2 h-[140vmax] w-[140vmax]">
-          <div
-            className="absolute inset-0"
-            style={{
-              background: [
-                // warm core, off-centre like the galactic bulge
-                "radial-gradient(18% 7% at 58% 50%, rgba(255,228,196,0.20) 0%, rgba(253,186,116,0.07) 45%, transparent 75%)",
-                // the band's glow
-                "radial-gradient(62% 12% at 50% 50%, rgba(191,219,254,0.20) 0%, rgba(125,160,220,0.10) 40%, rgba(56,100,170,0.04) 65%, transparent 80%)",
-                // a wider, fainter halo so the band has no hard edge
-                "radial-gradient(75% 24% at 50% 50%, rgba(91,141,177,0.10) 0%, transparent 70%)",
-              ].join(", "),
-            }}
-          />
-          {/* Mottling: the band is clumped star clouds, not an even glow. */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background: [
-                "radial-gradient(9% 3.2% at 30% 49%, rgba(191,219,254,0.16), transparent 70%)",
-                "radial-gradient(7% 2.6% at 41% 51.5%, rgba(224,242,254,0.14), transparent 70%)",
-                "radial-gradient(11% 3.4% at 70% 48.5%, rgba(255,237,213,0.13), transparent 70%)",
-                "radial-gradient(6% 2.2% at 80% 51%, rgba(191,219,254,0.12), transparent 70%)",
-                "radial-gradient(8% 2.8% at 20% 50.5%, rgba(147,197,253,0.10), transparent 70%)",
-              ].join(", "),
-            }}
-          />
-          {/* Two tiles at different pitches so the band's stars never line
-             up, masked to the band so they thin out towards its edges. */}
-          <div
-            className="loader-stars absolute inset-0"
-            style={{
-              background: `${STARS_BAND}, ${STARS_BAND}`,
-              backgroundSize: "38px 38px, 61px 61px",
-              backgroundPosition: "0 0, 17px 23px",
-              maskImage:
-                "linear-gradient(180deg, transparent 40%, #000 47.5%, #000 52.5%, transparent 60%)",
-              WebkitMaskImage:
-                "linear-gradient(180deg, transparent 40%, #000 47.5%, #000 52.5%, transparent 60%)",
-            }}
-          />
-          {/* The dust lane, over the stars: dark clouds hiding the band's
-             brightest stretch are most of what makes it read as a galaxy
-             rather than as a stripe of glow. */}
-          <div
-            className="absolute inset-0"
-            style={{
-              // Broken into patches that wander off the centre line — one
-              // continuous stroke read as a slash through the sky.
-              background: [
-                "radial-gradient(10% 0.7% at 28% 50.3%, rgba(1,5,10,0.55) 0%, transparent 100%)",
-                "radial-gradient(8% 0.9% at 42% 50.6%, rgba(1,5,10,0.5) 0%, transparent 100%)",
-                "radial-gradient(6% 0.6% at 53% 49.8%, rgba(1,5,10,0.45) 0%, transparent 100%)",
-                "radial-gradient(9% 0.8% at 66% 49.5%, rgba(1,5,10,0.5) 0%, transparent 100%)",
-                "radial-gradient(5% 0.5% at 78% 50.2%, rgba(1,5,10,0.4) 0%, transparent 100%)",
-              ].join(", "),
-            }}
-          />
-        </div>
-        {/* The real sky: Umar's /bg.gif, drifting very slowly. It sits over
-           the drawn Milky Way above, which is the fallback for the moment
-           before this paints. Keep the photo small (it is part of what the
-           loader waits for) and dark in the middle, where the US forms. */}
+        {/* The real sky: Umar's /bg.gif, drifting very slowly. Keep the photo
+           small (it is part of what the loader waits for) and dark in the
+           middle, where the US forms. */}
         <div
           className="loader-photo absolute -inset-[6%] bg-cover bg-center"
           style={{ backgroundImage: "url(/bg.gif)" }}
+        />
+        {/* A second sky (bg2.jpg), held at zero opacity and smoothly blended
+           up over the sky above it and back — same box, so it reads as the
+           frame itself drifting into another view rather than a hard cut. */}
+        <div
+          aria-hidden="true"
+          className="loader-photo-glitch absolute -inset-[6%] bg-cover bg-center"
+          style={{ backgroundImage: "url(/bg2.jpg)" }}
         />
         <div
           className="loader-nebula-b absolute -inset-[20%]"

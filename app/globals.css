@@ -871,9 +871,9 @@ html {
   }
 }
 
-/* Ambient shooting stars are created at randomized intervals by
-   ShootingStars.tsx. Each instance gets its own lane, scale and duration;
-   CSS only handles the composited top-left to bottom-right flight. */
+/* Ambient shooting stars are launched one at a time by ShootingStars.tsx.
+   Their lane and scale vary, but the authored art keeps its original
+   top-left to bottom-right direction. */
 @keyframes ambientShootingStarPass {
   0% {
     opacity: 0;
@@ -904,8 +904,41 @@ html {
   will-change: transform, opacity;
 }
 
+/* One future-facing placeholder approaches almost along the viewer's Z axis.
+   It moves only a little down and right while growing dramatically, leaving
+   star2.svg's naturally slanted tail visible. Most of the twelve-second loop
+   is intentionally empty so this remains a rare depth beat. */
+@keyframes ambientDepthStarApproach {
+  0%,
+  80% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.08);
+  }
+
+  84% {
+    opacity: 0.24;
+  }
+
+  94% {
+    opacity: 0.86;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(8vw, 13vh, 0) scale(2.8);
+  }
+}
+
+.ambient-depth-star {
+  animation: ambientDepthStarApproach 12s cubic-bezier(0.2, 0.62, 0.3, 1) -4s infinite both;
+  filter: drop-shadow(0 0 10px rgba(249, 243, 22, 0.38));
+  transform-origin: 100% 100%;
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .ambient-shooting-star {
+  .ambient-shooting-star,
+  .ambient-depth-star {
     animation: none;
     opacity: 0;
   }
@@ -1027,12 +1060,6 @@ html {
   50% { opacity: 0.8; }
 }
 
-@keyframes loaderGalaxy {
-  0% { transform: translate(-50%, -50%) rotate(-31deg); }
-  50% { transform: translate(-50%, -50%) rotate(-27deg); }
-  100% { transform: translate(-50%, -50%) rotate(-31deg); }
-}
-
 @keyframes loaderPhoto {
   0%, 100% { transform: scale(1.02) translate3d(0, 0, 0); }
   50% { transform: scale(1.07) translate3d(-1.2%, 0.8%, 0); }
@@ -1044,17 +1071,29 @@ html {
   100% { transform: translate3d(-6%, -4%, 0) scale(1); }
 }
 
+/* bg2.jpg, held at zero and smoothly blended up over bg.gif and back —
+   a slow crossfade rather than a glitch. Timed so the first blend starts
+   early enough to be seen even on a quick load, with a second, longer one
+   for anyone who lingers on the loader. */
+@keyframes loaderPhotoGlitch {
+  0%, 10% { opacity: 0; }
+  26% { opacity: 0.85; }
+  42%, 58% { opacity: 0; }
+  78% { opacity: 0.7; }
+  100% { opacity: 0; }
+}
+
 .loader-photo {
   animation: loaderPhoto 48s ease-in-out infinite;
 }
 
-.loader-darken {
-  animation: loaderDarken 22s ease-in-out infinite;
+.loader-photo-glitch {
+  opacity: 0;
+  animation: loaderPhotoGlitch 10s ease-in-out infinite;
 }
 
-.loader-galaxy {
-  transform: translate(-50%, -50%) rotate(-31deg);
-  animation: loaderGalaxy 60s ease-in-out infinite;
+.loader-darken {
+  animation: loaderDarken 22s ease-in-out infinite;
 }
 
 .loader-nebula-b {
@@ -1082,12 +1121,18 @@ html {
 
   /* The loader's sky holds still; the mark still assembles, since that is
      the progress report rather than decoration. */
-  .loader-galaxy,
   .loader-photo,
   .loader-nebula-b,
   .loader-stars,
   .loader-stars-late,
   .loader-darken {
     animation: none;
+  }
+
+  /* The blend is motion, full stop — reduced motion means the second sky
+     never shows at all rather than holding on screen. */
+  .loader-photo-glitch {
+    animation: none;
+    opacity: 0;
   }
 }
