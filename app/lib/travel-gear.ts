@@ -2,6 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 
+import { isCoarsePointer } from "./pointer";
+
 // The flight's gearbox.
 //
 // Two inputs move the traveller — the wheel and the dial — and they used to
@@ -64,10 +66,27 @@ export const TRAVEL_GEARS: Record<TravelGearId, TravelGear> = {
 
 export const TRAVEL_GEAR_IDS: TravelGearId[] = [1, 2, 3];
 
-// Second is the default: the wheel still lands somewhere on purpose, but a
-// section takes three of them rather than being one flick wide.
+// Second is the wheel's default: it still lands somewhere on purpose, but a
+// section takes three of them rather than being one flick wide. It is also
+// the server's answer, because the server cannot know what is holding the
+// device — see defaultGearForDevice.
 const DEFAULT_GEAR: TravelGearId = 2;
 const STORAGE_KEY = "flight-travel-gear";
+
+// A finger is not a wheel, and second gear is built around a wheel.
+//
+// `scroll-snap-stop: always` on every landing means a gesture cannot pass
+// one — which is the point on a wheel, where a notch is a deliberate unit of
+// travel. A flick is not: it is one continuous throw that expects to coast,
+// and catching it at the first landing reads as the page fighting the hand.
+// So touch starts in first, where the document does not snap at all.
+//
+// This only decides the first visit. The gear button is on the dial on every
+// device, and the choice is remembered, so a phone visitor who wants the
+// landings has them one hold away.
+function defaultGearForDevice(): TravelGearId {
+  return isCoarsePointer() ? 1 : DEFAULT_GEAR;
+}
 
 function isGearId(value: unknown): value is TravelGearId {
   return value === 1 || value === 2 || value === 3;
@@ -89,10 +108,15 @@ function restore() {
   restored = true;
   try {
     const stored = Number(window.localStorage.getItem(STORAGE_KEY));
-    if (isGearId(stored)) current = stored;
+    if (isGearId(stored)) {
+      current = stored;
+      return;
+    }
   } catch {
-    /* private mode, or storage blocked by policy — the default stands */
+    /* private mode, or storage blocked by policy — fall through to the
+       device default, which is the better guess than the wheel's */
   }
+  current = defaultGearForDevice();
 }
 
 export function getTravelGear(): TravelGear {

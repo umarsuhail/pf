@@ -93,6 +93,12 @@ export default function PageLoader() {
   const signatureOpacity = useTransform(progress, [0.82, 1], [0, 1]);
   const signatureY = useTransform(progress, [0.82, 1], [10, 0]);
   const [markSize] = useState(markSizeFor);
+  // below. Re-enable both together.
+  // const starOpacity = useTransform(progress, [0, 0.08, 0.62, 0.88], [0, 1, 1, 0]);
+  // const starScale = useTransform(progress, [0, 0.22], [0.72, 1]);
+  // const starX = useTransform(progress, [0, 0.24], [-markSize * 1.9, 0]);
+  // const starY = useTransform(progress, [0, 0.24], [-markSize * 0.85, 0]);
+  // const starRotate = useTransform(progress, [0, 0.24], [-28, 0]);
   // Only the stage name goes through React (three changes in the loader's
   // life); the progress itself is a motion value the canvas reads per frame.
   const [stage, setStage] = useState(0);
@@ -243,19 +249,11 @@ export default function PageLoader() {
             "radial-gradient(120% 90% at 50% 50%, #04121f 0%, #020a13 55%, #01050a 100%)",
         }}
       >
-        {/* The real sky: Umar's /bg.gif, drifting very slowly. Keep the photo
-           small (it is part of what the loader waits for) and dark in the
-           middle, where the US forms. */}
+        {/* The real sky: Umar's /bg2.jpg, drifting very slowly. Keep the
+           photo small (it is part of what the loader waits for) and dark in
+           the middle, where the US forms. */}
         <div
           className="loader-photo absolute -inset-[6%] bg-cover bg-center"
-          style={{ backgroundImage: "url(/bg.gif)" }}
-        />
-        {/* A second sky (bg2.jpg), held at zero opacity and smoothly blended
-           up over the sky above it and back — same box, so it reads as the
-           frame itself drifting into another view rather than a hard cut. */}
-        <div
-          aria-hidden="true"
-          className="loader-photo-glitch absolute -inset-[6%] bg-cover bg-center"
           style={{ backgroundImage: "url(/bg2.jpg)" }}
         />
         <div

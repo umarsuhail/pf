@@ -511,8 +511,7 @@ export default function CockpitTray() {
       .catch(() => {});
   }, [runRamp, track]);
 
-  // The one mute for everything the flight plays — the soundtrack decks
-  // here, and the engine hum (EngineHum listens for "flight-sound-mute").
+  // The one mute for everything the flight plays — the soundtrack decks here.
   const toggleMute = () => {
     const next = !isMuted;
     setIsMuted(next);

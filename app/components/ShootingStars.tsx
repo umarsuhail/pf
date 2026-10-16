@@ -10,6 +10,9 @@ import {
 } from "react";
 
 const LAUNCH_INTERVAL_MS = 3_000;
+// However many are already mid-flight, never more than this many streaks
+// on screen at once.
+const MAX_ACTIVE_STARS = 5;
 const MIN_FLIGHT_SECONDS = 1.35;
 const MAX_FLIGHT_SECONDS = 2.15;
 
@@ -103,9 +106,11 @@ export default function ShootingStars() {
       if (disposed) return;
 
       const star = createStar(nextId.current++);
-      // One active streak at most. Its flight is deliberately shorter than
-      // the cadence, leaving a quiet beat before the next launch.
-      setActiveStars([star]);
+      // Up to MAX_ACTIVE_STARS at once; each flight is deliberately shorter
+      // than the cadence, so in practice they rarely stack up that deep.
+      setActiveStars((current) =>
+        current.length >= MAX_ACTIVE_STARS ? current : [...current, star],
+      );
 
       const cleanupTimer = window.setTimeout(() => {
         cleanupTimers.delete(cleanupTimer);

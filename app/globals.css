@@ -4,6 +4,11 @@
   --background: #020617;
   --foreground: #e2e8f0;
   --accent: #7dd3fc;
+  /* The sky behind every route. Painted by the fixed layer under `body`
+     rather than by the body itself — see `body::before`. */
+  --page-sky: linear-gradient(180deg, #002d54 0%, #00101f 100%);
+  /* The flat colour under that layer, so the canvas is never unpainted. */
+  --page-sky-base: #00101f;
 }
 
 @theme inline {
@@ -14,19 +19,33 @@
 }
 
 body {
-  background: linear-gradient(180deg, #002d54 0%, #00101f 100%);
-  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-plex-sans), "Segoe UI", Arial, sans-serif;
   font-size: 1rem;
   line-height: 1.6;
   letter-spacing: 0.005em;
   font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
-  text-rendering: optimizeLegibility;
   position: relative;
   overflow-x: hidden;
   overscroll-behavior-y: none;
   transition: color 220ms ease;
+}
+
+/* The sky, in a layer the compositor can keep.
+   This was `background-attachment: fixed` on the body, which pins the
+   gradient to the viewport by repainting it on every scroll frame — and a
+   scrolling box with a fixed background cannot be handed to the compositor
+   at all, so the whole page is repainted with it. It is the single most
+   expensive thing a long scrolling page can do on a phone, and on `/` it
+   bought nothing: the flight's own opaque backdrop covers it for the length
+   of the track. A fixed child is painted once and then only translated. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--page-sky);
+  pointer-events: none;
 }
 
 p,
@@ -459,9 +478,14 @@ li {
   transition: color 180ms ease;
 }
 
+:root[data-mission-theme="dark"],
+:root[data-mission-theme="light"] {
+  --page-sky: var(--mission-space);
+  --page-sky-base: var(--mission-space);
+}
+
 :root[data-mission-theme="dark"] body,
 :root[data-mission-theme="light"] body {
-  background: var(--mission-space);
   color: var(--mission-ink);
 }
 
@@ -672,6 +696,14 @@ a {
 }
 
 html {
+  /* Only ever seen if the fixed sky layer has not painted yet. A flat colour
+     on the root costs nothing; a gradient here would stretch over the whole
+     3330svh track rather than the viewport, which is why the sky is a fixed
+     child instead. */
+  background: var(--page-sky-base);
+  /* Programmatic scrolls only — user wheel and touch scrolling is unaffected
+     by this. The flight passes an explicit `behavior` on every scrollTo it
+     makes, so this governs snap transitions and nothing else. */
   scroll-behavior: smooth;
 }
 
@@ -904,28 +936,36 @@ html {
   will-change: transform, opacity;
 }
 
-/* One future-facing placeholder approaches almost along the viewer's Z axis.
-   It moves only a little down and right while growing dramatically, leaving
-   star2.svg's naturally slanted tail visible. Most of the twelve-second loop
-   is intentionally empty so this remains a rare depth beat. */
+/* One slower, nearer streak, on its own long cadence.
+   This used to approach almost straight down the viewer's Z axis: it
+   translated 8vw/13vh while scaling 0.08 -> 2.8, so a 35x growth was set
+   against barely a tenth of a screen of travel. Scale that far ahead of
+   translation does not read as distance — it reads as a star sitting still
+   and swelling, which is what it looked like. It now crosses the frame like
+   the launched ones do (see ambientShootingStarPass above), keeping a modest
+   growth for depth rather than leading with it.
+   Anchored at 68%/16% by ShootingStars.tsx, so it enters just above the top
+   edge and leaves past the bottom-right corner.
+   Most of the twelve-second loop is still deliberately empty: this is a rare
+   beat, not a second stream of streaks. */
 @keyframes ambientDepthStarApproach {
   0%,
   80% {
     opacity: 0;
-    transform: translate3d(0, 0, 0) scale(0.08);
+    transform: translate3d(-12vw, -18vh, 0) scale(0.45);
   }
 
   84% {
-    opacity: 0.24;
+    opacity: 0.5;
   }
 
-  94% {
-    opacity: 0.86;
+  92% {
+    opacity: 0.9;
   }
 
   100% {
     opacity: 0;
-    transform: translate3d(8vw, 13vh, 0) scale(2.8);
+    transform: translate3d(58vw, 96vh, 0) scale(1.5);
   }
 }
 
@@ -1071,25 +1111,8 @@ html {
   100% { transform: translate3d(-6%, -4%, 0) scale(1); }
 }
 
-/* bg2.jpg, held at zero and smoothly blended up over bg.gif and back —
-   a slow crossfade rather than a glitch. Timed so the first blend starts
-   early enough to be seen even on a quick load, with a second, longer one
-   for anyone who lingers on the loader. */
-@keyframes loaderPhotoGlitch {
-  0%, 10% { opacity: 0; }
-  26% { opacity: 0.85; }
-  42%, 58% { opacity: 0; }
-  78% { opacity: 0.7; }
-  100% { opacity: 0; }
-}
-
 .loader-photo {
   animation: loaderPhoto 48s ease-in-out infinite;
-}
-
-.loader-photo-glitch {
-  opacity: 0;
-  animation: loaderPhotoGlitch 10s ease-in-out infinite;
 }
 
 .loader-darken {
@@ -1127,12 +1150,5 @@ html {
   .loader-stars-late,
   .loader-darken {
     animation: none;
-  }
-
-  /* The blend is motion, full stop — reduced motion means the second sky
-     never shows at all rather than holding on screen. */
-  .loader-photo-glitch {
-    animation: none;
-    opacity: 0;
   }
 }

@@ -21,7 +21,6 @@ import ExpandableText from "./ExpandableText";
 import NarratedText from "./NarratedText";
 import { NARRATION_SPANS, narrationSegments } from "../data/narration";
 import SpaceParticles from "./SpaceParticles";
-import EngineHum from "./EngineHum";
 import ShootingStars from "./ShootingStars";
 import ParticleLogo from "./HeroLogo";
 import SignatureName from "./SignatureName";
@@ -42,6 +41,8 @@ import {
   scrollFromProgress,
 } from "../data/flightTimeline";
 import { useTravelGear } from "../lib/travel-gear";
+import { useCoarsePointer } from "../lib/pointer";
+import { flightScrollTo, useSmoothScroll } from "../lib/smooth-scroll";
 import TechnologyLayover, { LayoverCaption } from "./TechnologyLayover";
 import {
   buildSnapPoints,
@@ -112,6 +113,39 @@ const CAMERA_SPRING = {
   stiffness: 260,
   damping: 32,
   mass: 0.32,
+  restDelta: 0.00005,
+} as const;
+
+// The same settle, tightened for a thumb.
+//
+// A wheel is an indirect control: the hand is not touching what it moves, so
+// a short follow reads as weight. A finger is in contact with the thing it is
+// dragging, and any lag between the two reads as the page failing to keep up.
+//
+// Stiffer and lighter, with the damping ratio held where it already was —
+// 32 / (2 * sqrt(400 * 0.22)) = 1.71, against 1.75 for the wheel — so this is
+// the same non-oscillating character arriving about 1.5x sooner, not a
+// bouncier spring. The ratio is the part that must stay above 1: a 60Hz phone
+// shows every overshoot.
+const CAMERA_SPRING_TOUCH = {
+  stiffness: 400,
+  damping: 32,
+  mass: 0.22,
+  restDelta: 0.00005,
+} as const;
+
+// Near enough to a direct follow, for when Lenis is smoothing the scroll.
+//
+// The camera spring exists to take the step out of a wheel notch. In first
+// gear Lenis has already done that, to the scroll position itself, and two
+// lerps in series do not read as smoother — they read as lag, because the
+// camera is easing toward a target that is itself still easing. This tracks
+// Lenis's output almost 1:1 and leaves the smoothing to it. Still overdamped
+// (50 / (2 * sqrt(900 * 0.15)) = 2.16) so a hard stop does not ring.
+const CAMERA_SPRING_LENIS = {
+  stiffness: 900,
+  damping: 50,
+  mass: 0.15,
   restDelta: 0.00005,
 } as const;
 
@@ -1249,6 +1283,15 @@ export default function MultiverseFlight() {
   }, [gear.snapStepsPerSection]);
 
   const isMobile = compact;
+  // Width answers "how much room is there"; this answers "what is moving it".
+  // They are different questions and the camera spring wants the second one.
+  const isCoarsePointer = useCoarsePointer();
+
+  // First gear is the only gear without scroll-snap, and Lenis cannot coexist
+  // with scroll-snap; touch is excluded because native momentum beats any
+  // main-thread lerp. See lib/smooth-scroll.ts for both decisions.
+  const smoothWheelActive = gear.snapStepsPerSection === 0 && !isCoarsePointer;
+  useSmoothScroll(smoothWheelActive);
   // `endMarkBox` is 0 until the first measure lands (there is no window to
   // read during SSR); the breakpoint guess stands in for that one render.
   const markBox = endMarkBox || (isMobile ? 240 : 440);
@@ -1299,7 +1342,20 @@ export default function MultiverseFlight() {
   // Autoplay calls jump() on this value from its own rAF loop, so narration
   // holds still land exactly on their readable card slots instead of easing
   // into or beyond them.
-  const smoothScrollProgress = useSpring(scrollYProgress, CAMERA_SPRING);
+  //
+  // Which spring depends on what is doing the scrolling, not on how wide the
+  // screen is — a tablet in landscape is past the `compact` breakpoint and
+  // still being scrolled with a thumb. useSpring re-attaches when the config
+  // changes (useFollowValue keys its effect on the serialised options), and
+  // re-attaching keeps the motion value, so the swap is safe mid-flight.
+  const smoothScrollProgress = useSpring(
+    scrollYProgress,
+    smoothWheelActive
+      ? CAMERA_SPRING_LENIS
+      : isCoarsePointer
+        ? CAMERA_SPRING_TOUCH
+        : CAMERA_SPRING,
+  );
 
   // The visual velocity follows the camera rather than raw document input.
   // It gives the space behind the cards a small, forward-only speed trail
@@ -1550,7 +1606,7 @@ export default function MultiverseFlight() {
     // fast-forward behind the veil. (Not "auto": that defers to the CSS
     // scroll-behavior, which globals.css sets to smooth.)
     window.setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: "instant" });
+      flightScrollTo(0);
       pull.set(0);
       smoothPull.jump(0);
       // Snap the camera too: left to its spring it rewound the whole
@@ -1792,20 +1848,18 @@ export default function MultiverseFlight() {
       if (targetProgress === undefined || !container) return;
       const containerTop = window.scrollY + container.getBoundingClientRect().top;
       const scrollableHeight = container.offsetHeight - window.innerHeight;
-      const root = document.documentElement;
-      const previousBehavior = root.style.scrollBehavior;
-      if (customEvent.detail?.source === "dial") {
-        root.style.scrollBehavior = "auto";
-      }
-      window.scrollTo({
-        top: containerTop + scrollableHeight * scrollFromProgress(targetProgress),
-        behavior: customEvent.detail?.source === "dial" ? "auto" : "smooth",
-      });
-      if (customEvent.detail?.source === "dial") {
-        requestAnimationFrame(() => {
-          root.style.scrollBehavior = previousBehavior;
-        });
-      }
+      // The dial is already a continuous control — the hand turning it is the
+      // animation — so it wants the position it asks for. The nav is a jump
+      // between two places and flies there.
+      //
+      // The dial case used to have to force `scroll-behavior: auto` on the
+      // root and restore it a frame later, because `behavior: "auto"` defers
+      // to the CSS, which is smooth. flightScrollTo is explicit either way,
+      // so there is nothing left to fight.
+      flightScrollTo(
+        containerTop + scrollableHeight * scrollFromProgress(targetProgress),
+        customEvent.detail?.source !== "dial",
+      );
     };
 
     window.addEventListener("navigate-flight-section", handleNavigation as EventListener);
@@ -2001,7 +2055,7 @@ export default function MultiverseFlight() {
       // Always departs from the beginning — a tour that starts halfway is not
       // a tour. The camera spring is snapped along with the scroll so the
       // flight doesn't replay itself in fast-forward on the way back to 0.
-      window.scrollTo({ top: toScrollTop(0), behavior: "instant" });
+      flightScrollTo(toScrollTop(0));
       smoothScrollProgress.jump(0);
 
       let index = 0;
@@ -2020,7 +2074,7 @@ export default function MultiverseFlight() {
         refreshScrollGeometryIfNeeded();
         const targetScrollTop = toScrollTop(currentProgress);
         if (Math.abs(window.scrollY - targetScrollTop) <= 1) return;
-        window.scrollTo({ top: targetScrollTop, behavior: "auto" });
+        flightScrollTo(targetScrollTop);
         smoothScrollProgress.jump(currentProgress);
       };
 
@@ -2040,7 +2094,7 @@ export default function MultiverseFlight() {
       // matches currentProgress (0) before the first leg begins easing.
       let holdFrames = 6;
       const holdAtStart = (now: number) => {
-        window.scrollTo({ top: toScrollTop(0), behavior: "instant" });
+        flightScrollTo(toScrollTop(0));
         if (--holdFrames > 0) {
           raf = requestAnimationFrame(holdAtStart);
           return;
@@ -2078,7 +2132,7 @@ export default function MultiverseFlight() {
         // wrote that trailing position back into scrollYProgress over the
         // jump(p) below — the camera yanked back toward the previous card
         // and, once a leg ended, glided forward again as the scroll caught up.
-        window.scrollTo({ top: toScrollTop(p), behavior: "instant" });
+        flightScrollTo(toScrollTop(p));
         // window.scrollTo doesn't move the camera directly — every card's
         // transforms read smoothScrollProgress, which normally only updates
         // when the browser fires a scroll event off that call. Those events
@@ -2314,10 +2368,6 @@ export default function MultiverseFlight() {
         >
           <SpaceParticles />
         </motion.div>
-
-        {/* The ship's engines — looping, speed-driven ambience. Renders
-           nothing; see EngineHum. */}
-        <EngineHum />
 
         {/* Ambient meteors stay in screen space behind the corridor. Their
            randomized launches continue across the complete flight rather
