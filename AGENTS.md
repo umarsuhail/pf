@@ -64,9 +64,9 @@ sky, stars and speed trail keep moving round it — until the last tool's stop,
 where it lets go and the flight passes through it into Projects. The radar
 finds one tool per technology focus stop and the copy beside it names that
 tool; which tool is showing is `technologyFocusWindow` (`flightStops.ts`), a
-pure function of progress shared with the history rail, so the dial, gear
-snapping and the autopilot's per-tool stops all land on the tool on screen,
-and scrolling back steps the list backwards. The bezel and glass are the
+pure function of progress shared with the history rail, so the dial and the
+autopilot's per-tool stops both land on the tool on screen, and scrolling back
+steps the list backwards. The bezel and glass are the
 artwork as drawn; the face, its line art (`radar_lines.svg` — `radar_base.svg`
 without its background disc, used as a mask), the beam and the title holder
 take `--radar-face` / `--radar-beam`, i.e. the theme's accent and second
@@ -197,9 +197,9 @@ each tool on the radar. Every other leg keeps its original length.
 
 The conversion runs one way at the top of `MultiverseFlight` (scroll →
 progress, once) and the other way in everything that *writes* a scroll
-position from a progress: nav and dial flights, the autopilot's rAF clock, the
-route-map drum, and the snap markers, which are laid out down the document and
-therefore live in scroll. Anything new that turns a progress into a scrollTop
+position from a progress: nav and dial flights, the autopilot's rAF clock and
+the route-map drum, all of which go out through `flightScrollTo`. Anything new
+that turns a progress into a scrollTop
 needs `scrollFromProgress`; forgetting it lands you at the right moment of the
 flight in the wrong place in the page.
 
@@ -207,32 +207,58 @@ flight in the wrong place in the page.
 
 Two inputs move the flight and they are deliberately not the same instrument.
 The wheel is travel; the dial (`ScrollDial.tsx`) is navigation — a bezel you
-turn, where one gear's worth of rotation is one section and the detents count
-out the distance on the way.
+turn, where one full revolution is one section and the 36 detents count out
+the distance on the way.
 
-Both read one gearbox, `app/lib/travel-gear.ts`, which answers a single
-question: how much ground does one gesture cover?
+Both run on one scroll system, `app/lib/smooth-scroll.ts`, mounted once for
+the whole app (`SmoothScroll`, in `ChromeBeforeMain`) so the detail routes
+scroll like `/` does. Lenis animates the *real* scroll position rather than
+transforming a content wrapper — which is why it can be used here at all,
+since a transform on an ancestor of the corridor's `position: sticky` child
+would become the containing block for it and every fixed overlay. GSAP's
+ScrollSmoother works that way and was ruled out for it. Everything that
+*writes* a scroll position goes through `flightScrollTo`, because a bare
+`window.scrollTo` is overwritten on Lenis's next frame.
 
-| gear | wheel | dial |
-|------|-------|------|
-| 1 | no snapping at all — free, smooth scrolling | 1080° per section |
-| 2 (default) | three landings per section | 360° per section |
-| 3 | one landing per section | 120° per section, settles on a stop |
+`syncTouch` is off, so a finger keeps native momentum — handled on the
+compositor at the device's own refresh rate, where a main-thread lerp only
+makes it worse. The instance still runs on phones, because Lenis emits
+`virtual-scroll` before the syncTouch branch decides whether to animate
+anything, so the snap plugin hears a gesture it is not smoothing.
 
-The landings are `buildSnapPoints` in `app/data/flightStops.ts`, rendered as
-snap markers down the track. `scroll-snap-stop: always` on each is what makes
-"three landings" mean *at least* three scrolls — a fling cannot pass one.
-Snapping is suspended while the autopilot runs and while a hand is on the
-dial (`flight-dial-turn`), because both of those drive the scroll position
-themselves and mandatory snapping pulls against them every frame.
+**The landings are `lenis/snap`, not CSS scroll-snap.** The difference is the
+whole reason snapping is bearable: `scroll-snap-stop: always` had to catch a
+fling mid-flight to work, and that is what made scrolling feel like a fight.
+`lenis/snap` is proximity-based and debounced — nothing moves until the
+gesture has been over for ~480ms, and a landing only claims you if you
+stopped within 45% of a viewport of it. Park mid-layover to read and you stay
+there.
 
-The gear sits in the middle of the dial face (`DialGearButton.tsx`), where
-the page number used to be — one button, showing the gear you are in, and a
-three-second hold steps to the next one (1 → 2 → 3 → 1). It is a hold rather
-than a click because it changes how far every gesture travels, mid-journey,
-under someone who is reading. The panel number is still spoken in the dial's
-`aria-valuetext`; on screen it is the card above the dial that names where
-you are.
+The flight publishes its own landings as absolute scroll positions through
+`setFlightSnapPoints` — every panel plus every tool on the radar, 24 of them.
+It is the only thing that can, since the mapping runs through
+`scrollFromProgress` and the track's measured height, and they are republished
+on resize because a pixel position is only true for the viewport that made
+it. Leaving the flight clears them, so a detail route does not inherit stops
+that mean nothing on it. The closing beat is deliberately not a landing: one
+on the last frame would pull against the push that wraps the flight round.
+Snapping is suspended while the autopilot runs and while a hand is on the dial
+(`flight-dial-turn`), because both drive the scroll position themselves.
+
+This was a gearbox for a while — three ratios in `app/lib/travel-gear.ts`,
+paired with three CSS scroll-snap modes, stepped through by a three-second
+hold on the middle of the dial. It existed to let someone turn the landings
+down when they caught too hard, which `lenis/snap` no longer does. With one
+snapping behaviour there was no second axis for a ratio to pair against, so
+the middle ratio (360°) became the only one and the gearbox came out —
+`travel-gear.ts`, `buildSnapPoints` and the snap markers with it.
+
+The middle of the dial face is the way in to the assistant now
+(`DialChatButton.tsx`). It has held the page number, then the gear, and now
+one click opens HoloChat — which still owns the panel and its state; the
+button only dispatches `toggle-holochat` and reads `holochat-state` back. The
+panel number is still spoken in the dial's `aria-valuetext`; on screen it is
+the card above the dial that names where you are.
 
 ## Rules for adding to it
 

@@ -5,10 +5,10 @@ import { useEffect, useState } from "react";
 // A finger, not a wheel.
 //
 // Two things in the flight want this answer and they have to agree: the
-// gearbox, which starts a touch visitor in free travel because snap landings
-// catch a flick (see travel-gear.ts), and the camera spring, which is
-// tightened on touch because a thumb is in contact with the thing it is
-// moving and any follow reads as lag.
+// smoothed wheel, which is never engaged on touch because native momentum
+// beats a main-thread lerp (see smooth-scroll.ts), and the camera spring,
+// which is tightened on touch because a thumb is in contact with the thing
+// it is moving and any follow reads as lag.
 //
 // `(pointer: coarse)` asks about the *primary* input, which is the right
 // question: a laptop with a touchscreen still reports `fine`, and it should,

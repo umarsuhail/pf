@@ -13,7 +13,7 @@ import {
 } from "framer-motion";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CardPortal } from "./CardPortal";
 import { CardIcon } from "./icons/card-icon";
 import { DownloadIcon, type DownloadIconHandle } from "./icons/download";
@@ -40,12 +40,11 @@ import {
   progressFromScroll,
   scrollFromProgress,
 } from "../data/flightTimeline";
-import { useTravelGear } from "../lib/travel-gear";
 import { useCoarsePointer } from "../lib/pointer";
-import { flightScrollTo, useSmoothScroll } from "../lib/smooth-scroll";
+import { flightScrollTo, setFlightSnapPoints } from "../lib/smooth-scroll";
 import TechnologyLayover, { LayoverCaption } from "./TechnologyLayover";
 import {
-  buildSnapPoints,
+  MAIN_FLIGHT_STOPS,
   TECHNOLOGY_FOCUS_STOPS,
   getCardSlotProgress,
   getDepartWindow,
@@ -389,20 +388,6 @@ function toStrictlyIncreasing(values: number[]) {
     out.push(Math.max(values[i], out[i - 1] + 0.0005));
   }
   return out;
-}
-
-// Snap landings keep the document scrollable and accessible while making a
-// gesture land somewhere chosen. Which landings exist is the gear's call —
-// first gear has none at all.
-function snapMarkerTop(progress: number) {
-  // Converted out of flight progress: these are absolutely positioned down the
-  // track, and the track is scroll. A marker left in progress would sit at the
-  // right moment of the flight in the wrong place in the document.
-  const percentage = Number((scrollFromProgress(progress) * 100).toFixed(4));
-  // The target progress maps over containerHeight - viewportHeight, not the
-  // full track. Expanded form avoids CSS multiplication while remaining
-  // responsive to orientation and browser-toolbar changes.
-  return `calc(${percentage}% - ${percentage}dvh)`;
 }
 
 // `live` gates the cycle on the card actually being on screen.
@@ -1125,9 +1110,6 @@ function BillboardCard({
 
 export default function MultiverseFlight() {
   const containerRef = useRef<HTMLDivElement>(null);
-  // The gearbox both inputs read; see lib/travel-gear.ts. Only its snap
-  // setting matters here — the dial reads the same object for its own ratio.
-  const gear = useTravelGear();
   // `compact` drives the smaller in-flight card sizing. The flight now runs
   // at every viewport — portrait phones included — with `mobileOffsetScale`
   // (derived from the actual viewport width below) keeping the left/right
@@ -1216,82 +1198,68 @@ export default function MultiverseFlight() {
     };
   }, []);
 
-  // How far one wheel gesture lands you is the gear's decision, not this
-  // component's.
-  //
-  // This used to hard-code `y mandatory` with a marker at every stop, which
-  // made one gesture worth one whole panel — you could not scroll *through* a
-  // section, only past it. First gear now turns the layer off entirely (free,
-  // smooth travel), second divides each section into three landings, third
-  // keeps the original panel-at-a-time jump. The flight is a continuous
-  // function of scroll position either way, so nothing below this cares.
-  const snapPoints = useMemo(
-    () => buildSnapPoints(gear.snapStepsPerSection),
-    [gear.snapStepsPerSection],
-  );
-
-  useEffect(() => {
-    const root = document.documentElement;
-    const previousSnapType = root.style.scrollSnapType;
-    const previousSnapPadding = root.style.scrollPaddingTop;
-    const snaps = gear.snapStepsPerSection > 0;
-
-    // Two things drive the scroll position themselves and must not have
-    // mandatory snapping pulling at them every frame: the autopilot tour, and
-    // a hand on the dial. The dial is the reason this is not just the
-    // autopilot flag any more — landings belong to the wheel, and the ring is
-    // supposed to travel continuously whatever gear it is in.
-    let autopilotRunning = false;
-    let dialTurning = false;
-    const applySnap = () => {
-      root.style.scrollSnapType =
-        snaps && !autopilotRunning && !dialTurning ? "y mandatory" : "none";
-    };
-
-    const onAutopilotState = (event: Event) => {
-      autopilotRunning = Boolean(
-        (event as CustomEvent<{ running?: boolean }>).detail?.running,
-      );
-      applySnap();
-    };
-    const onDialState = (event: Event) => {
-      dialTurning = Boolean(
-        (event as CustomEvent<{ turning?: boolean }>).detail?.turning,
-      );
-      applySnap();
-    };
-
-    applySnap();
-    root.style.scrollPaddingTop = "0px";
-    window.addEventListener(
-      "flight-autopilot-state",
-      onAutopilotState as EventListener,
-    );
-    window.addEventListener("flight-dial-turn", onDialState as EventListener);
-    return () => {
-      window.removeEventListener(
-        "flight-autopilot-state",
-        onAutopilotState as EventListener,
-      );
-      window.removeEventListener(
-        "flight-dial-turn",
-        onDialState as EventListener,
-      );
-      root.style.scrollSnapType = previousSnapType;
-      root.style.scrollPaddingTop = previousSnapPadding;
-    };
-  }, [gear.snapStepsPerSection]);
-
   const isMobile = compact;
   // Width answers "how much room is there"; this answers "what is moving it".
   // They are different questions and the camera spring wants the second one.
   const isCoarsePointer = useCoarsePointer();
 
-  // First gear is the only gear without scroll-snap, and Lenis cannot coexist
-  // with scroll-snap; touch is excluded because native momentum beats any
-  // main-thread lerp. See lib/smooth-scroll.ts for both decisions.
-  const smoothWheelActive = gear.snapStepsPerSection === 0 && !isCoarsePointer;
-  useSmoothScroll(smoothWheelActive);
+  // Lenis is mounted for the whole app (SmoothScroll, in ChromeBeforeMain),
+  // not by the flight. What the flight still decides is whether the camera
+  // needs its own follow: Lenis lerps the scroll position on a wheel, but on
+  // touch it only observes one, so the step is still there to take out.
+  const wheelIsSmoothed = !isCoarsePointer;
+
+  // The flight's landings, handed to the snap plugin as absolute scroll
+  // positions — the only form it takes, and the flight is the only thing that
+  // can produce them, since the mapping runs through scrollFromProgress and
+  // the track's measured height.
+  //
+  // Every panel, plus every tool on the radar. The layover is the longest leg
+  // on the track by a distance and the one place where "where am I" has a
+  // precise answer, so the tools earn their own stops; the closing beat is
+  // deliberately left out, because a landing on the last frame would pull
+  // against the push that wraps the flight back to the beginning.
+  //
+  // Proximity snapping, so none of these claim you unless you stop near one.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const progresses = Array.from(
+      new Set(
+        [
+          ...MAIN_FLIGHT_STOPS.map((stop) => stop.progress),
+          ...TECHNOLOGY_FOCUS_STOPS.map((stop) => stop.progress),
+        ].map((progress) => Number(progress.toFixed(5))),
+      ),
+    ).sort((a, b) => a - b);
+
+    const publish = () => {
+      const scrollable = container.offsetHeight - window.innerHeight;
+      if (scrollable <= 0) return;
+      const containerTop = window.scrollY + container.getBoundingClientRect().top;
+      setFlightSnapPoints(
+        progresses.map(
+          (progress) => containerTop + scrollable * scrollFromProgress(progress),
+        ),
+      );
+    };
+
+    publish();
+    // A landing is a pixel position, so it is only correct for the viewport
+    // that produced it — the same URL-bar resize the track is measured in
+    // `svh` to survive moves every one of these.
+    window.addEventListener("resize", publish);
+    window.addEventListener("orientationchange", publish);
+    return () => {
+      window.removeEventListener("resize", publish);
+      window.removeEventListener("orientationchange", publish);
+      // Leaving the flight takes its landings with it, so a detail route does
+      // not inherit stops that mean nothing on it.
+      setFlightSnapPoints([]);
+    };
+  }, []);
+
   // `endMarkBox` is 0 until the first measure lands (there is no window to
   // read during SSR); the breakpoint guess stands in for that one render.
   const markBox = endMarkBox || (isMobile ? 240 : 440);
@@ -1350,7 +1318,7 @@ export default function MultiverseFlight() {
   // re-attaching keeps the motion value, so the swap is safe mid-flight.
   const smoothScrollProgress = useSpring(
     scrollYProgress,
-    smoothWheelActive
+    wheelIsSmoothed
       ? CAMERA_SPRING_LENIS
       : isCoarsePointer
         ? CAMERA_SPRING_TOUCH
@@ -2296,21 +2264,6 @@ export default function MultiverseFlight() {
       // sum waiting to disagree with the first.
       style={{ height: `${TRACK_VH}svh`, overflowAnchor: "none" }}
     >
-      {/* Empty in first gear, which is what "free scrolling" means here. */}
-      {snapPoints.map((point) => (
-        <span
-          key={point.id}
-          aria-hidden="true"
-          className="pointer-events-none absolute left-0 h-px w-px"
-          style={{
-            top: snapMarkerTop(point.progress),
-            scrollSnapAlign: "start",
-            // What makes three landings *at least* three scrolls: a fling
-            // cannot pass over one.
-            scrollSnapStop: "always",
-          }}
-        />
-      ))}
       <div className="sticky top-0 flex h-screen w-screen items-center justify-center overflow-hidden [perspective:1100px]">
         {/* Furthest plane — barely moves, and is over-sized so translating it
            never drags an edge into frame. */}

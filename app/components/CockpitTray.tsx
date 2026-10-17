@@ -1,7 +1,6 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cards } from "../data/sections";
@@ -216,7 +215,6 @@ export default function CockpitTray() {
   const [track, setTrack] = useState<"intro" | "main" | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isSidenavVisible, setIsSidenavVisible] = useState(true);
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const [missionTheme, setMissionTheme] = useState<MissionTheme>(() => {
     if (typeof window === "undefined") return DEFAULT_MISSION_THEME;
     try {
@@ -712,24 +710,6 @@ export default function CockpitTray() {
     );
   };
 
-  // HoloChat is likewise a separate sibling — this just asks it to flip,
-  // and reports its own open/closed state back so this button's icon and
-  // highlight stay in sync with it (including when closed from inside the
-  // panel itself).
-  useEffect(() => {
-    const onChatState = (event: Event) => {
-      const open = (event as CustomEvent<{ open?: boolean }>).detail?.open;
-      if (typeof open === "boolean") setIsChatOpen(open);
-    };
-    window.addEventListener("holochat-state", onChatState as EventListener);
-    return () =>
-      window.removeEventListener("holochat-state", onChatState as EventListener);
-  }, []);
-
-  const toggleChat = () => {
-    window.dispatchEvent(new CustomEvent("toggle-holochat"));
-  };
-
   // On the flight this follows the live camera state. A standalone route has
   // no camera broadcaster, so derive the highlight directly from its URL
   // without a route-change effect and its extra render.
@@ -1160,33 +1140,11 @@ export default function CockpitTray() {
               </>
             )}
 
-            <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
-
-            {/* VEGA chat — moved here from its own floating button; HoloChat
-               still owns the panel and its animation, this just flips it.
-               The brand mark doubles as the trigger: a plain static image,
-               always on screen (this bar never closes the way the tray
-               console does) — no particle canvas here anymore, so no
-               shatter flourish on click, just the button's own toggle. */}
-            <button
-              type="button"
-              onClick={toggleChat}
-              aria-pressed={isChatOpen}
-              aria-label={isChatOpen ? "Close VEGA" : "Open VEGA, the portfolio assistant"}
-              className="relative z-10 h-5 w-5 shrink-0 overflow-hidden rounded-full"
-            >
-            
-              <Image
-                src="/images/us2.png"
-                alt=""
-                fill
-                // The button is a fixed h-5 w-5 (20px) at every breakpoint.
-                // "100vw" had Next picking a candidate sized for the whole
-                // viewport and painting it into a 20px circle.
-                sizes="20px"
-                className="absolute inset-0 object-cover"
-              />
-            </button>
+            {/* VEGA's trigger used to sit here, as the brand mark. It lives
+               in the middle of the scroll dial now (DialChatButton), where
+               the gearbox was — one control, on the instrument the traveller
+               already has a hand on. HoloChat still owns the panel either
+               way; this was only ever a button that flipped it. */}
 
             <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
 

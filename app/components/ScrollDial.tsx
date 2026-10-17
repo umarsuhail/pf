@@ -5,8 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FLIGHT_SECTION_STOPS } from "../data/flightStops";
 import { progressFromScroll } from "../data/flightTimeline";
 import { playTick, primeTicks } from "../lib/tick-sound";
-import { useTravelGear } from "../lib/travel-gear";
-import DialGearButton from "./DialGearButton";
+import DialChatButton from "./DialChatButton";
 
 // Dial moves are discrete and must not inherit the document's global smooth
 // scrolling. The 3D camera owns the short visual settle after the document
@@ -58,11 +57,16 @@ const DETENT_DEGREES = TURN / DETENTS;
 //
 // This replaces a sector model — turn 48°, release, and the page jumped a
 // whole section — which made the dial a set of buttons arranged in a circle
-// and left the ring with nothing to say in between them. How much rotation a
-// section costs is the gear's decision now (lib/travel-gear.ts): three full
-// revolutions in first, one in second, a third of one in third. The detents
-// are what make that legible — 108 clicks to cross a section in first gear,
-// 12 in third — so the ring reports the distance, not just the arrival.
+// and left the ring with nothing to say in between them. One full revolution
+// is one section, and the detents are what make that legible — 36 clicks to
+// cross a section — so the ring reports the distance, not just the arrival.
+//
+// This was a gearbox for a while: three ratios the traveller could step
+// through, paired with three snapping modes for the wheel. The snapping is
+// gone — nothing lands any more, the flight is free travel throughout — and
+// a ratio selector with nothing to pair against is just a setting, so the
+// middle ratio became the only one.
+const DEGREES_PER_SECTION = 360;
 //
 // Movement below MIN_TRAVEL is the hand resting rather than travelling, and
 // re-dispatching scroll for it would only fight the camera's own settle.
@@ -176,11 +180,6 @@ const DESKTOP_MAX_DIAL_SCALE = 1.7;
 
 export default function ScrollDial() {
   const pathname = usePathname();
-  // How much ground one turn of the ring covers. The wheel reads the same
-  // gear for its own landings (see MultiverseFlight), which is what keeps the
-  // two inputs feeling like two speeds of one vehicle rather than two
-  // unrelated controls.
-  const gear = useTravelGear();
   const [compact, setCompact] = useState(
     () => typeof window !== "undefined" && window.matchMedia(COMPACT_QUERY).matches,
   );
@@ -469,10 +468,9 @@ export default function ScrollDial() {
 
     // The whole of the travel, recomputed from the gesture's origin: the
     // flight follows the ring continuously instead of waiting for a sector
-    // to complete. `degreesPerSection` is the gear ratio — the same rotation
-    // covers three times as much ground in second as in first.
+    // to complete.
     const travelled =
-      turnStartRef.current + gestureRotationRef.current / gear.degreesPerSection;
+      turnStartRef.current + gestureRotationRef.current / DEGREES_PER_SECTION;
     const next = progressFromTurn(travelled);
     if (Math.abs(next - progressRef.current) < MIN_TRAVEL) return;
     commit(next);
@@ -482,34 +480,16 @@ export default function ScrollDial() {
     if (!draggingRef.current) return;
     draggingRef.current = false;
     setDragging(false);
-    // Landings are the wheel's again. In a gear that has them, the browser
-    // settles to the nearest one from wherever the ring was let go — which
-    // is what a landing means; only first gear leaves you exactly there.
     announceTurning(false);
     gestureRotationRef.current = 0;
     if (bezelRef.current) {
       bezelRef.current.style.transition = BEZEL_RETURN_TRANSITION;
     }
-
-    // Third gear lands. It is the section-to-section gear, so letting go
-    // between two of them would be the one thing it is not for — the ring is
-    // eased the remaining fraction of a section so the landing is visible on
-    // the bezel too, not just in the page.
-    //
-    // First and second leave the traveller exactly where they stopped:
-    // stopping between two places is the whole point of a low gear, and a
-    // snap-back would undo the last part of every careful turn.
-    if (!gear.settlesOnStops) return;
-
-    const landing = stops[nearestStopIndex(progressRef.current)];
-    if (!landing) return;
-    const remainder =
-      turnFromProgress(landing.progress) - turnFromProgress(progressRef.current);
-    bezelAngleRef.current += remainder * gear.degreesPerSection;
-    applyBezelRotation(bezelAngleRef.current);
-    lastDetentRef.current = Math.round(bezelAngleRef.current / DETENT_DEGREES);
-    commit(landing.progress);
-  }, [applyBezelRotation, commit, gear]);
+    // Nothing settles. The ring leaves the traveller exactly where they
+    // stopped, because stopping between two places is the point of a flight
+    // that no longer lands anywhere — a snap-back would undo the last part
+    // of every careful turn.
+  }, []);
 
   // The release can arrive anywhere.
   //
@@ -568,7 +548,7 @@ export default function ScrollDial() {
     if (bezelRef.current) {
       bezelRef.current.style.transition = BEZEL_RETURN_TRANSITION;
     }
-    bezelAngleRef.current += turned * gear.degreesPerSection;
+    bezelAngleRef.current += turned * DEGREES_PER_SECTION;
     applyBezelRotation(bezelAngleRef.current);
     lastDetentRef.current = Math.round(bezelAngleRef.current / DETENT_DEGREES);
     commit(target.progress);
@@ -885,15 +865,14 @@ export default function ScrollDial() {
           );
         })}
 
-        {/* The middle of the face is the gearbox — see DialGearButton.
-           It replaces the page number that used to sit here: with the section
-           named on the card directly above the dial, the centre was spending
-           the only readout the face has on a figure that was already legible
-           two centimetres away, while the gear — which changes how far every
-           gesture travels — had nowhere to live. The number is still spoken
-           in the slider's aria-valuetext, so nothing was lost for a screen
-           reader. */}
-        <DialGearButton compact={compact} />
+        {/* The middle of the face is the way in to the assistant — see
+           DialChatButton. It has held the page number and then the gearbox;
+           with the section named on the card directly above the dial and the
+           gears gone, the only readout the face has is free for the one
+           control that had been living in the top console. The page number is
+           still spoken in the slider's aria-valuetext, so nothing was lost
+           for a screen reader. */}
+        <DialChatButton compact={compact} />
 
         {/* Crystal sheen. Skipped on phones — a full-face radial gradient over
            the dial is another composited layer for a highlight that is a few

@@ -15,6 +15,10 @@ import dynamic from "next/dynamic";
 // `ssr: false` take effect, so they load and hydrate off the critical path
 // instead of competing with the page's actual content for the main thread
 // right after load.
+// The app's scrolling: a smoothed wheel and the flight's landings. Loaded
+// client-only and off the critical path like the rest of this file, so Lenis
+// and its stylesheet are not in the bundle that has to hydrate first.
+const SmoothScroll = dynamic(() => import("./SmoothScroll"), { ssr: false });
 const ScrollSound = dynamic(() => import("./ScrollSound"), { ssr: false });
 const CockpitTray = dynamic(() => import("./CockpitTray"), { ssr: false });
 const AutopilotStartToast = dynamic(() => import("./AutopilotStartToast"), {
@@ -36,6 +40,7 @@ const SkipIntroPrompt = dynamic(() => import("./SkipIntroPrompt"), { ssr: false 
 export default function ChromeBeforeMain() {
   return (
     <>
+      <SmoothScroll />
       <ScrollSound />
       <CockpitTray />
       <AutopilotStartToast />
