@@ -1,9 +1,9 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
 import type { FlightCard } from "../data/sections";
+import { ProjectVisual } from "./ProjectVisual";
 import { ArrowLeftIcon } from "../components/icons/arrow-left";
 import { ArrowRightIcon } from "../components/icons/arrow-right";
 
@@ -80,14 +80,7 @@ function MissionDossier({
           </div>
 
           <figure className="mission-visual">
-            <Image
-              src={project.image}
-              alt={`${project.title} project preview`}
-              fill
-              sizes="100vw"
-              className={project.imageFit === "contain" ? "object-contain p-4" : "object-cover"}
-              priority
-            />
+            <ProjectVisual project={project} sizes="100vw" padding="p-4" priority />
           </figure>
 
           <div className="mission-chapters">
@@ -180,12 +173,9 @@ export function ProjectMissionLog({ projects }: { projects: Project[] }) {
           {visibleProjects.map(({ project, index }) => (
             <article key={project.title} className="mission-file" data-file={`File ${fileNumber(index)}`}>
               <div className="mission-file-visual">
-                <Image
-                  src={project.image}
-                  alt=""
-                  fill
+                <ProjectVisual
+                  project={project}
                   sizes="(max-width: 720px) 100vw, 260px"
-                  className={project.imageFit === "contain" ? "object-contain p-3" : "object-cover"}
                 />
               </div>
               <div className="mission-file-body">

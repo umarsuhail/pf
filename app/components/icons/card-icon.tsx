@@ -8,9 +8,6 @@ import { CpuIcon } from "./cpu";
 import { BriefcaseBusinessIcon } from "./briefcase-business";
 import { AtSignIcon } from "./at-sign";
 
-// Every lucide-animated icon shares this exact shape (size?: number over
-// HTMLAttributes<HTMLDivElement>, wrapping a ref handle with start/stop) —
-// declared once so the registry below can hold them interchangeably.
 export type AnimatedIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
@@ -20,8 +17,6 @@ export type AnimatedIcon = React.ForwardRefExoticComponent<
   AnimatedIconProps & RefAttributes<AnimatedIconHandle>
 >;
 
-// One icon per section — keyed by the card id used throughout sections.ts,
-// so every place that renders a card can look its icon up the same way.
 const REGISTRY: Record<string, AnimatedIcon> = {
   home: HomeIcon,
   skills: HatGlassesIcon,

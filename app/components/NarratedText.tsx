@@ -5,11 +5,6 @@ import { narrationSegments, type NarrationWordSegment } from "../data/narration"
 
 type WordState = "read" | "current" | "future";
 
-// Each word belongs to one of the four narration clips (spanIndex). Whichever
-// clip is actually playing right now drives its own words' reveal fraction
-// off that clip's real currentTime/duration — spans before it are fully
-// read, spans after it stay dim. No estimation: this is exact because each
-// span is a real, separately-playing <audio> element.
 function resolveStates(
   words: string[],
   segments: NarrationWordSegment[],
@@ -31,7 +26,6 @@ function resolveStates(
       states.fill("read", cursor, Math.min(revealed, segmentEnd));
       if (revealed < segmentEnd) states[revealed] = "current";
     }
-    // spanIndex > activeSpanIndex: not reached yet, stays "future".
 
     cursor = segmentEnd;
   }
@@ -39,11 +33,6 @@ function resolveStates(
   return states;
 }
 
-// Listens for CockpitTray's per-clip narration clock and lights up words as
-// they're spoken, karaoke-style. Falls back to plain, fully-readable text
-// whenever the narration isn't actively playing — before it starts, after it
-// hands over to the main track, or if it's stopped outright — rather than
-// leaving the copy stuck half-dimmed.
 export default function NarratedText({
   id,
   text,
@@ -103,7 +92,7 @@ export default function NarratedText({
               ? "text-inherit"
               : states[i] === "current"
                 ? "text-(--accent)"
-                : "text-slate-500/60"
+                : "text-(--flight-muted) opacity-60"
           }
         >
           {word}

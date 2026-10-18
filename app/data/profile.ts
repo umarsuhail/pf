@@ -1,6 +1,3 @@
-// Structured profile data — the source of truth for the AI assistant's
-// context and anywhere else that needs the raw facts rather than the
-// hand-written flight-card prose in sections.ts.
 
 export const skills = [
   { name: "React JS", level: "Expert" },

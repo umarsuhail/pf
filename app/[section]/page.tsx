@@ -4,8 +4,6 @@ import { cacheLife } from "next/cache";
 import { cardGradients, cards } from "../data/sections";
 import { SectionContent } from "./SectionContent";
 
-// The resume card downloads a PDF directly instead of opening a details
-// page, so it's excluded from the standalone /[section] routes.
 const detailSections = cards.filter((card) => card.id !== "resume");
 
 export function generateStaticParams() {
@@ -29,7 +27,6 @@ export async function generateMetadata({
   if (!card) return {};
 
   return {
-    // The root layout's title template already appends "| Umar Suhail".
     title: card.title,
     description: card.description,
     alternates: { canonical: `/${card.id}` },

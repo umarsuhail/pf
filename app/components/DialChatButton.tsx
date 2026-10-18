@@ -3,26 +3,6 @@
 import { useEffect, useState } from "react";
 import { playTick } from "../lib/tick-sound";
 
-// The middle of the dial, which used to be the gearbox.
-//
-// The gears are gone — the flight does not snap any more, so there is no
-// ratio left to choose — and the one readout the dial has room for is better
-// spent on the way in to the assistant. HoloChat already owns its own open
-// state and listens for `toggle-holochat`; this is a trigger, not a second
-// source of truth, so it reads the state back off `holochat-state`.
-//
-// A click, not a three-second hold. The hold existed because changing gear
-// altered how far every gesture travelled under someone mid-read; opening a
-// panel is reversible by the same button that opened it, so making it
-// deliberate would be ceremony for its own sake.
-
-// The glyph is lucide's bot-message-square, the same one HoloChat shows in
-// its own header, inlined because this lives inside the dial's <svg> and the
-// icon component renders a <div> around its own.
-//
-// Its art is a 24-unit box; the dial's face is 120 units with the button
-// centred at (60, 60). Scaled to `size` units and offset by half of that, so
-// the glyph's own centre lands on the button's.
 function ChatGlyph({ size }: { size: number }) {
   const scale = size / 24;
   const offset = 60 - (24 * scale) / 2;
@@ -62,8 +42,6 @@ export default function DialChatButton({ compact }: { compact: boolean }) {
 
   const toggle = () => {
     window.dispatchEvent(new CustomEvent("toggle-holochat"));
-    // Lower and softer than the bezel's detent, so opening the assistant
-    // never sounds like one more notch of travel.
     playTick(0.72, 0.42);
   };
 
@@ -74,9 +52,6 @@ export default function DialChatButton({ compact }: { compact: boolean }) {
       aria-label={isOpen ? "Close the assistant" : "Open the assistant"}
       aria-pressed={isOpen}
       className="gear-control cursor-pointer outline-none"
-      // Every pointer event stops here. The whole dial is a drag surface, and
-      // without this, pressing the button would also grab the bezel and fly
-      // the page out from under the press.
       onPointerDown={(e) => {
         e.stopPropagation();
         setPressed(true);
@@ -91,7 +66,6 @@ export default function DialChatButton({ compact }: { compact: boolean }) {
       onPointerLeave={() => setPressed(false)}
       onKeyDown={(e) => {
         if (e.key !== "Enter" && e.key !== " ") return;
-        // Space would otherwise scroll the page out from under the dial.
         e.preventDefault();
         e.stopPropagation();
         if (e.repeat) return;
@@ -107,12 +81,6 @@ export default function DialChatButton({ compact }: { compact: boolean }) {
       onBlur={() => setPressed(false)}
     >
       <defs>
-        {/* Black neumorphism, done with gradients rather than blurred
-           shadows: an SVG drop-shadow filter rasterises its subtree into an
-           offscreen buffer every frame this ring turns, which is exactly the
-           cost the compact dial strips out elsewhere. A bevel ring lit from
-           the top-left and a face gradient running the same way read as
-           raised at this size for nothing. */}
         <linearGradient id="gear-face" x1="18%" y1="0%" x2="82%" y2="100%">
           <stop offset="0%" stopColor="var(--flight-gear-face-1)" />
           <stop offset="55%" stopColor="var(--flight-gear-face-2)" />
@@ -123,7 +91,6 @@ export default function DialChatButton({ compact }: { compact: boolean }) {
           <stop offset="55%" stopColor="var(--flight-gear-face-3)" />
           <stop offset="100%" stopColor="var(--flight-gear-face-pressed)" />
         </linearGradient>
-        {/* The bevel: light where the light is, black where it is not. */}
         <linearGradient id="gear-bevel" x1="20%" y1="0%" x2="80%" y2="100%">
           <stop offset="0%" stopColor="rgba(255,255,255,0.22)" />
           <stop offset="45%" stopColor="rgba(255,255,255,0.04)" />
@@ -136,9 +103,6 @@ export default function DialChatButton({ compact }: { compact: boolean }) {
         </linearGradient>
       </defs>
 
-      {/* The button stands on the face: a soft dark seat under it, then the
-         cap itself, then the bevel. Pressed, the whole stack flips its
-         lighting so the cap reads as pushed into the dial. */}
       <circle cx="60" cy="60" r="24" fill="color-mix(in srgb, var(--flight-dial-case) 72%, black)" />
       <circle
         className="gear-face"
@@ -162,8 +126,6 @@ export default function DialChatButton({ compact }: { compact: boolean }) {
 
       <ChatGlyph size={compact ? 19 : 22} />
 
-      {/* Open, the accent ring sits lit around the cap — the same ring the
-         gear's hold used to fill, reused as a plain state light. */}
       <circle
         cx="60"
         cy="60"

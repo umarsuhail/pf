@@ -49,18 +49,18 @@ export default function CallbackForm() {
   };
 
   const inputClass =
-    "w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition-colors focus:border-sky-300/50 focus:bg-white/[0.06]";
+    "detail-input w-full rounded-xl border px-4 py-3 text-sm outline-none transition-colors";
 
   return (
     <section aria-labelledby="callback-heading" className="mt-16">
       <div className="flex items-center gap-4">
         <h2
           id="callback-heading"
-          className="text-xs font-semibold uppercase tracking-[0.32em] text-sky-100/60"
+          className="detail-muted text-xs font-semibold uppercase tracking-[0.32em]"
         >
           Request a Callback
         </h2>
-        <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+        <div className="detail-rule h-px flex-1" />
       </div>
 
       <form onSubmit={handleSubmit} className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -111,7 +111,7 @@ export default function CallbackForm() {
           <button
             type="submit"
             disabled={status.state === "submitting"}
-            className="rounded-full border border-sky-200/25 bg-white/10 px-6 py-3 text-sm font-semibold text-sky-50 transition duration-300 hover:-translate-y-1 disabled:pointer-events-none disabled:opacity-60"
+            className="detail-action-primary rounded-full px-6 py-3 text-sm font-semibold hover:-translate-y-1 disabled:pointer-events-none disabled:opacity-60"
           >
             {status.state === "submitting" ? "Sending..." : "Request Callback"}
           </button>
@@ -120,10 +120,10 @@ export default function CallbackForm() {
               role="status"
               className={`text-sm ${
                 status.state === "success"
-                  ? "text-emerald-300"
+                  ? "detail-success"
                   : status.state === "error"
-                    ? "text-red-300"
-                    : "text-slate-400"
+                    ? "detail-error"
+                    : "detail-muted"
               }`}
             >
               {status.message}

@@ -4,10 +4,7 @@
   --background: #020617;
   --foreground: #e2e8f0;
   --accent: #7dd3fc;
-  /* The sky behind every route. Painted by the fixed layer under `body`
-     rather than by the body itself — see `body::before`. */
   --page-sky: linear-gradient(180deg, #002d54 0%, #00101f 100%);
-  /* The flat colour under that layer, so the canvas is never unpainted. */
   --page-sky-base: #00101f;
 }
 
@@ -31,14 +28,6 @@ body {
   transition: color 220ms ease;
 }
 
-/* The sky, in a layer the compositor can keep.
-   This was `background-attachment: fixed` on the body, which pins the
-   gradient to the viewport by repainting it on every scroll frame — and a
-   scrolling box with a fixed background cannot be handed to the compositor
-   at all, so the whole page is repainted with it. It is the single most
-   expensive thing a long scrolling page can do on a phone, and on `/` it
-   bought nothing: the flight's own opaque backdrop covers it for the length
-   of the track. A fixed child is painted once and then only translated. */
 body::before {
   content: "";
   position: fixed;
@@ -53,11 +42,6 @@ li {
   text-wrap: pretty;
 }
 
-/* Layered so Tailwind utility classes (text-*, hover:text-*, etc.) can
-   still override these defaults on individual elements — unlayered CSS
-   otherwise beats @layer utilities in Tailwind v4 regardless of source
-   order, which was silently forcing every <a>/heading to --accent even
-   when a component set its own text color (e.g. black text on a button). */
 @layer base {
   a,
   h1,
@@ -81,10 +65,6 @@ li {
     text-wrap: balance;
   }
 
-  /* Marvel ships two weights only (400 and 700). The previous 640-760
-     values implied a variable axis that does not exist — every one of them
-     resolved to the 700 file, so the hierarchy here comes from size, not
-     weight. Stated explicitly so nobody tunes a number that cannot move. */
   h1 {
     font-size: clamp(2.5rem, 1.9rem + 2.9vw, 5rem);
     font-weight: 700;
@@ -108,10 +88,6 @@ li {
   }
 }
 
-/* Mission UI ---------------------------------------------------------------
-   `flight` preserves the portfolio's original blue palette. The two log
-   palettes come from the supplied standalone reference. Components consume
-   semantic variables so a future theme is one new variable block. */
 :root {
   --mission-space: #020617;
   --mission-hull: #0f172a;
@@ -128,8 +104,6 @@ li {
   --mission-mono: var(--font-plex-mono), ui-monospace, monospace;
   color-scheme: dark;
 
-  /* The windscreen and portal art keep their story palette in every theme.
-     These tokens are the readable cockpit surfaces placed in front of it. */
   --flight-ink: #f0f9ff;
   --flight-dim: #cbd5e1;
   --flight-muted: #94a3b8;
@@ -473,9 +447,185 @@ li {
 ) { color: var(--flight-muted); }
 
 .detail-page {
-  color: var(--mission-ink);
+  --mission-space: var(--flight-surface-solid);
+  --mission-hull: var(--flight-surface);
+  --mission-hull-2: var(--flight-surface-raised);
+  --mission-line: var(--flight-line);
+  --mission-ink: var(--flight-ink);
+  --mission-dim: var(--flight-dim);
+  --mission-accent: var(--flight-accent);
+  --mission-on-accent: var(--flight-on-accent);
+  --mission-positive: var(--flight-positive);
+  --accent: var(--flight-accent);
+  color: var(--flight-ink);
   font-family: var(--mission-body);
   transition: color 180ms ease;
+}
+
+.detail-atmosphere {
+  background:
+    radial-gradient(82% 66% at 10% 10%, color-mix(in srgb, var(--flight-accent) 14%, transparent), transparent 68%),
+    radial-gradient(72% 62% at 92% 84%, color-mix(in srgb, var(--flight-positive) 9%, transparent), transparent 66%),
+    linear-gradient(180deg, transparent, color-mix(in srgb, var(--flight-surface-solid) 34%, transparent));
+  transition: background 220ms ease;
+}
+
+.detail-panel {
+  border-color: var(--flight-line);
+  box-shadow: var(--flight-card-shadow);
+}
+
+.detail-ink { color: var(--flight-ink); }
+.detail-copy { color: var(--flight-dim); }
+.detail-muted { color: var(--flight-muted); }
+.detail-accent { color: var(--flight-accent); }
+.detail-positive { color: var(--flight-positive); }
+.detail-line { border-color: var(--flight-line); }
+.detail-rule { background: linear-gradient(90deg, var(--flight-line), transparent); }
+
+.detail-eyebrow,
+.detail-status-pill {
+  border-color: color-mix(in srgb, var(--flight-positive) 32%, transparent);
+  background: color-mix(in srgb, var(--flight-positive) 11%, transparent);
+  color: color-mix(in srgb, var(--flight-positive) 82%, var(--flight-ink));
+}
+
+.detail-back-link { color: var(--flight-muted); }
+.detail-back-link:hover { color: var(--flight-ink); }
+.detail-back-link:hover .detail-copy { color: var(--flight-ink); }
+
+.detail-action-primary,
+.detail-action-secondary {
+  border: 1px solid var(--flight-line);
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.detail-action-primary {
+  border-color: var(--flight-accent);
+  background: var(--flight-accent);
+  color: var(--flight-on-accent);
+}
+
+.detail-action-primary:hover {
+  background: color-mix(in srgb, var(--flight-accent) 86%, var(--flight-ink));
+}
+
+.detail-action-secondary {
+  background: var(--flight-control);
+  color: var(--flight-ink);
+}
+
+.detail-action-secondary:hover {
+  border-color: var(--flight-accent);
+  background: var(--flight-control-hover);
+}
+
+.detail-surface,
+.detail-surface-subtle,
+.detail-surface-raised {
+  border-color: var(--flight-line);
+  color: var(--flight-ink);
+}
+
+.detail-surface { background: var(--flight-surface); }
+.detail-surface-subtle { background: var(--flight-control); }
+.detail-surface-subtle:hover { background: var(--flight-control-hover); }
+.detail-surface-raised { background: color-mix(in srgb, var(--flight-surface-raised) 88%, transparent); }
+
+.detail-icon {
+  border-color: color-mix(in srgb, var(--flight-accent) 28%, transparent);
+  background: color-mix(in srgb, var(--flight-accent) 11%, transparent);
+  color: var(--flight-accent);
+}
+
+.detail-glow { background: color-mix(in srgb, var(--flight-accent) 8%, transparent); }
+.detail-positive-dot { background: color-mix(in srgb, var(--flight-positive) 66%, transparent); }
+
+.detail-timeline {
+  border-color: var(--flight-line);
+}
+
+.detail-timeline-dot {
+  background: var(--flight-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--flight-accent) 20%, transparent);
+}
+
+.detail-input {
+  border-color: var(--flight-line);
+  background: var(--flight-control);
+  color: var(--flight-ink);
+}
+
+.detail-input::placeholder { color: var(--flight-muted); }
+.detail-input:focus {
+  border-color: color-mix(in srgb, var(--flight-accent) 58%, transparent);
+  background: var(--flight-control-hover);
+}
+
+.detail-success { color: var(--flight-positive); }
+.detail-error { color: color-mix(in srgb, #ef4444 72%, var(--flight-ink)); }
+
+.detail-project-card {
+  border-color: var(--flight-line);
+  background: color-mix(in srgb, var(--flight-surface-solid) 92%, transparent);
+  box-shadow: 0 18px 42px color-mix(in srgb, var(--flight-surface-solid) 62%, transparent);
+}
+
+.detail-project-card:hover {
+  border-color: color-mix(in srgb, var(--flight-accent) 42%, transparent);
+  box-shadow: 0 24px 58px color-mix(in srgb, var(--flight-accent) 24%, transparent);
+}
+
+.detail-project-visual {
+  border-color: var(--flight-line);
+  background: var(--flight-surface-raised);
+}
+
+.detail-project-veil {
+  background: linear-gradient(135deg, transparent, color-mix(in srgb, var(--flight-surface-solid) 68%, transparent));
+}
+
+.detail-project-tag {
+  border-color: var(--flight-line);
+  background: color-mix(in srgb, var(--flight-surface-solid) 76%, transparent);
+  color: var(--flight-dim);
+}
+
+.detail-project-stage {
+  border-color: var(--flight-line);
+  background: color-mix(in srgb, var(--flight-surface-solid) 48%, transparent);
+  box-shadow: 0 32px 90px -28px color-mix(in srgb, var(--flight-accent) 48%, transparent);
+}
+
+.detail-project-stage-glow {
+  background:
+    radial-gradient(circle at 25% 45%, color-mix(in srgb, var(--flight-accent) 20%, transparent), transparent 28%),
+    radial-gradient(circle at 78% 24%, color-mix(in srgb, var(--flight-positive) 16%, transparent), transparent 34%),
+    linear-gradient(145deg, color-mix(in srgb, var(--flight-surface-raised) 35%, transparent), color-mix(in srgb, var(--flight-surface-solid) 90%, transparent));
+}
+
+.detail-project-grid,
+.detail-project-fallback-grid {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--flight-accent) 10%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--flight-accent) 10%, transparent) 1px, transparent 1px);
+}
+
+.detail-project-orbit-primary {
+  border-color: color-mix(in srgb, var(--flight-accent) 22%, transparent);
+  box-shadow:
+    0 0 55px color-mix(in srgb, var(--flight-accent) 20%, transparent),
+    inset 0 0 40px color-mix(in srgb, var(--flight-accent) 12%, transparent);
+}
+
+.detail-project-orbit-secondary { border-color: color-mix(in srgb, var(--flight-positive) 22%, transparent); }
+.detail-project-orbit-tertiary { border-color: color-mix(in srgb, var(--flight-accent) 28%, transparent); }
+.detail-project-logo { filter: drop-shadow(0 20px 34px color-mix(in srgb, var(--flight-accent) 30%, transparent)); }
+
+.detail-project-fallback {
+  background:
+    radial-gradient(circle at 30% 35%, color-mix(in srgb, var(--flight-accent) 22%, transparent), transparent 60%),
+    linear-gradient(145deg, color-mix(in srgb, var(--flight-surface-raised) 60%, transparent), var(--flight-surface-solid));
 }
 
 :root[data-mission-theme="dark"],
@@ -486,15 +636,6 @@ li {
 
 :root[data-mission-theme="dark"] body,
 :root[data-mission-theme="light"] body {
-  color: var(--mission-ink);
-}
-
-:root[data-mission-theme="dark"] .detail-page,
-:root[data-mission-theme="light"] .detail-page {
-  --accent: var(--mission-accent);
-}
-
-:root[data-mission-theme="light"] .detail-page :is(.text-sky-50,.text-slate-50\/90,.text-slate-100\/90,.text-slate-100\/80,.text-slate-100\/70,.text-sky-100\/80,.text-sky-100\/60,.text-sky-100\/50,.text-sky-100\/40) {
   color: var(--mission-ink);
 }
 
@@ -696,18 +837,10 @@ a {
 }
 
 html {
-  /* Only ever seen if the fixed sky layer has not painted yet. A flat colour
-     on the root costs nothing; a gradient here would stretch over the whole
-     3330svh track rather than the viewport, which is why the sky is a fixed
-     child instead. */
   background: var(--page-sky-base);
-  /* Programmatic scrolls only — user wheel and touch scrolling is unaffected
-     by this. The flight passes an explicit `behavior` on every scrollTo it
-     makes, so this governs snap transitions and nothing else. */
   scroll-behavior: smooth;
 }
 
-/* Soft neumorphic panel used by the floating navbar */
 .neumorphic-panel {
   background: #f3f5f9;
   box-shadow:
@@ -718,12 +851,9 @@ html {
 .hero-overlay {
   width: 100%;
   height: 400px;
-  /* The gradient MUST come before the image URL */
   background-image: linear-gradient(to bottom,
       rgba(0, 0, 0, 0.3),
-      /* 30% opaque black at the top */
       rgba(0, 0, 0, 0.8)
-      /* 80% opaque black at the bottom */
     ), url('/mylogo.svg');
 
   background-size: cover;
@@ -778,10 +908,6 @@ html {
   }
 }
 
-/* VEGA communications console ------------------------------------------------
-   A static coordinate grid and two compositor-only accents give the chat its
-   spacecraft-instrument character without adding another canvas or repainting
-   a large filtered surface on every frame. */
 .vega-panel-grid {
   background-image:
     linear-gradient(rgba(103, 232, 249, 0.025) 1px, transparent 1px),
@@ -822,7 +948,6 @@ html {
   animation: vegaOrbit 18s linear infinite;
 }
 
-/* Set on the chat panel while it is closed (see HoloChat). */
 .vega-dormant :is(.vega-scanline, .vega-orbit-ring) {
   animation-play-state: paused;
 }
@@ -903,9 +1028,6 @@ html {
   }
 }
 
-/* Ambient shooting stars are launched one at a time by ShootingStars.tsx.
-   Their lane and scale vary, but the authored art keeps its original
-   top-left to bottom-right direction. */
 @keyframes ambientShootingStarPass {
   0% {
     opacity: 0;
@@ -936,18 +1058,6 @@ html {
   will-change: transform, opacity;
 }
 
-/* One slower, nearer streak, on its own long cadence.
-   This used to approach almost straight down the viewer's Z axis: it
-   translated 8vw/13vh while scaling 0.08 -> 2.8, so a 35x growth was set
-   against barely a tenth of a screen of travel. Scale that far ahead of
-   translation does not read as distance — it reads as a star sitting still
-   and swelling, which is what it looked like. It now crosses the frame like
-   the launched ones do (see ambientShootingStarPass above), keeping a modest
-   growth for depth rather than leading with it.
-   Anchored at 68%/16% by ShootingStars.tsx, so it enters just above the top
-   edge and leaves past the bottom-right corner.
-   Most of the twelve-second loop is still deliberately empty: this is a rare
-   beat, not a second stream of streaks. */
 @keyframes ambientDepthStarApproach {
   0%,
   80% {
@@ -984,7 +1094,6 @@ html {
   }
 }
 
-/* Per-section portal motifs (About/Skills/Projects/Experience/Open Source/Contact) */
 @keyframes motifBreathe {
 
   0%,
@@ -1046,20 +1155,15 @@ html {
   animation-delay: -0.8s;
 }
 
-/* Set by CardPortal while its window is off screen (see isNear there). */
 .motif-dormant :is(.motif-breathe, .motif-drift, .motif-float-slow, .motif-float-med, .motif-float-fast) {
   animation-play-state: paused;
 }
 
-/* The toolkit radar (RadarScope). Its face and line art take the theme's
-   accent and its beam the theme's second colour, like every other card. */
 :root {
   --radar-face: var(--flight-accent);
   --radar-beam: var(--flight-positive);
 }
 
-/* Day's green is a text colour, dark enough to read on a pale card; screened
-   over the dark scope it barely shows, so the beam takes a lit version. */
 :root[data-mission-theme="light"] {
   --radar-beam: #34b37a;
 }
@@ -1074,7 +1178,6 @@ html {
   animation: radarSweep 4.2s linear infinite;
 }
 
-/* Set by RadarCard whenever nothing of the card is on screen. */
 .radar-dormant .radar-beam {
   animation-play-state: paused;
 }
@@ -1085,10 +1188,6 @@ html {
   }
 }
 
-/* The loader's sky: two slow nebula washes drifting against each other over a
-   near-black ground, and a star layer that breathes. Transform and opacity
-   only, so they stay on the compositor while the page loads underneath —
-   the particle mark is the one thing on this screen that should be working. */
 @keyframes loaderNebulaB {
   0% { transform: translate3d(5%, 4%, 0) scale(1.08); opacity: 0.9; }
   50% { transform: translate3d(-4%, -5%, 0) scale(0.96); opacity: 0.6; }
@@ -1142,8 +1241,6 @@ html {
     animation: none;
   }
 
-  /* The loader's sky holds still; the mark still assembles, since that is
-     the progress report rather than decoration. */
   .loader-photo,
   .loader-nebula-b,
   .loader-stars,

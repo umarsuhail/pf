@@ -4,12 +4,6 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { BotIcon } from "./icons/bot";
-// Imported, never copied. This file used to hold its own duplicate of the
-// map, frozen at the pre-layover layout (skills 0.22, projects 0.56), so
-// clicking "Projects" in the nav flew to 0.56 — by then a coordinate inside
-// the technology layover, nowhere near the Projects card. A second copy of a
-// moving number is a bug with a delay on it; AGENTS.md rule 2 is that the
-// numbering is shared.
 import { sectionProgressMap } from "../data/sections";
 
 const navLinks = [
@@ -83,9 +77,6 @@ function navigateToSection(id: string) {
   );
 }
 
-// Framer's `layout` measures with getBoundingClientRect, so it only behaves
-// on elements outside a 3D perspective context — this pill is fixed to the
-// viewport, well clear of the flight scene's transforms.
 const PILL_SPRING = { type: "spring", stiffness: 320, damping: 32, mass: 0.7 } as const;
 
 export default function NeumorphicNavbar() {
@@ -93,12 +84,6 @@ export default function NeumorphicNavbar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isPillOpen, setIsPillOpen] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
-  // Scroll progress used to just be React state, but the flight broadcasts
-  // it on every scroll tick (~60/s) — routing that through setState forced
-  // a full re-render of this whole nav on every frame while scrolling, just
-  // to change one bar's height. It's read here instead, and the bar's DOM
-  // node is written to directly, so scrolling no longer re-renders this
-  // component at all.
   const journeyProgressRef = useRef(0);
   const progressBarRef = useRef<HTMLDivElement>(null);
 
@@ -158,8 +143,6 @@ export default function NeumorphicNavbar() {
 
   return (
     <>
-      {/* Collapsed: a single round button. Tap it and the pill grows sideways
-         into a horizontal card of section links. */}
       <div className="fixed left-1/2 top-3 z-50 -translate-x-1/2 sm:top-6">
         <motion.nav
           layout
@@ -253,93 +236,6 @@ export default function NeumorphicNavbar() {
           </AnimatePresence>
         </motion.nav>
 
-        {/* <nav className="relative flex items-center justify-between rounded-2xl border border-white/70 bg-gray-100/95 px-3 py-2 shadow-md sm:h-20 sm:rounded-full sm:px-4 sm:py-0 sm:shadow-[8px_8px_16px_#d1d5db,-8px_-8px_16px_#ffffff]">
-          <div className="hidden items-center gap-3 lg:flex">
-            {navLinks.map((link) => {
-              const isActive = activeId === link.id;
-
-              return (
-                <button
-                  key={link.label}
-                  type="button"
-                  onClick={() => handleNavigate(link.id)}
-                  className={`rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-300 ease-in-out focus:outline-none active:scale-95 ${
-                    isActive
-                      ? "bg-(--accent) text-white shadow-[inset_2px_2px_6px_rgba(255,255,255,0.25),0_8px_20px_rgba(18,70,119,0.35)]"
-                      : "bg-gray-100 text-(--accent) shadow-[4px_4px_8px_#d1d5db,-4px_-4px_8px_#ffffff] hover:shadow-[inset_4px_4px_8px_#d1d5db,inset_-4px_-4px_8px_#ffffff]"
-                  }`}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  {link.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="hidden items-center gap-2 pr-2 md:flex">
-            <button
-              type="button"
-              onClick={() => handleNavigate("services")}
-              className="rounded-full bg-gray-100 px-8 py-3 text-sm font-bold text-(--accent) transition-all duration-300 ease-in-out shadow-[4px_4px_8px_#d1d5db,-4px_-4px_8px_#ffffff] hover:shadow-[inset_4px_4px_8px_#d1d5db,inset_-4px_-4px_8px_#ffffff] active:scale-95 focus:outline-none"
-            >
-              Book a Demo
-            </button>
-
-            <button
-              type="button"
-              aria-label="Go to Home"
-              onClick={() => handleNavigate("home")}
-              className="flex items-center justify-center rounded-full border border-white/75 bg-white/70 p-2 shadow-sm"
-            >
-              <Image
-                src="/ef-r-logo.png"
-                alt="EFR Company Logo"
-                width={36}
-                height={36}
-                className="h-8 w-8 object-contain"
-              />
-            </button>
-          </div>
-
-          <button
-            type="button"
-            aria-label="Toggle navigation menu"
-            aria-expanded={isMenuOpen}
-            onClick={() => setIsMenuOpen((prev) => !prev)}
-            className="mr-1 rounded-xl border border-white/80 bg-gray-100 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-(--accent) shadow-sm transition-all duration-300 active:scale-95 lg:hidden"
-          >
-            {isMenuOpen ? "Close" : "Menu"}
-          </button>
-
-          {isMenuOpen && (
-            <div className="absolute left-0 right-0 top-[calc(100%+0.6rem)] rounded-2xl border border-white/80 bg-gray-100/98 p-3 shadow-xl lg:hidden">
-              <div className="grid grid-cols-1 gap-2">
-                {navLinks.map((link) => (
-                  <button
-                    key={link.label}
-                    type="button"
-                    onClick={() => handleNavigate(link.id)}
-                    className={`rounded-xl px-4 py-3 text-left text-sm font-semibold ${
-                      activeId === link.id
-                        ? "bg-(--accent) text-white"
-                        : "bg-gray-100 text-(--accent) shadow-[inset_2px_2px_6px_#d1d5db,inset_-2px_-2px_6px_#ffffff]"
-                    }`}
-                    aria-current={activeId === link.id ? "page" : undefined}
-                  >
-                    {link.label}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => handleNavigate("services")}
-                  className="mt-1 rounded-xl bg-(--accent) px-4 py-3 text-sm font-semibold text-white"
-                >
-                  Book a Demo
-                </button>
-              </div>
-            </div>
-          )}
-        </nav> */}
       </div>
 
       <motion.aside

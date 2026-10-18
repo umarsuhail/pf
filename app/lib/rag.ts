@@ -34,7 +34,6 @@ const aliases: [RegExp, string][] = [
 const index = documents.map(doc => ({ doc, terms: tokens(`${doc.title} ${doc.title} ${doc.text}`) }));
 const averageLength = index.reduce((sum, entry) => sum + entry.terms.length, 0) / index.length;
 
-/** Local BM25 retrieval: works even when every model/embedding API is down. */
 export function retrieve(message: string, previousUserMessages: string[] = []): Passage[] {
   const followup = /\b(it|that|those|there|them|this|more)\b/i.test(message) || tokens(message).length < 2;
   let query = `${followup ? previousUserMessages.slice(-2).join(' ') : ''} ${message}`;

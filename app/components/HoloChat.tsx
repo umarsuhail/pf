@@ -22,9 +22,6 @@ const GREETING: ChatMessage = {
   text: "Hi, I'm VEGA — Umar's portfolio assistant. Ask me about his projects, skills, or experience.",
 };
 
-// Openers offered while the transcript is still just the greeting. A blank
-// prompt box is the hardest thing to answer on a phone, where typing is the
-// expensive part — these turn the first turn into a tap.
 const SUGGESTIONS = [
   "What has Umar built?",
   "What's his tech stack?",
@@ -44,7 +41,6 @@ export default function HoloChat() {
   const closeRef = useRef<AnimatedIconHandle>(null);
   const resetRef = useRef<AnimatedIconHandle>(null);
 
-  // New messages always push the transcript into view.
   useEffect(() => {
     messagesRef.current?.scrollTo({
       top: messagesRef.current.scrollHeight,
@@ -52,9 +48,6 @@ export default function HoloChat() {
     });
   }, [messages, isSending]);
 
-  // The trigger button lives in the cockpit tray (top nav) now, not here —
-  // it flips us open/closed via this event and reads our state back via
-  // "holochat-state" so its own icon/highlight can track us.
   useEffect(() => {
     window.dispatchEvent(new CustomEvent("holochat-state", { detail: { open: isOpen } }));
   }, [isOpen]);
@@ -75,10 +68,6 @@ export default function HoloChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  // Escape closes, the way every other dismissible surface on the web does.
-  // Bound to the document rather than the panel so it works while focus is
-  // anywhere inside — including the input, which swallows key events that
-  // never bubble past it in some mobile browsers.
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -94,8 +83,6 @@ export default function HoloChat() {
     inputRef.current?.focus();
   };
 
-  // Takes the text explicitly so a suggestion chip can send without first
-  // round-tripping through the input's state.
   const sendMessage = async (override?: string) => {
     const text = (override ?? input).trim();
     if (!text || isSending) return;
@@ -105,12 +92,7 @@ export default function HoloChat() {
     setInput("");
     setIsSending(true);
     sendRef.current?.startAnimation();
-    // send.tsx's "animate" variant is a toggle state (paper plane flown off),
-    // not a self-reverting keyframe loop — reset it after the flourish plays.
     setTimeout(() => sendRef.current?.stopAnimation(), 650);
-    // The header status glyph draws itself in on every send — a transmission
-    // blip — then settles back to its steady state on its own, since
-    // activity.tsx's "animate" keyframes already end where "normal" rests.
     transmitRef.current?.startAnimation();
 
     try {
@@ -135,8 +117,6 @@ export default function HoloChat() {
       ]);
     } finally {
       setIsSending(false);
-      // Hand the caret straight back, so a conversation is a run of typing
-      // rather than a click-to-focus before every question.
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   };
@@ -160,14 +140,8 @@ export default function HoloChat() {
         role="dialog"
         aria-label="VEGA portfolio assistant"
         aria-modal="false"
-        // `vega-dormant` parks the scanline and orbit ring while the panel is
-        // closed — it stays mounted at opacity 0, and their infinite loops
-        // otherwise ticked for the whole visit. The lattice is gated the same
-        // way through SpacetimeField's `active`.
         className={`${isOpen ? "" : "vega-dormant "}relative isolate mb-3 flex h-[min(590px,78dvh)] w-full flex-col overflow-hidden rounded-[1.75rem] border border-sky-200/20 bg-[#020716]/96 shadow-[0_0_0_1px_rgba(56,189,248,0.06),0_30px_100px_rgba(0,0,0,0.72),0_0_80px_rgba(14,165,233,0.11)] sm:mb-5 sm:h-[min(680px,80dvh)] sm:w-[430px] lg:h-[min(720px,82dvh)] lg:w-[470px]`}
       >
-        {/* Lightweight depth layers: the SVG is a warped spacetime navigation
-            lattice, while the nebula and frame are composited CSS surfaces. */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(34,211,238,0.13),transparent_32%),radial-gradient(circle_at_88%_46%,rgba(99,102,241,0.14),transparent_42%),linear-gradient(160deg,rgba(8,20,45,0.95),rgba(2,7,22,0.98)_56%,rgba(7,5,28,0.98))]"
@@ -183,7 +157,6 @@ export default function HoloChat() {
         <div aria-hidden="true" className="pointer-events-none absolute inset-[7px] rounded-[1.4rem] border border-white/[0.035]" />
         <div aria-hidden="true" className="pointer-events-none absolute inset-x-9 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/80 to-transparent shadow-[0_0_14px_rgba(103,232,249,0.9)]" />
 
-        {/* Narrow spacecraft telemetry rail. */}
         <div className="relative z-30 flex h-7 shrink-0 items-center justify-between border-b border-cyan-200/10 bg-cyan-300/[0.035] px-4 font-mono text-[8px] font-semibold uppercase tracking-[0.24em] text-cyan-100/45">
           <span className="flex items-center gap-2">
             <span className="h-1 w-1 rounded-full bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.95)]" />

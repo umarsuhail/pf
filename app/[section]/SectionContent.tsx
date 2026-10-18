@@ -27,9 +27,6 @@ import { SkillsShowcase } from "./SkillsShowcase";
 
 const RESUME_PDF_URL = "/umar-suhail-resume-2026.pdf";
 
-// Real numbers already established in the home card's own `details` line
-// ("Stats: 7+ years experience, 6+ projects delivered, ...") — kept as a
-// dedicated list here so the hero stat tiles can each get their own icon.
 const HOME_STATS = [
   { Icon: HistoryIcon, value: "7+", label: "Years Experience" },
   { Icon: FolderKanbanIcon, value: "6+", label: "Projects Delivered" },
@@ -61,11 +58,11 @@ const WHAT_I_DO = [
 ];
 
 const PANEL_CLASS =
-  "relative overflow-hidden rounded-[1.5rem] border border-white/15 p-5 shadow-[0_32px_80px_-20px_rgba(2,8,23,0.7)] sm:rounded-[2rem] sm:p-10 lg:p-12";
+  "detail-panel relative overflow-hidden rounded-[1.5rem] border p-5 sm:rounded-[2rem] sm:p-10 lg:p-12";
 
 function Eyebrow({ card }: { card: FlightCard }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200/30 bg-emerald-200/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.32em] text-emerald-100">
+    <span className="detail-eyebrow inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.32em]">
       <CardIcon id={card.id} size={14} aria-hidden="true" />
       {card.eyebrow}
     </span>
@@ -73,11 +70,10 @@ function Eyebrow({ card }: { card: FlightCard }) {
 }
 function GlowOverlay() {
   return (
-    <div className="pointer-events-none absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-white/5" />
+    <div className="detail-glow pointer-events-none absolute -bottom-24 -right-24 h-96 w-96 rounded-full" />
   );
 }
 
-// Contact details are single "Label: value" lines.
 function parseContactLine(line: string): { label: string; value: string } {
   const separator = line.indexOf(": ");
   if (separator === -1) return { label: line, value: "" };
@@ -101,15 +97,11 @@ export function SectionContent({
 
   const projects = useMemo(() => card.projects ?? [], [card.projects]);
 
-  // Flat list (no group headings) for the home page's "Tech I Work With"
-  // preview — same source (`skillGroups.ts`) the standalone /skills page and
-  // the in-flight layovers use, so all three stay in sync automatically.
   const homeTechItems = useMemo(
     () => getSkillGroups(allCards.find((c) => c.id === "skills")?.details ?? []).flatMap((g) => g.items),
     [],
   );
 
-  // Framer Motion animation variants for staggered children
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: {
@@ -129,28 +121,21 @@ export function SectionContent({
 
   return (
     <>
-      {card.id === "skills" && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none fixed inset-0 z-0 bg-slate-950/10 "
-        />
-      )}
+      <div
+        aria-hidden="true"
+        className="detail-atmosphere pointer-events-none fixed inset-0 z-0"
+      />
 
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        // Runs to the full width of a desktop display instead of stopping at
-        // a 4xl/6xl column — on a 1440px+ screen that left roughly a third of
-        // the viewport empty on either side. Tighter gutters on phones
-        // (px-4) buy back real reading width where it is scarcest, and the
-        // 8xl ceiling keeps line length sane on ultrawide monitors.
         className="detail-page relative z-10 mx-auto w-full max-w-[110rem] px-4 pb-20 pt-24 sm:px-8 sm:pb-24 sm:pt-28 lg:px-12 xl:px-16"
       >
         <motion.div variants={itemVariants}>
           <Link
             href="/"
-            className="group inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-sky-100/60 transition-colors hover:text-sky-50"
+            className="detail-back-link group inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] transition-colors"
             onMouseEnter={() => backArrowRef.current?.startAnimation()}
             onMouseLeave={() => backArrowRef.current?.stopAnimation()}
           >
@@ -159,7 +144,6 @@ export function SectionContent({
           </Link>
         </motion.div>
 
-        {/* HOME — portrait hero, stat row, What I Do + Tech I Work With */}
         {card.id === "home" && (
           <>
             <motion.header
@@ -169,17 +153,17 @@ export function SectionContent({
               <div>
                 <Eyebrow card={card} />
                 <h1 className="mt-6 text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
-                  <HandwritingText className="block text-sky-50">
+                  <HandwritingText className="detail-ink block">
                     <span className="block">Hi, I&apos;m</span>
-                    <span className="block text-emerald-300">Umar Suhail</span>
+                    <span className="detail-accent block">Umar Suhail</span>
                   </HandwritingText>
                 </h1>
-                <p className="mt-6 inline-flex flex-wrap items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-sm font-medium text-emerald-100">
+                <p className="detail-status-pill mt-6 inline-flex flex-wrap items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium">
                   Lead Frontend Engineer
-                  <span className="h-1 w-1 rounded-full bg-emerald-300/60" aria-hidden="true" />
+                  <span className="detail-positive-dot h-1 w-1 rounded-full" aria-hidden="true" />
                   7+ Years Experience
                 </p>
-                <p className="mt-6 max-w-[62ch] text-lg leading-relaxed text-slate-100/80 sm:text-xl lg:text-[1.375rem]">
+                <p className="detail-copy mt-6 max-w-[62ch] text-lg leading-relaxed sm:text-xl lg:text-[1.375rem]">
                   I build modern, scalable, and high-performance web applications with a strong
                   focus on clean UI, great user experience, and solving real-world problems
                   through code.
@@ -187,7 +171,7 @@ export function SectionContent({
                 <div className="mt-8 flex flex-wrap gap-3">
                   <Link
                     href="/projects"
-                    className="inline-flex items-center gap-2 rounded-full bg-emerald-400 px-6 py-3 text-sm font-semibold text-black transition duration-300 hover:-translate-y-0.5 hover:bg-emerald-300"
+                    className="detail-action-primary inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold hover:-translate-y-0.5"
                   >
                     View My Work
                     <ArrowRightIcon size={14} aria-hidden="true" />
@@ -195,7 +179,7 @@ export function SectionContent({
                   <a
                     href={RESUME_PDF_URL}
                     download
-                    className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-6 py-3 text-sm font-semibold text-sky-50 transition duration-300 hover:bg-white/10"
+                    className="detail-action-secondary inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold hover:-translate-y-0.5"
                   >
                     Download CV
                     <DownloadIcon size={14} aria-hidden="true" />
@@ -203,10 +187,9 @@ export function SectionContent({
                 </div>
               </div>
 
-              {/* Portrait — TODO: swap for a higher-res headshot if you have one */}
               <div className="relative mx-auto w-full max-w-sm lg:max-w-none">
-                <div className="pointer-events-none absolute inset-0 rounded-full bg-emerald-400/10" />
-                <div className="relative aspect-square w-full overflow-hidden rounded-[2rem] border border-white/10">
+                <div className="detail-glow pointer-events-none absolute inset-0 rounded-full" />
+                <div className="detail-line relative aspect-square w-full overflow-hidden rounded-[2rem] border">
                   <Image src="/images/me-s.jpg" alt="Umar Suhail" fill className="object-cover" />
                 </div>
                 {[
@@ -217,10 +200,10 @@ export function SectionContent({
                 ].map((chip) => (
                   <div
                     key={chip.title}
-                    className={`absolute hidden rounded-xl border border-white/10 bg-slate-900/85 px-4 py-3 shadow-lg sm:block ${chip.pos}`}
+                    className={`detail-surface-raised absolute hidden rounded-xl border px-4 py-3 shadow-lg sm:block ${chip.pos}`}
                   >
-                    <p className="text-xs font-semibold text-sky-50">{chip.title}</p>
-                    <p className="text-[11px] text-slate-100/60">{chip.detail}</p>
+                    <p className="detail-ink text-xs font-semibold">{chip.title}</p>
+                    <p className="detail-muted text-[11px]">{chip.detail}</p>
                   </div>
                 ))}
               </div>
@@ -228,16 +211,16 @@ export function SectionContent({
 
             <motion.div
               variants={itemVariants}
-              className="mt-10 grid grid-cols-2 gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:grid-cols-4 sm:p-6"
+              className="detail-surface mt-10 grid grid-cols-2 gap-3 rounded-2xl border p-4 sm:grid-cols-4 sm:p-6"
             >
               {HOME_STATS.map(({ Icon, value, label }) => (
                 <div key={label} className="flex items-center gap-3">
-                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-300/25 bg-emerald-400/10 text-emerald-300">
+                  <span className="detail-icon inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border">
                     <Icon size={16} aria-hidden="true" />
                   </span>
                   <div>
-                    <p className="text-lg font-semibold text-sky-50">{value}</p>
-                    <p className="text-xs text-slate-100/60">{label}</p>
+                    <p className="detail-ink text-lg font-semibold">{value}</p>
+                    <p className="detail-muted text-xs">{label}</p>
                   </div>
                 </div>
               ))}
@@ -245,33 +228,33 @@ export function SectionContent({
 
             <motion.div variants={itemVariants} className="mt-16 grid gap-10 lg:grid-cols-2 lg:gap-14">
               <div>
-                <h2 className="text-lg font-semibold text-sky-50">What I Do</h2>
-                <div className="mt-4 h-px w-12 bg-emerald-300/50" />
+                <h2 className="detail-ink text-lg font-semibold">What I Do</h2>
+                <div className="detail-rule mt-4 h-px w-12" />
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   {WHAT_I_DO.map(({ Icon, title, description }) => (
-                    <div key={title} className="rounded-2xl border border-white/5 bg-white/[0.02] p-5">
-                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-300/20 bg-emerald-400/10 text-emerald-300">
+                    <div key={title} className="detail-surface-subtle rounded-2xl border p-5">
+                      <span className="detail-icon inline-flex h-9 w-9 items-center justify-center rounded-lg border">
                         <Icon size={16} aria-hidden="true" />
                       </span>
-                      <p className="mt-3 text-sm font-semibold text-sky-50">{title}</p>
-                      <p className="mt-1.5 text-xs leading-relaxed text-slate-100/70">{description}</p>
+                      <p className="detail-ink mt-3 text-sm font-semibold">{title}</p>
+                      <p className="detail-copy mt-1.5 text-xs leading-relaxed">{description}</p>
                     </div>
                   ))}
                 </div>
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-sky-50">Tech I Work With</h2>
-                <div className="mt-4 h-px w-12 bg-emerald-300/50" />
+                <h2 className="detail-ink text-lg font-semibold">Tech I Work With</h2>
+                <div className="detail-rule mt-4 h-px w-12" />
                 <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-5">
                   {homeTechItems.map((item) => (
                     <div
                       key={item.label}
-                      className="flex flex-col items-center gap-2 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-4 text-center"
+                      className="detail-surface-subtle flex flex-col items-center gap-2 rounded-xl border px-3 py-4 text-center"
                     >
-                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03]">
+                      <span className="detail-icon inline-flex h-10 w-10 items-center justify-center rounded-lg border">
                         <BrandIcon slug={item.icon} className="h-6 w-6" />
                       </span>
-                      <p className="text-xs text-slate-100/70">{item.label}</p>
+                      <p className="detail-copy text-xs">{item.label}</p>
                     </div>
                   ))}
                 </div>
@@ -280,10 +263,8 @@ export function SectionContent({
           </>
         )}
 
-        {/* SKILLS — grouped showcase with real animated brand marks */}
         {card.id === "skills" && <SkillsShowcase card={card} itemVariants={itemVariants} />}
 
-        {/* EXPERIENCE — standard header, timeline body below */}
         {card.id === "experience" && (
           <motion.header
             variants={itemVariants}
@@ -292,10 +273,10 @@ export function SectionContent({
           >
             <div className="relative z-10">
               <Eyebrow card={card} />
-              <h1 className="mt-6 max-w-[24ch] text-[2.5rem] font-semibold leading-[1.08] text-sky-50 sm:text-6xl lg:text-7xl">
+              <h1 className="detail-ink mt-6 max-w-[24ch] text-[2.5rem] font-semibold leading-[1.08] sm:text-6xl lg:text-7xl">
                 <HandwritingText className="text-5xl font-semibold">{card.title}</HandwritingText>
               </h1>
-              <p className="mt-6 max-w-[62ch] text-lg leading-relaxed text-slate-100/90 sm:text-xl lg:text-[1.375rem]">
+              <p className="detail-copy mt-6 max-w-[62ch] text-lg leading-relaxed sm:text-xl lg:text-[1.375rem]">
                 <NarratedText id={card.id} text={card.description} />
               </p>
             </div>
@@ -309,26 +290,25 @@ export function SectionContent({
           </motion.div>
         )}
 
-        {/* EXPERIENCE — vertical timeline */}
         {card.id === "experience" && (
           <motion.section variants={itemVariants} className="mt-16">
             <div className="flex items-center gap-4">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.32em] text-sky-100/60">
+              <h2 className="detail-muted text-xs font-semibold uppercase tracking-[0.32em]">
                 Career Timeline
               </h2>
-              <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+              <div className="detail-rule h-px flex-1" />
             </div>
-            <div className="relative mt-10 space-y-10 border-l border-white/10 pl-8">
+            <div className="detail-timeline relative mt-10 space-y-10 border-l pl-8">
               {(card.timeline ?? []).map((job) => (
                 <motion.div variants={itemVariants} key={job.company} className="relative">
-                  <span className="absolute -left-[2.375rem] top-1.5 h-3 w-3 rounded-full bg-sky-400 ring-4 ring-sky-400/20" />
-                  <p className="text-xs font-semibold uppercase tracking-widest text-sky-100/50">
+                  <span className="detail-timeline-dot absolute -left-[2.375rem] top-1.5 h-3 w-3 rounded-full" />
+                  <p className="detail-muted text-xs font-semibold uppercase tracking-widest">
                     {job.period} · {job.location}
                   </p>
-                  <h3 className="mt-1.5 text-lg font-semibold text-sky-50">
+                  <h3 className="detail-ink mt-1.5 text-lg font-semibold">
                     {job.role} — {job.company}
                   </h3>
-                  <p className="mt-2 max-w-[72ch] text-base leading-relaxed text-slate-100/80">
+                  <p className="detail-copy mt-2 max-w-[72ch] text-base leading-relaxed">
                     {job.summary}
                   </p>
                 </motion.div>
@@ -337,7 +317,6 @@ export function SectionContent({
           </motion.section>
         )}
 
-        {/* CONTACT — single full-width panel with the contact grid */}
         {card.id === "contact" && (
           <motion.section
             variants={itemVariants}
@@ -346,10 +325,10 @@ export function SectionContent({
           >
             <div className="relative z-10">
               <Eyebrow card={card} />
-              <h1 className="mt-6 max-w-[24ch] text-[2.5rem] font-semibold leading-[1.08] text-sky-50 sm:text-6xl lg:text-7xl">
+              <h1 className="detail-ink mt-6 max-w-[24ch] text-[2.5rem] font-semibold leading-[1.08] sm:text-6xl lg:text-7xl">
                 <HandwritingText className="text-4xl font-semibold sm:text-5xl lg:text-6xl">{card.title}</HandwritingText>
               </h1>
-              <p className="mt-6 max-w-[62ch] text-lg leading-relaxed text-slate-100/90 sm:text-xl lg:text-[1.375rem]">
+              <p className="detail-copy mt-6 max-w-[62ch] text-lg leading-relaxed sm:text-xl lg:text-[1.375rem]">
                 <NarratedText id={card.id} text={card.description} />
               </p>
 
@@ -359,12 +338,12 @@ export function SectionContent({
                   return (
                     <div
                       key={line}
-                      className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 "
+                      className="detail-surface-subtle rounded-2xl border px-5 py-4"
                     >
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-sky-100/50">
+                      <p className="detail-muted text-[10px] font-semibold uppercase tracking-widest">
                         {label}
                       </p>
-                      <p className="mt-1 text-sm leading-relaxed text-slate-50/90">
+                      <p className="detail-ink mt-1 text-sm leading-relaxed">
                         {value}
                       </p>
                     </div>
@@ -382,36 +361,35 @@ export function SectionContent({
           </motion.div>
         )}
 
-        {/* FOOTER NAVIGATION */}
         <motion.nav
           variants={itemVariants}
           aria-label="Other sections"
-          className="mt-20 flex flex-col gap-6 border-t border-white/10 pt-10 sm:flex-row sm:items-center sm:justify-between"
+          className="detail-line mt-20 flex flex-col gap-6 border-t pt-10 sm:flex-row sm:items-center sm:justify-between"
         >
           <Link
             href={`/${previous.id}`}
-            className="group flex flex-col items-start gap-1 transition-colors hover:text-sky-50"
+            className="detail-back-link group flex flex-col items-start gap-1 transition-colors"
             onMouseEnter={() => previousArrowRef.current?.startAnimation()}
             onMouseLeave={() => previousArrowRef.current?.stopAnimation()}
           >
-            <span className="text-xs font-semibold uppercase tracking-widest text-sky-100/40">
+            <span className="detail-muted text-xs font-semibold uppercase tracking-widest">
               Previous
             </span>
-            <div className="flex items-center gap-3 text-sm font-medium text-sky-100/80">
+            <div className="detail-copy flex items-center gap-3 text-sm font-medium">
               <ArrowLeftIcon ref={previousArrowRef} size={16} aria-hidden="true" />
               <span>{previous.eyebrow.replace(/^\d+\s*\/\s*/, "")}</span>
             </div>
           </Link>
           <Link
             href={`/${next.id}`}
-            className="group flex flex-col items-start sm:items-end gap-1 transition-colors hover:text-sky-50"
+            className="detail-back-link group flex flex-col items-start gap-1 transition-colors sm:items-end"
             onMouseEnter={() => nextArrowRef.current?.startAnimation()}
             onMouseLeave={() => nextArrowRef.current?.stopAnimation()}
           >
-            <span className="text-xs font-semibold uppercase tracking-widest text-sky-100/40">
+            <span className="detail-muted text-xs font-semibold uppercase tracking-widest">
               Next
             </span>
-            <div className="flex items-center gap-3 text-sm font-medium text-sky-100/80">
+            <div className="detail-copy flex items-center gap-3 text-sm font-medium">
               <span>{next.eyebrow.replace(/^\d+\s*\/\s*/, "")}</span>
               <ArrowRightIcon ref={nextArrowRef} size={16} aria-hidden="true" />
             </div>

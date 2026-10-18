@@ -1,12 +1,5 @@
-// Groups the flat "skills" detail lines (e.g. "React JS — Expert") into the
-// three showcases used by both the standalone /skills page (SkillsShowcase)
-// and the brief in-flight layovers on the home page (MultiverseFlight), so
-// editing the skill list in one place updates both.
 export type SkillGroupName = "Frontend Development" | "UI/UX Design" | "Backend & Tooling";
 
-/** One step in a tool's history with Umar: when, which version (or phase),
- *  and what it meant. Shown down the left edge of the layover while the
- *  flight is level with the tool. */
 export type ToolMilestone = { date: string; version: string; note: string };
 
 export type SkillGroupItem = {
@@ -19,21 +12,6 @@ export type SkillGroupItem = {
 
 export type SkillGroup = { name: SkillGroupName; blurb: string; items: SkillGroupItem[] };
 
-// `icon` keys into the self-hosted BrandIcon registry (app/components/icons/
-// brand-icon.tsx) — no icon-library runtime dependency.
-// ORDER IS SIGNIFICANT — the first pattern that matches wins (see the
-// `.find()` below), so anything whose name *contains* a more generic
-// technology's name has to be listed before that generic one. "Tailwind CSS"
-// matching /\bcss3?\b/ and rendering with the CSS3 logo is exactly the bug
-// this ordering prevents; the generic single-word patterns are grouped at the
-// end of each section for that reason.
-// `usage` is the one-line "where I actually used this" note rendered under
-// each mark on the /skills page — every line is anchored to a real role in
-// `profile.ts` (EFR, Epixel, Aspire, Uvionics) or a real project from the
-// `projects` list, so the two files must be updated together.
-// `timeline` is optional and personal: it is Umar's history with the tool,
-// so only add one he has given. The version notes are the tool's own public
-// release history.
 const SKILL_META: {
   pattern: RegExp;
   icon: string;
@@ -41,7 +19,6 @@ const SKILL_META: {
   usage: string;
   timeline?: ToolMilestone[];
 }[] = [
-  // Compound names first — each of these contains a generic term below.
   {
     pattern: /\btailwind\b/i,
     icon: "tailwindcss",

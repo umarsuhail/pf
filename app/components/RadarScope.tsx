@@ -10,23 +10,9 @@ import {
 } from "../data/flightStops";
 import { BrandIcon } from "./icons/brand-icon";
 
-// The toolkit radar: Umar's instrument (public/radar/SVG), assembled.
-//
-// Every piece was drawn in one coordinate space centred on the bezel, so each
-// layer here is placed as a percentage of the bezel's own box using the
-// artwork's units — the face, the beam's pivot and the glass land exactly
-// where they were drawn, at any size the card gives the scope.
-//
-// The bezel and the glass are used as drawn. The face, its line art, the beam
-// and the title holder take the theme instead (--radar-face / --radar-beam in
-// globals.css), the way every other card on the flight does: the face is a
-// gradient drawn here, the line art is radar_lines.svg (radar_base.svg without
-// its background disc) used as a mask over the accent, and the beam and title
-// holder are redrawn inline from their files so their colours can be tokens.
 const RING = { w: 43.4, h: 42.8 };
 const FACE = { x: 1.1, y: 1.0, w: 41.3, h: 40.8 };
 const GLASS = { x: 2.7, y: 2.7, w: 37.9, h: 37.4 };
-// Where the beam pivots inside the face's box: the radar's centre.
 const FACE_CENTRE = { x: 20.6, y: 20.4 };
 
 const inRing = (r: { x: number; y: number; w: number; h: number }) => ({
@@ -38,9 +24,6 @@ const inRing = (r: { x: number; y: number; w: number; h: number }) => ({
 
 const LAST = TECHNOLOGY_FOCUS_STOPS.length - 1;
 
-// How present one tool is, 0..1, as a pure function of flight progress: its
-// own focus window, with no blank ends — the first tool is already on the
-// radar as the card arrives, and the last is still on it as the card leaves.
 export function useToolPresence(progress: MotionValue<number>, index: number) {
   const [fadeInStart, fadeInEnd, fadeOutStart, fadeOutEnd] =
     technologyFocusWindow(TECHNOLOGY_FOCUS_STOPS[index].progress);
@@ -59,8 +42,6 @@ export function useToolPresence(progress: MotionValue<number>, index: number) {
   return useTransform(progress, input, output);
 }
 
-// One tool's mark at the centre of the scope. It blips in from a little
-// smaller as its window opens, and shrinks away as the next one is found.
 function RadarContact({
   index,
   progress,
@@ -75,10 +56,6 @@ function RadarContact({
       style={{ opacity: presence, scale }}
       className="absolute inset-0 grid place-items-center"
     >
-      {/* The contact's plate. Brand marks bring their own colours, and a
-         blue whale on a sky-blue face (or a yellow JS on Night's amber)
-         all but vanishes; a dark well behind each one keeps every mark
-         legible on every theme. */}
       <span
         className="absolute inset-[29%] rounded-full border bg-[rgba(2,8,23,0.62)]"
         style={{ borderColor: "color-mix(in srgb, var(--radar-beam) 55%, transparent)" }}
@@ -91,7 +68,6 @@ function RadarContact({
   );
 }
 
-// The tool's name, set in the title holder above the scope.
 function RadarLabel({
   index,
   progress,
@@ -110,9 +86,6 @@ function RadarLabel({
   );
 }
 
-// The beam's light, from the trailing edge to the leading one. beam_light.svg
-// builds this out of a black-to-green ramp under a grey mask; these stops are
-// that product, so the sweep fades the same way in any colour.
 const BEAM_STOPS = [
   [0, 0],
   [0.3, 4],
@@ -128,16 +101,12 @@ export default function RadarScope({
   className = "",
 }: {
   progress: MotionValue<number>;
-  /** Parks the sweep while the card is not on screen (see .radar-dormant). */
   dormant: boolean;
   className?: string;
 }) {
   const beamGradientId = `radar-beam-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const faceGradientId = `radar-face-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
-  // A ring goes out from the centre as each tool is found: over the first
-  // third of the tool's window, finished by the time it is level with you.
-  // A pure function of progress like the rest, so it plays backwards too.
   const ping = useTransform(progress, (value) => {
     const nearest = Math.min(
       LAST,
@@ -155,7 +124,6 @@ export default function RadarScope({
       aria-hidden="true"
       className={`flex flex-col items-center ${dormant ? "radar-dormant" : ""} ${className}`}
     >
-      {/* Title holder: title_holder.svg, with the tool's name in its tab. */}
       <div
         className="relative w-full"
         style={{ aspectRatio: "55 / 3.2", containerType: "inline-size" }}
@@ -175,10 +143,6 @@ export default function RadarScope({
           />
         </svg>
         <div
-          // Sized off the holder's own width (it is a size container), so the
-          // longest name, "Adobe After Effects", clears the tab's sloped
-          // sides — about 24 of the holder's 55 units at mid-height — at any
-          // scope size.
           className="absolute inset-0 font-semibold uppercase tracking-[0.12em]"
           style={{ color: "var(--radar-face)", fontSize: "clamp(7px, 2.8cqw, 10px)" }}
         >
@@ -188,8 +152,6 @@ export default function RadarScope({
         </div>
       </div>
 
-      {/* The scope, 43.4 : 42.8 like the bezel it sits in. isolate keeps the
-         beam's screen and the glass's multiply inside the instrument. */}
       <div
         className="relative isolate mt-[4%] w-[79%]"
         style={{ aspectRatio: `${RING.w} / ${RING.h}` }}
@@ -228,7 +190,6 @@ export default function RadarScope({
           />
         </svg>
 
-        {/* Rings, crosshair and ticks, in the accent. */}
         <div
           className="absolute"
           style={{
@@ -255,8 +216,6 @@ export default function RadarScope({
           />
         </div>
 
-        {/* The sweep. Its own compositor layer (.radar-beam animates only
-           transform), screened over the face below it. */}
         <div
           className="radar-beam absolute mix-blend-screen"
           style={{
@@ -284,8 +243,6 @@ export default function RadarScope({
                 ))}
               </linearGradient>
             </defs>
-            {/* beam_light.svg's wedge, moved so its pivot (18.2, 18) sits on
-               the face's centre. */}
             <g transform={`translate(${FACE_CENTRE.x - 18.2} ${FACE_CENTRE.y - 18})`}>
               <path
                 d="M18.2,0C8.2,0,0,8.1,0,18h18.2l14.6-10.8C29.5,2.8,24.2,0,18.2,0Z"
@@ -295,16 +252,14 @@ export default function RadarScope({
           </svg>
         </div>
 
-        {/* eslint-disable-next-line @next/next/no-img-element -- static
-           artwork layered with blend modes; next/image would only add a
-           wrapper around a 1KB SVG. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/radar/SVG/radar_glass_top.svg"
           alt=""
           className="absolute mix-blend-multiply"
           style={inRing(GLASS)}
         />
-        {/* eslint-disable-next-line @next/next/no-img-element -- as above. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/radar/SVG/ring_outer.svg"
           alt=""

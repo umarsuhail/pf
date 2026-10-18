@@ -2,11 +2,6 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 
-// Wraps long copy that would otherwise blow out a space-constrained card:
-// collapses to a fixed preview height with a fade-out cue, and grows to the
-// full text on click. Height is animated via max-height rather than true
-// "auto" — cheap, and reliable inside the flight's 3D-transformed ancestors,
-// where layout-measuring approaches tend to misbehave.
 export default function ExpandableText({
   children,
   collapsedHeight = "4.6em",
@@ -24,25 +19,12 @@ export default function ExpandableText({
   expandedHeight?: string;
   toggleClassName?: string;
   className?: string;
-  // One-way trigger (e.g. the autopilot tour opening the card for the
-  // visitor mid-flight) — after it fires, expansion reverts to ordinary
-  // click-driven state, so the visitor can still collapse it again.
   forceExpanded?: boolean;
-  // Changing this collapses the text back to its preview, whoever opened it.
-  // forceExpanded only has a rising edge, so without this a bio opened by
-  // the narration (or by hand) stays open for the rest of the session — the
-  // flight looping back to its first panel included.
   resetKey?: number;
-  // Lets a parent react to the real expanded state (manual toggle or
-  // forceExpanded alike) instead of just the one-way forceExpanded trigger.
   onExpandedChange?: (expanded: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  // Reacts to forceExpanded's rising edge during render (React's documented
-  // pattern for adjusting state from a prop) rather than in an effect, so
-  // there's no extra commit between the prop changing and expanded catching
-  // up to it.
   const [prevForceExpanded, setPrevForceExpanded] = useState(forceExpanded);
   if (forceExpanded !== prevForceExpanded) {
     setPrevForceExpanded(forceExpanded);
@@ -56,8 +38,6 @@ export default function ExpandableText({
 
   useEffect(() => {
     onExpandedChange?.(expanded);
-    // onExpandedChange is passed inline by callers — depending on it would
-    // re-fire this on every parent render instead of only on real changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expanded]);
 
@@ -75,8 +55,6 @@ export default function ExpandableText({
       <button
         type="button"
         onClick={(e) => {
-          // The card this sits in is itself a click target (opens the
-          // section page) — this toggle must not also trigger that.
           e.preventDefault();
           e.stopPropagation();
           setExpanded((prev) => !prev);

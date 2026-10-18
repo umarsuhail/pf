@@ -21,20 +21,6 @@ export function getCardSlotProgress(index: number) {
   return Math.max(previous + span * 0.3, current - CARD_SLOT_LEAD);
 }
 
-// Derived from the two panels it sits between rather than hard-coded, so
-// lengthening that leg (as moving Skills to 0.18 did) hands the extra room
-// straight to the helix instead of leaving it stranded at old coordinates.
-// The insets keep the tools clear of both cards: the first one fades up after
-// Skills has been read, the last is gone before Projects arrives.
-// The layover owns this stretch outright. Its start clears the Skills card's
-// whole departure (see getDepartWindow, which clamps that fade to end just
-// before this), and its end leaves the Projects card enough runway to reveal
-// before its own reading slot. Nothing overlaps: one thing at a time is on
-// screen, which is the only way nineteen tools can be looked at.
-// +0.18 was sized against a Skills card that departed at 0.28. Now that the
-// departure is a depth event it clears at 0.155, and the offset was buying
-// 0.195 of progress — 7.7 viewport heights — of corridor with nothing in it.
-// +0.02 puts the first tool just after the card has passed.
 export const TECHNOLOGY_LAYOVER_START = sectionProgressMap.skills + 0.02;
 export const TECHNOLOGY_LAYOVER_END = sectionProgressMap.projects - 0.11;
 
@@ -56,21 +42,10 @@ export const TECHNOLOGY_FOCUS_STOPS = technologies.map(
   }),
 );
 
-// The progress between two neighbouring tools.
 export const TECHNOLOGY_NODE_GAP =
   (TECHNOLOGY_LAYOVER_END - TECHNOLOGY_LAYOVER_START) /
   Math.max(TECHNOLOGY_FOCUS_STOPS.length - 1, 1);
 
-// The stretch of flight a single tool owns: half a gap either side of its own
-// stop, which tiles the layover exactly, plus a fast crossfade at each edge.
-//
-// This is what "the tool you are level with" means, and it is a window rather
-// than a number on purpose. An earlier readout tracked the nearest tool in
-// React state and swapped words inside an AnimatePresence — and named Git
-// while the camera was passing React: the state and the exit queue were two
-// more clocks to keep in step with the flight. Everything that names the
-// current tool (the radar, its copy, the history rail) reads this one window
-// instead, so none of them can disagree with each other or with the scroll.
 const TECHNOLOGY_OWN_WINDOW = [-0.5, -0.42, 0.42, 0.5] as const;
 
 export function technologyFocusWindow(stop: number) {
@@ -96,44 +71,14 @@ export const MAIN_FLIGHT_STOPS = cards.map((card, index) => ({
   progress: getCardSlotProgress(index),
 }));
 
-// The dial's ordered list of landings: one full turn of the bezel travels
-// from one of these to the next. They are the cards' readable slots rather
-// than their raw depth, so the dial lands where the card is legible.
 export const FLIGHT_SECTION_STOPS = [
   ...MAIN_FLIGHT_STOPS,
   ...TECHNOLOGY_GROUP_STOPS,
   { id: "closing", label: "Closing", progress: 1 },
 ].sort((a, b) => a.progress - b.progress);
 
-// --- Card windows --------------------------------------------------------
-//
-// When a panel is on approach, when it is legible, and when it has been flown
-// past. These lived in MultiverseFlight, which was fine while the corridor
-// was their only reader — but a card's portal has to paint its scene across
-// the same stretch, and CardPortal cannot import a component that imports it.
-// So it kept its own guess at the timing, and the guess was wrong: it centred
-// the scene on the card's raw progress *stop* instead of its reading slot,
-// which put the Skills rocket's entire crossing after the card had begun to
-// leave. Both readers now take the real windows from here.
-
-// A card's natural stop puts it almost on the CSS perspective camera. That
-// is useful as a pass-through moment while scrolling, but it is the wrong
-// place to hold an autoplay scene: copy gets cropped and the portal swallows
-// the viewport. Every navigation now lands just before that point in the
-// card's readable "slot", where the whole panel has room to breathe.
 export const CARD_SLOT_MIN_APPROACH = 0.045;
 
-// How long before its own reveal a billboard is allowed to exist as a faint
-// shape in the distance.
-//
-// The card fade used to run its first segment from progress 0 to the reveal
-// start, which meant the ramp to the 42% "approaching" level was stretched
-// across the *entire flight up to that point*. Experience was therefore
-// already at 0.39 opacity while Projects was still parked at its reading
-// slot: two billboards on screen at once, the upcoming one not far enough
-// away to read as depth, just a duplicate panel behind the one being read.
-// A card is now dark until it is genuinely on approach, and the corridor
-// depth it used to stand for is bought over this runway instead.
 export const REVEAL_APPROACH_RUNWAY = 0.1;
 
 export function getRevealWindow(index: number) {
@@ -143,37 +88,21 @@ export function getRevealWindow(index: number) {
   const span = Math.max(current - previous, 0.08);
   const slot = getCardSlotProgress(index);
   let start = Math.max(
-    // Begin the handoff while the card is still at a comfortable depth, and
-    // have its sharp, full-scale state arrive exactly at the readable slot.
     previous + span * 0.24,
     slot - Math.max(span * 0.3, CARD_SLOT_MIN_APPROACH),
     0,
   );
 
-  // A card arriving on the far side of the technology layover waits for it.
-  // Its natural approach would begin 0.135 of progress before its slot, which
-  // is most of the way back through the helix — the billboard would fade up
-  // behind the tools and the two would be on screen together, each making the
-  // other unreadable.
   if (previous < TECHNOLOGY_LAYOVER_END && slot > TECHNOLOGY_LAYOVER_END) {
     start = Math.max(start, TECHNOLOGY_LAYOVER_END + 0.01);
   }
 
-  // Skills is the first full billboard the traveller flies toward. Give its
-  // approach a wider runway than the generic card reveal so the panel grows
-  // into view as a deliberate, slow zoom instead of appearing only in the
-  // last instant before its readable slot. The stop itself does not move —
-  // this only shapes how early that one card becomes visible.
   if (index === 1) {
     start = Math.min(start, slot - Math.max(span * 0.5, 0.075));
   }
 
   start = Math.min(start, slot - 0.01);
 
-  // The runway is clipped by whatever the card is not allowed to appear in
-  // front of: the previous card's own reading slot, and — for a card on the
-  // far side of the toolkit — the layover itself, which the clamp above has
-  // already pushed `start` clear of.
   const floor = Math.max(
     getCardSlotProgress(index - 1),
     previous < TECHNOLOGY_LAYOVER_END && slot > TECHNOLOGY_LAYOVER_END
@@ -185,26 +114,9 @@ export function getRevealWindow(index: number) {
   return { approach: Math.min(approach, start), start, end: slot };
 }
 
-// Progress by which the last billboard must be fully gone. Everything in the
-// closing sequence is timed against this: the black void reaches full
-// opacity here, and the closing beat only begins fading in afterwards, so
-// the corridor is genuinely empty before the ending is shown.
 export const LAST_CARD_CLEARED = 0.95;
 
 export function getDepartWindow(index: number) {
-  // A departure is a depth event, not a fraction of the gap to the next
-  // panel. That distinction did not matter while the camera crossed 8400
-  // over the flight and the two happened to line up; at three times the
-  // travel they do not. A card now reaches the camera three times sooner in
-  // progress, so a window written as "30% to 85% of the way to the next
-  // stop" opens long *after* the card has already gone past — Skills was at
-  // z=2046, well through the projection plane, at the first keyframe of its
-  // own fade. Clamping it at 1.67x to hide that is what made a departing
-  // card sit still in the middle of the frame and dissolve.
-  //
-  // Expressed in depth it is simply: the card starts going as it reaches the
-  // camera (CARD_DEPART_NEAR_Z) and is gone by the time it fills the frame
-  // (CARD_PASS_THROUGH_Z). It follows the camera at any travel.
   const slot = getCardSlotProgress(index);
   const travel = CAMERA_TRAVEL.desktop;
   const atDepth = (z: number) => slot + (z - CARD_READING_DEPTH) / travel;
@@ -212,12 +124,6 @@ export function getDepartWindow(index: number) {
   let start = atDepth(CARD_DEPART_NEAR_Z);
   let end = atDepth(CARD_PASS_THROUGH_Z);
 
-  // Everything below is a ceiling, never a floor: the depth window is what
-  // the departure *is*, and these only pull it in where something else has
-  // a prior claim on the corridor.
-
-  // A card leaving into the technology layover has to be gone before it, not
-  // merely dimming through it — the toolkit owns that stretch outright.
   const current = sectionProgressStops[index];
   const next =
     index < sectionProgressStops.length - 1
@@ -227,9 +133,6 @@ export function getDepartWindow(index: number) {
     end = Math.min(end, TECHNOLOGY_LAYOVER_START - 0.01);
   }
 
-  // The final card has no successor to clear for, but it does have the
-  // closing beat: LAST_CARD_CLEARED is where the void reaches full black.
-  // Every other card clears before the next one's reading slot.
   if (index === sectionProgressStops.length - 1) {
     end = Math.min(end, LAST_CARD_CLEARED);
   } else {
@@ -240,9 +143,6 @@ export function getDepartWindow(index: number) {
   return { start, end };
 }
 
-// The stretch a card is actually on screen for, start to finish: from the
-// moment it first lights as a shape in the distance to the moment it is
-// gone. Anything painting *on* a card belongs on this clock.
 export function getCardLifeWindow(index: number) {
   const reveal = getRevealWindow(index);
   const depart = getDepartWindow(index);

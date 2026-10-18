@@ -15,9 +15,6 @@ import {
 import { CardIcon } from "./icons/card-icon";
 import type { AnimatedIconHandle } from "./icons/card-icon";
 
-// Overhead console: a small latch sits on the top edge, and pulling it drops
-// the whole assembly into the cockpit — a centre nav console flanked by two
-// equipment bays, all hanging off one rail so they read as a single unit.
 const stops = cards.map((card) => ({
   id: card.id,
   code: card.eyebrow.split("/")[0].trim(),
@@ -31,29 +28,14 @@ const TRAY_SPRING = {
   mass: 0.8,
 } as const;
 
-// The console is physically attached to the latch below it, so opening has
-// to animate layout height. A transform-only entrance makes the latch jump
-// to its final position before the panel catches up.
 const CONSOLE_OPEN = { duration: 0.42, ease: [0.22, 1, 0.36, 1] } as const;
 const CONSOLE_CLOSE = { duration: 0.24, ease: [0.4, 0, 1, 1] } as const;
 
-// The soundtrack is a two-act programme, not a loop. intro.aac is the
-// narration with its own background music already mixed in (see
-// data/narration.ts — still played through the "span" machinery below in
-// case it's ever split back into multiple clips, but there's just the one
-// now), then tomoon.mp3 takes over on a loop for however long the visitor
-// stays. It starts the instant the narration ends and ramps up under it
-// (see runRamp), so there's no dead air between the two.
 const MAIN_SRC = "/music/tomoon.mp3";
 const TARGET_VOLUME = 0.42;
 
-// Brushed steel: a raking light gradient for the body, a hard specular line
-// along the top edge and a dark one along the bottom, so every surface reads
-// as a milled plate rather than a flat panel.
 const METAL_SURFACE = "mission-metal-surface relative overflow-hidden border";
 
-// Fine vertical brush lines over the body — cheap, and it kills the flatness
-// of a plain gradient at large panel sizes.
 function BrushedGrain() {
   return (
     <span
@@ -63,11 +45,8 @@ function BrushedGrain() {
   );
 }
 
-// The pause between two passes of the highlight below.
 const SHEEN_REST_S = 4.2;
 
-// The travelling highlight. Skewed and blend-screened so it reads as light
-// raking across metal instead of a white bar sliding over a box.
 function Sheen({
   delay = 0,
   duration = 3.2,
@@ -78,14 +57,6 @@ function Sheen({
   active?: boolean;
 }) {
   if (!active) return null;
-  // One cycle is the sweep and then the rest before the next one, written
-  // into the keyframes rather than as `repeatDelay`. framer-motion cannot
-  // hand a repeatDelay (or an `x`) to the browser, so that version ran every
-  // frame of every sweep on the main thread for as long as the tray was up —
-  // the one thing still waking the page's frame loop with nobody touching
-  // anything. Animating `transform` itself with the rest in the keyframes
-  // runs as a native animation on the compositor instead; same path, same
-  // timing.
   const cycle = duration + SHEEN_REST_S;
   return (
     <motion.span
@@ -122,11 +93,6 @@ function Rivets({ className = "" }: { className?: string }) {
   );
 }
 
-// The closed latch floats alone at the very top of the page, so its flat
-// top edge can get a pair of concave "ear" flares — the classic iPhone
-// notch trick: a small square masked with a radial gradient so it reads as
-// solid near the notch's corner and fades to nothing away from it, faking
-// a corner that curves the *opposite* way from a normal border-radius.
 const NOTCH_EAR = 14;
 function notchEarStyle(corner: "top right" | "top left") {
   const mask = `radial-gradient(circle at ${corner}, black ${NOTCH_EAR}px, transparent ${NOTCH_EAR}px)`;
@@ -139,9 +105,6 @@ function notchEarStyle(corner: "top right" | "top left") {
   } as const;
 }
 
-// Collapsed state: squeezed to a sliver at the corner nearest the console
-// (set by transformOrigin below) and nudged the rest of the way across the
-// gap, so the bay reads as folding into the tray.
 const folded = (side: "left" | "right") => ({
   x: side === "left" ? "22%" : "-22%",
   y: "-38%",
@@ -150,7 +113,6 @@ const folded = (side: "left" | "right") => ({
   opacity: 0,
 });
 
-// Equipment bay — deliberately empty. Drop content into the inner slot.
 function EquipmentBay({
   side,
   label,
@@ -163,9 +125,6 @@ function EquipmentBay({
   return (
     <motion.section
       aria-label={label}
-      // Anchored to the corner nearest the console, so the bay unfolds out of
-      // the tray and retracts back into it rather than sliding off the top
-      // edge as a separate slab.
       style={{ transformOrigin: side === "left" ? "top right" : "top left" }}
       initial={folded(side)}
       animate={{ x: 0, y: 0, scaleX: 1, scaleY: 1, opacity: 1 }}
@@ -188,7 +147,6 @@ function EquipmentBay({
         <span className="h-1.5 w-1.5 rounded-full bg-amber-300/70 shadow-[0_0_8px_rgba(252,211,77,0.8)]" />
       </header>
 
-      {/* Empty slot — content goes here */}
       <div
         className="mission-console-well relative z-10 m-3 mt-3 flex-1 rounded-xl border"
         style={{
@@ -224,27 +182,16 @@ export default function CockpitTray() {
       return DEFAULT_MISSION_THEME;
     }
   });
-  // The <audio> elements themselves are expensive to justify keeping around
-  // for a visitor who never touches the console — they're only mounted once
-  // the tray is actually expanded (or the latch's own play button is
-  // pressed before that ever happens).
   const [audioReady, setAudioReady] = useState(false);
   const pendingPlayRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const stopIconRefs = useRef<Record<string, AnimatedIconHandle | null>>({});
-  // NARRATION_SPANS is down to a single combined clip now (see
-  // data/narration.ts), but this still walks it as a sequence in case it's
-  // ever split back into multiple — spanIndexRef tracks which is loaded.
   const narrationRef = useRef<HTMLAudioElement>(null);
   const spanIndexRef = useRef(0);
   const mainRef = useRef<HTMLAudioElement>(null);
-  // Where each deck's volume is heading; one rAF loop walks both there.
   const levelsRef = useRef({ intro: 0, main: 0 });
   const rampRef = useRef(0);
 
-  // The head script applies the saved palette before first paint. Re-apply it
-  // before this client-only control paints as well, which also survives the
-  // development Strict Mode remount described by Next's theme guidance.
   useLayoutEffect(() => {
     document.documentElement.dataset.missionTheme = missionTheme;
   }, [missionTheme]);
@@ -265,7 +212,6 @@ export default function CockpitTray() {
     try {
       localStorage.setItem(MISSION_THEME_STORAGE_KEY, theme);
     } catch {
-      // Storage can be disabled while the live theme still remains usable.
     }
   };
 
@@ -307,9 +253,6 @@ export default function CockpitTray() {
 
   useEffect(() => () => cancelAnimationFrame(rampRef.current), []);
 
-  // One loop ramps both decks toward their targets. Cutting volume outright
-  // pops, and a crossfade needs the two moving at once — a deck that reaches
-  // zero with nowhere to go is paused so it stops decoding.
   const runRamp = useCallback(() => {
     cancelAnimationFrame(rampRef.current);
 
@@ -337,22 +280,13 @@ export default function CockpitTray() {
     rampRef.current = requestAnimationFrame(step);
   }, []);
 
-  // The narration clock NarratedText (on the home card) times its
-  // word-by-word reveal against — which of the 4 clips is playing, its real
-  // position within that clip, or an inactive signal that snaps any
-  // narrated text to fully readable.
   const emitNarration = (spanIndex: number, currentTime: number, duration: number, active: boolean) => {
     window.dispatchEvent(
       new CustomEvent("narration-progress", { detail: { spanIndex, currentTime, duration, active } }),
     );
   };
 
-  // Bring tomoon.mp3 (looping) up under intro.aac and fade the intro out.
-  // Declared first since playNextSpan's own fallback (no more spans left,
-  // or the browser refused the asset) skips straight here.
   const handOverToMain = useCallback(() => {
-    // The intro has ended even if the looping track cannot start. Emitting
-    // this before main.play() keeps the autopilot tied to intro.aac itself.
     emitNarration(NARRATION_SPANS.length, 0, 0, false);
     const main = mainRef.current;
     if (!main || !main.paused) return;
@@ -368,12 +302,6 @@ export default function CockpitTray() {
       .catch(() => setTrack(null));
   }, [runRamp]);
 
-  // Plays NARRATION_SPANS[spanIndexRef.current] on the shared narration
-  // element, advancing sequentially — each clip cuts straight into the
-  // next (spoken sentences, not music, so no crossfade between them).
-  // The recursive call in .catch() goes through a ref rather than closing
-  // over playNextSpan directly, since the const isn't assigned until after
-  // this initializer returns.
   const playNextSpanRef = useRef<() => void>(() => {});
   const playNextSpan = useCallback(() => {
     const narration = narrationRef.current;
@@ -392,32 +320,21 @@ export default function CockpitTray() {
         setTrack("intro");
         emitNarration(spanIndexRef.current, 0, span.fallbackDuration, true);
       })
-      // This clip is missing or the browser refused it — skip to the next
-      // sentence rather than going silent on just one span.
       .catch(() => {
         spanIndexRef.current += 1;
         playNextSpanRef.current();
       });
   }, [handOverToMain]);
-  // Keeps the ref current after every render — writing to a ref during
-  // render itself (rather than in an effect) isn't allowed.
   useEffect(() => {
     playNextSpanRef.current = playNextSpan;
   });
 
-  // "Skip intro", from SkipIntroPrompt. The autopilot's home leg waits on
-  // intro.aac finishing rather than on a clock, and handOverToMain emits
-  // exactly the narration-complete event it is waiting for — so ending the
-  // narration here is all it takes to release the tour. Nothing needs to
-  // reach into the autopilot's legs.
   const skipIntro = useCallback(() => {
     const narration = narrationRef.current;
     if (narration) {
       narration.pause();
       narration.currentTime = 0;
     }
-    // Past the last span, so nothing queued can restart the narration behind
-    // the hand-over.
     spanIndexRef.current = NARRATION_SPANS.length;
     levelsRef.current = { intro: 0, main: TARGET_VOLUME };
     handOverToMain();
@@ -462,11 +379,6 @@ export default function CockpitTray() {
     runRamp();
   }, [playNextSpan, runRamp]);
 
-  // The <audio> elements themselves only mount once audioReady flips true
-  // (tray expanded, or the latch's own play button pressed first) — so a
-  // play request that arrives before that has happened has nothing to call
-  // .play() on yet. This remembers the request and fires it the moment the
-  // elements exist, via the effect below.
   const requestPlayback = useCallback(() => {
     if (narrationRef.current) {
       startAudio();
@@ -490,10 +402,6 @@ export default function CockpitTray() {
     emitNarration(NARRATION_SPANS.length, 0, 0, false);
   }, [runRamp]);
 
-  // A paused tour keeps both deck positions and the current crossfade
-  // targets intact. Continuing simply restarts the deck that was active;
-  // no src/currentTime values are rewritten, so narration and music pick up
-  // on the exact audio frame where the visitor paused them.
   const pauseAudio = useCallback(() => {
     cancelAnimationFrame(rampRef.current);
     narrationRef.current?.pause();
@@ -509,7 +417,6 @@ export default function CockpitTray() {
       .catch(() => {});
   }, [runRamp, track]);
 
-  // The one mute for everything the flight plays — the soundtrack decks here.
   const toggleMute = () => {
     const next = !isMuted;
     setIsMuted(next);
@@ -518,15 +425,6 @@ export default function CockpitTray() {
     window.dispatchEvent(new CustomEvent("flight-sound-mute", { detail: { muted: next } }));
   };
 
-  // Fullscreen rides along with the tour. Engaging is a real user gesture —
-  // the only context the Fullscreen API accepts a request from (scroll/wheel
-  // never qualify) — and the tour ending, however it ends (natural finish,
-  // Disengage, the visitor scrolling to take the controls back), drops back
-  // out. The ref means we only ever exit a fullscreen we ourselves entered:
-  // never one the visitor was already in, and not after they've already
-  // Esc'd out mid-tour (fullscreenElement is null by then, so exit is
-  // skipped). On platforms without element fullscreen (iPhone Safari) the
-  // request is simply absent and the tour runs windowed.
   const wentFullscreenRef = useRef(false);
 
   const enterFullscreen = useCallback(() => {
@@ -540,7 +438,6 @@ export default function CockpitTray() {
         })
         .catch(() => {});
     } catch {
-      // Older engines throw synchronously instead of rejecting.
     }
   }, []);
 
@@ -552,19 +449,10 @@ export default function CockpitTray() {
     }
   }, []);
 
-  // Taking over someone's whole screen unasked is the kind of thing a site
-  // should offer, not decide, so engaging now puts the question first and the
-  // launch behind the answer. The tour runs either way — answering "no" just
-  // flies it in the window. Only fresh launches ask: resuming a paused tour
-  // reuses whatever was chosen for it (see fullscreenChoiceRef), since being
-  // asked again on every Continue would be its own kind of rude.
   const [askFullscreen, setAskFullscreen] = useState(false);
   const fullscreenChoiceRef = useRef(false);
   const fullscreenAskRef = useRef<HTMLButtonElement>(null);
 
-  // While the question is up it owns the keyboard: focus lands on the
-  // primary answer so Enter takes it, and Escape backs out without starting
-  // anything.
   useEffect(() => {
     if (!askFullscreen) return;
     fullscreenAskRef.current?.focus();
@@ -580,18 +468,12 @@ export default function CockpitTray() {
     typeof document.documentElement.requestFullscreen === "function" &&
     !document.fullscreenElement;
 
-  // Everything engaging actually does, once the fullscreen question is
-  // settled. Called straight from the Engage click when there is nothing to
-  // ask, or from the prompt's own buttons — both are real user gestures,
-  // which is what audio playback and the Fullscreen API each require.
   const launchAutopilot = useCallback(
     (useFullscreen: boolean) => {
       fullscreenChoiceRef.current = useFullscreen;
       requestPlayback();
       setIsOpen(false);
       setAskFullscreen(false);
-      // Must be called synchronously inside the gesture — it would be
-      // rejected from the tour's own async flow.
       if (useFullscreen) enterFullscreen();
 
       if (pathname !== "/") {
@@ -607,11 +489,6 @@ export default function CockpitTray() {
     [enterFullscreen, pathname, requestPlayback, router],
   );
 
-  // Engaging is the one click that starts everything: the tour flies itself
-  // and the soundtrack runs under it. Audio can only ever begin here, from a
-  // real gesture — nothing autoplays on load. The flight only exists on "/",
-  // so engaging from a section detail page has to land there first — a tour
-  // starts at the beginning, not wherever the visitor happened to be reading.
   const toggleAutopilot = useCallback(() => {
     if (isRunning) {
       window.dispatchEvent(
@@ -630,8 +507,6 @@ export default function CockpitTray() {
       return;
     }
 
-    // Nothing to ask where the browser has no element fullscreen to give
-    // (iPhone Safari) or the visitor is already in it — those just fly.
     if (!canFullscreen()) {
       launchAutopilot(false);
       return;
@@ -647,9 +522,6 @@ export default function CockpitTray() {
     launchAutopilot,
   ]);
 
-  // Pausing (from the transport or a real wheel/touch/key handback) freezes
-  // the audio decks in place. Only a completed/cancelled tour tears the
-  // soundtrack down and exits fullscreen.
   useEffect(() => {
     const onState = (event: Event) => {
       const detail = (
@@ -684,8 +556,6 @@ export default function CockpitTray() {
     setActiveId(id);
     setIsOpen(false);
 
-    // Only the multiverse route owns the scroll-event listener. From a
-    // standalone section, these controls perform real route navigation.
     if (pathname !== "/") {
       router.push(id === "home" ? "/" : `/${id}`);
       return;
@@ -696,12 +566,6 @@ export default function CockpitTray() {
     );
   };
 
-  // RouteMap (the right-edge journey rail) owns its own visibility, driven
-  // by this toggle rather than a prop — the two are separately-mounted
-  // siblings in layout.tsx. The dispatch has to happen outside the state
-  // updater: React can invoke that updater during its own render pass, and
-  // this event is heard synchronously by RouteMap's listener, which called
-  // its setState while CockpitTray was still rendering.
   const toggleSidenav = () => {
     const next = !isSidenavVisible;
     setIsSidenavVisible(next);
@@ -710,9 +574,6 @@ export default function CockpitTray() {
     );
   };
 
-  // On the flight this follows the live camera state. A standalone route has
-  // no camera broadcaster, so derive the highlight directly from its URL
-  // without a route-change effect and its extra render.
   const routeId = pathname.split("/").filter(Boolean)[0];
   const visibleActiveId =
     pathname === "/" || !stops.some((stop) => stop.id === routeId)
@@ -724,9 +585,6 @@ export default function CockpitTray() {
       ref={containerRef}
       className="mission-chrome pointer-events-none fixed inset-x-0 top-0 z-50"
     >
-      {/* The fullscreen question. Both answers start the tour — this only
-         decides how much of the screen it gets — so neither button is a
-         cancel; dismissing (Esc, or the backdrop) is what backs out. */}
       <AnimatePresence>
         {askFullscreen && (
           <motion.div
@@ -794,11 +652,8 @@ export default function CockpitTray() {
         )}
       </AnimatePresence>
 
-      {/* Mounted only once actually needed (tray opened, or the latch's own
-         play button pressed first) — see requestPlayback/audioReady. */}
       {audioReady && (
         <>
-          {/* No static src — playNextSpan sets it imperatively per clip. */}
           <audio
             ref={narrationRef}
             preload="none"
@@ -826,25 +681,9 @@ export default function CockpitTray() {
       </AnimatePresence>
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-start">
-        {/* Side bays parked for now — the console flies on its own.
-        <AnimatePresence initial={false}>
-          {isOpen && (
-            <EquipmentBay
-              key="bay-left"
-              side="left"
-              label="Port Bay"
-              sheenDelay={0}
-            />
-          )}
-        </AnimatePresence>
-        */}
         <div aria-hidden="true" />
 
-        {/* Centre column: the console, with the latch hanging beneath it */}
         <div className="col-start-2 flex flex-col items-center">
-          {/* Animate the real occupied height so the latch remains attached
-              throughout both directions. `inert` keeps the always-mounted
-              controls out of focus and hit-testing while collapsed. */}
           <motion.div
             initial={false}
             animate={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
@@ -872,7 +711,6 @@ export default function CockpitTray() {
                 <Sheen delay={0.45} active={isOpen} />
                 <Rivets className="inset-x-4 top-2.5" />
 
-                {/* Console header strip */}
                 <div className="relative z-10 mb-3 mt-3 flex items-center justify-between gap-3 border-b border-white/10 pb-2">
                   <span className="text-[9px] font-semibold uppercase tracking-[0.3em] text-sky-200/60">
                     Nav Console
@@ -935,7 +773,6 @@ export default function CockpitTray() {
                   })}
                 </div>
 
-                {/* Autopilot — one control flies the tour and scores it */}
                 <div className="mission-console-well relative z-10 mt-3 flex items-center gap-3 rounded-lg border px-3 py-2">
                   <button
                     type="button"
@@ -982,7 +819,6 @@ export default function CockpitTray() {
                           ? `Paused at ${stops[leg]?.label ?? "current position"}`
                           : "Sit back — it flies itself"}
                     </p>
-                    {/* Tour progress across the seven stops */}
                     <span className="mt-1 block h-[3px] w-full overflow-hidden rounded-full bg-white/10">
                       <motion.span
                         className="block h-full origin-left rounded-full bg-[linear-gradient(90deg,#34d399,#7dd3fc)]"
@@ -1017,10 +853,6 @@ export default function CockpitTray() {
                     </svg>
                   </button>
 
-                  {/* Level meter — reads the deck that is actually playing.
-                     Hidden below sm: the autopilot row is already tight
-                     against the status text on a phone-width console, and
-                     this is the most dispensable part of it. */}
                   <div className="hidden h-6 items-end gap-[3px] sm:flex">
                     {[0.5, 0.9, 0.65, 1, 0.75].map((peak, i) => {
                       const live = track !== null && !isMuted && !isPaused;
@@ -1058,10 +890,6 @@ export default function CockpitTray() {
             </div>
           </motion.div>
 
-          {/* The latch — always visible, hangs just under the console. Closed,
-             it's floating free against the page, so it gets the notch ears;
-             open, it's flush against the console above it and a flare there
-             would just read as a seam, so they're skipped. */}
           <div className="relative inline-block">
             {!isOpen && (
               <>
@@ -1084,8 +912,6 @@ export default function CockpitTray() {
             >
             <Sheen delay={0.2} duration={2.4} active={isOpen || isLatchHot} />
 
-            {/* Autopilot is reachable with the tray shut — it is the control
-               you want mid-flight, and the tray closes when it engages. */}
             <button
               type="button"
               onClick={toggleAutopilot}
@@ -1121,8 +947,6 @@ export default function CockpitTray() {
               <>
                 <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
 
-                {/* The journey dial only exists on the multiverse route. On
-                    detail pages this control did nothing, so it is omitted. */}
                 <button
                   type="button"
                   onClick={toggleSidenav}
@@ -1140,11 +964,6 @@ export default function CockpitTray() {
               </>
             )}
 
-            {/* VEGA's trigger used to sit here, as the brand mark. It lives
-               in the middle of the scroll dial now (DialChatButton), where
-               the gearbox was — one control, on the instrument the traveller
-               already has a hand on. HoloChat still owns the panel either
-               way; this was only ever a button that flipped it. */}
 
             <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
 
@@ -1153,8 +972,6 @@ export default function CockpitTray() {
               onClick={() =>
                 setIsOpen((prev) => {
                   const next = !prev;
-                  // Expanding the tray is the trigger to load the music —
-                  // it doesn't start playback, just makes the elements exist.
                   if (next) setAudioReady(true);
                   return next;
                 })
@@ -1182,18 +999,6 @@ export default function CockpitTray() {
           </div>
         </div>
 
-        {/*
-        <AnimatePresence initial={false}>
-          {isOpen && (
-            <EquipmentBay
-              key="bay-right"
-              side="right"
-              label="Starboard Bay"
-              sheenDelay={0.9}
-            />
-          )}
-        </AnimatePresence>
-        */}
         <div aria-hidden="true" />
       </div>
     </div>

@@ -1,9 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-// Named imports (not `import * as THREE`) so bundlers can tree-shake the
-// rest of three.js — a wildcard namespace import forces the whole library
-// into the chunk since every property access is reachable.
 import {
   AdditiveBlending,
   BufferAttribute,
@@ -28,30 +25,16 @@ import {
   type StarfieldSeedDetail,
 } from "../lib/starfield";
 
-// The base THREE.Points field is a single draw call no matter how many points
-// are in it, so the count here is a purely visual decision, not a performance
-// one — the real per-frame cost is the position rewrite loop below (already
-// gated on actual scroll warp) and fragment shading, which is governed by
-// pixel ratio. This sits deliberately sparse: a denser field read as texture
-// behind the closing mark and competed with the logo's own particles for the
-// eye, which is the opposite of what it is for. The occasional glaze below is
-// one extra one-point draw call, rather than making every field point heavier.
 const PARTICLE_COUNT = 620;
 const INITIAL_PARTICLES = 240;
-// Shared with the loader and the closing mark (lib/starfield), which hand
-// particles to and from this field and have to agree with it to the pixel.
 const FIELD_DEPTH = STARFIELD.depth;
 const FIELD_WIDTH = 44;
 const CAMERA_Z = STARFIELD.cameraZ;
 const PHASE_SCROLL_SCREENS = 3;
 const MOBILE_BREAKPOINT = 768;
-// The field's frame rate once input has settled (see the idle throttle in
-// the render loop).
 const IDLE_FPS = 20;
 const IDLE_FRAME_MS = 1000 / IDLE_FPS;
 const IDLE_FRAME_SLACK_MS = 4;
-// One random star catches the light roughly once a second. The flare and its
-// short rest both vary, so the frequent glints still avoid a mechanical beat.
 const GLAZE_FIRST_DELAY_MIN_MS = 700;
 const GLAZE_FIRST_DELAY_MAX_MS = 1050;
 const GLAZE_GAP_MIN_MS = 220;
@@ -86,8 +69,6 @@ function createGlazeTexture(): Texture {
   canvas.height = size;
   const ctx = canvas.getContext("2d")!;
 
-  // A soft bloom plus a fine four-point catch-light. Baking it once into a
-  // tiny texture is much cheaper than a live blur or a full-screen glow pass.
   const bloom = ctx.createRadialGradient(centre, centre, 0, centre, centre, centre);
   bloom.addColorStop(0, "rgba(255,255,255,1)");
   bloom.addColorStop(0.1, "rgba(255,255,255,0.9)");
@@ -146,18 +127,12 @@ export default function SpaceParticles() {
     const renderer = new WebGLRenderer({
       canvas,
       alpha: true,
-      antialias: false, // Disabled for better performance
+      antialias: false,
       powerPreference: "high-performance",
     });
-    // Deliberately 1.0. This is a full-viewport pass, so pixel ratio is the
-    // one setting here that scales cost quadratically — and the payoff is
-    // nil, because the points are soft round sprites with no hard edges to
-    // sharpen. Density and colour (above) are what make the field read; they
-    // cost almost nothing by comparison.
     renderer.setPixelRatio(1);
     renderer.setSize(window.innerWidth, window.innerHeight);
 
-    // Rounded, faded-blue starfield drifting through the z axis
     const positions = new Float32Array(finalCount * 3);
     const speeds = new Float32Array(finalCount);
 
@@ -167,20 +142,16 @@ export default function SpaceParticles() {
       positions[i * 3 + 2] = -Math.random() * FIELD_DEPTH;
       speeds[i] = 0.4 + Math.random() * 0.8;
     }
-    
+
     const geometry = new BufferGeometry();
     const posAttr = new BufferAttribute(positions, 3);
     geometry.setAttribute("position", posAttr);
-    geometry.setDrawRange(0, initialCount); // Start with fewer particles
+    geometry.setDrawRange(0, initialCount);
     const posArray = posAttr.array as Float32Array;
     let currentParticleCount = initialCount;
-    
+
     const material = new PointsMaterial({
       map: createCircleTexture(),
-      // Saturated blue at departure rather than the washed-out #93c5fd — the
-      // pale tint is where the field ends up late in the flight (see the
-      // lerp toward skyBlue/white below), so starting there meant the colour
-      // journey had nowhere to travel from.
       color: new Color(STARFIELD.color),
       size: STARFIELD.pointSize,
       sizeAttenuation: true,
@@ -191,9 +162,6 @@ export default function SpaceParticles() {
     const field = new Points(geometry, material);
     scene.add(field);
 
-    // A separate one-point layer can brighten and grow one chosen star while
-    // the batched base material remains untouched. Parenting it to the field
-    // makes the catch-light inherit the exact same mouse tilt and slow roll.
     const glazeGeometry = new BufferGeometry();
     glazeGeometry.setAttribute(
       "position",
@@ -236,11 +204,6 @@ export default function SpaceParticles() {
 
     let blueProgress = getBlueProgress(window.scrollY);
 
-    // Timestamp of the last real input. While the visitor is idle the
-    // starfield's only motion is the barely-perceptible z-drift and
-    // twinkle, so the render loop drops to a third of the frame rate —
-    // freeing the GPU/compositor budget for the rest of the page — and
-    // snaps back to full rate the instant anything moves.
     let lastActivity = performance.now();
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -249,11 +212,6 @@ export default function SpaceParticles() {
       lastActivity = performance.now();
     };
 
-    // Gains cut roughly 40%: this warp is driven by raw wheel/scroll deltas
-    // while the camera itself now glides on a soft spring, so at the old
-    // gains a fast flick rocketed the starfield past a camera that was still
-    // easing — the two read as different speeds in the same shot. Slower
-    // input response keeps the field travelling with the camera.
     const handleWheel = (e: WheelEvent) => {
       if (isAutopilotRunning) return;
       scrollVelocity += e.deltaY * 0.0006;
@@ -264,10 +222,6 @@ export default function SpaceParticles() {
       const currentY = window.scrollY;
       const deltaY = currentY - lastScrollY;
       lastScrollY = currentY;
-      // A jump, not travel: the loop wrapping from the end to the top (or any
-      // instant scrollTo). Read as a delta it is a scroll of tens of screens
-      // backwards and flung the whole field the wrong way; the loop brings
-      // its own forward rush (flight-loop-rush) instead.
       if (Math.abs(deltaY) > window.innerHeight * 2) {
         blueProgress = getBlueProgress(currentY);
         return;
@@ -295,14 +249,6 @@ export default function SpaceParticles() {
       lastScrollY = window.scrollY;
     };
 
-    // renderer.setSize() reallocates the WebGL drawing buffer — the most
-    // expensive thing on this page that a scroll can trigger. A mobile
-    // browser fires `resize` on every URL-bar slide, which is exactly during
-    // a scroll, and only reports a height change of ~60-100px. The canvas
-    // itself is laid out at 100vh (stable across that slide) and the field is
-    // a soft, depth-faded star wash with no hard edges, so a vertical
-    // mismatch that small is invisible. An orientation change or a desktop
-    // window drag clears the threshold and resizes properly.
     let lastWidth = window.innerWidth;
     let lastHeight = window.innerHeight;
     const handleResize = () => {
@@ -316,9 +262,6 @@ export default function SpaceParticles() {
       renderer.setSize(width, height);
     };
 
-    // --- Hand-offs ---------------------------------------------------------
-    // The field is where the loader's shattered US ends up, and where the
-    // closing US is gathered from. See lib/starfield.
     const handoffPoint = new Vector3();
     const glazeWorldPoint = new Vector3();
     const glazeNdcPoint = new Vector3();
@@ -350,9 +293,6 @@ export default function SpaceParticles() {
     };
 
     const startGlaze = (time: number) => {
-      // Random probes keep this O(1). Restricting the chosen point to the
-      // central viewport and middle depth makes every scheduled glaze visible
-      // and prevents a flare from wrapping from the camera to deep space.
       field.updateMatrixWorld(true);
       camera.updateMatrixWorld();
       const attempts = Math.min(currentParticleCount, 36);
@@ -392,9 +332,6 @@ export default function SpaceParticles() {
         activeGlazeIndex = index;
         glazeStart = time;
         glazeDuration = randomBetween(GLAZE_DURATION_MIN_MS, GLAZE_DURATION_MAX_MS);
-        // PointsMaterial sizes are world units. Convert the desired on-screen
-        // diameter back through the perspective projection so near and far
-        // stars both flare to a restrained, readable 26–34 CSS pixels.
         const targetPixels = isMobile ? 26 : 34;
         glazeBaseSize =
           (targetPixels * viewDepth) / Math.max(window.innerHeight / 2, 1);
@@ -406,14 +343,9 @@ export default function SpaceParticles() {
         return;
       }
 
-      // A tilted field can briefly leave few eligible stars on screen. Retry
-      // soon instead of consuming a full quiet interval on an invisible hit.
       nextGlazeAt = time + 250;
     };
 
-    // Seed: put stars exactly where the loader's dots are, at the depth each
-    // was drawn for. Built in camera space and taken into the field's own
-    // (rotated) space, so the mouse tilt and the slow roll do not shift them.
     const handleSeed = (event: Event) => {
       const stars = (event as CustomEvent<StarfieldSeedDetail>).detail?.stars;
       if (!stars?.length) return;
@@ -442,21 +374,14 @@ export default function SpaceParticles() {
       posAttr.needsUpdate = true;
       currentParticleCount = Math.max(currentParticleCount, count);
       geometry.setDrawRange(0, currentParticleCount);
-      // The loader takes its canvas away on the next frames; this one has
-      // to be drawn by then, idle throttle or not.
       material.opacity = STARFIELD.opacity;
       lastActivity = performance.now();
       renderer.render(scene, camera);
     };
 
-    // Gather: hand the closing mark the stars on screen right now, and take
-    // them out of the field while they are the mark. Parked far to the side
-    // (the drift loop only moves z) and remembered for release.
     const handleGather = (event: Event) => {
       const detail = (event as CustomEvent<StarfieldGatherDetail>).detail;
       if (!detail) return;
-      // The closing US owns the eye once it starts gathering. A white flare
-      // behind it would compete with the exact stars becoming the mark.
       glazePaused = true;
       stopGlaze(performance.now(), false);
       field.updateMatrixWorld();
@@ -491,8 +416,6 @@ export default function SpaceParticles() {
       if (!reduceMotion) scheduleNextGlaze(performance.now());
     };
 
-    // The loop arriving back at the beginning: a hard forward warp that
-    // decays on the usual 0.87/frame, held at the clamp for the first beat.
     const handleLoopRush = () => {
       if (isAutopilotRunning) return;
       scrollVelocity = 5;
@@ -513,7 +436,6 @@ export default function SpaceParticles() {
 
     let rafId: number;
 
-    // Gradually add more particles after initial load
     let lastParticleAddTime = 0;
     const addParticlesGradually = () => {
       const now = Date.now();
@@ -530,14 +452,6 @@ export default function SpaceParticles() {
     const animate = (time: number) => {
       rafId = requestAnimationFrame(animate);
 
-      // Idle throttle — see lastActivity above. 2s after the last input the
-      // field renders at IDLE_FPS; the slow drift/twinkle is
-      // indistinguishable at that rate and the skipped frames cost nothing.
-      // Timed, not counted: "every third frame" was 20fps on a 60Hz screen
-      // but 40 on a 120Hz ProMotion one, and every render here is a
-      // full-viewport repaint the whole corridor has to be recomposited over.
-      // The slack absorbs vsync jitter, so 60Hz still lands on every third
-      // frame and 120Hz on every sixth.
       if (
         time - lastActivity > 2000 &&
         time - lastParticleFrame < IDLE_FRAME_MS - IDLE_FRAME_SLACK_MS
@@ -545,9 +459,6 @@ export default function SpaceParticles() {
         return;
       }
 
-      // The renderer deliberately idles at 20fps after input settles. Use
-      // elapsed time rather than a per-frame increment so the ambient field
-      // keeps the same slow pace during autoplay narration and on phones.
       const elapsedSeconds = lastParticleFrame
         ? Math.min((time - lastParticleFrame) / 1000, 0.08)
         : 0;
@@ -560,10 +471,6 @@ export default function SpaceParticles() {
       field.rotation.x = rotation.x;
       field.rotation.y = rotation.y;
 
-      // Manual input adds a stronger warp on top of the ambient drift below.
-      // Decays a little faster and tops out a little lower than it used to
-      // (+-2 -> +-1.1): the ceiling is what a hard flick actually hits, so it,
-      // not the gain, is what set how violent fast scrolling looked.
       scrollVelocity *= 0.87;
       const warp = MathUtils.clamp(scrollVelocity, -1.1, 1.1);
       const t = time * 0.001;
@@ -574,19 +481,11 @@ export default function SpaceParticles() {
       phaseColor.lerpColors(normalColor, skyBlueColor, blueMix);
       phaseColor.lerp(endWhiteColor, endPhaseMix);
       material.color.lerp(phaseColor, 0.06);
-      // Dimmer than the field was, and dimmer still by the end of the
-      // flight: the starfield sits directly behind the closing mark, and at
-      // full strength its own points competed with the logo's particles so
-      // the glyph shapes stopped reading as a logo at all.
       const targetOpacity = MathUtils.lerp(0.4, 0.16, endPhaseMix);
       material.opacity += (targetOpacity - material.opacity) * 0.06;
 
-      // Slow whole-field drift keeps the stars alive without per-particle math
       field.rotation.z = t * 0.004;
 
-      // Manual scrolling supplies the flight warp. A quieter, time-based
-      // drift remains underneath it at all times, with a touch more presence
-      // during the narration-driven autoplay so space never freezes there.
       const ambientStep = (isAutopilotRunning ? 0.46 : 0.14) * elapsedSeconds;
       const particleStep = warp + ambientStep;
       if (Math.abs(particleStep) > 0.0001) {
@@ -608,8 +507,6 @@ export default function SpaceParticles() {
           const z = posArray[activeGlazeIndex * 3 + 2];
           const progress = (time - glazeStart) / glazeDuration;
 
-          // Stop at a wrap instead of letting the catch-light teleport from a
-          // near star to the same particle's recycled position in deep space.
           if (
             x === PARKED_X ||
             progress >= 1 ||
@@ -621,9 +518,6 @@ export default function SpaceParticles() {
             glazePoint.position.set(x, y, z);
             const pulse = Math.sin(Math.PI * MathUtils.clamp(progress, 0, 1));
             const brilliance = Math.pow(pulse, 1.25);
-            // Follow the flight's cool colour journey, then lift toward white
-            // at the centre like light sliding over glass. Calm it near the
-            // ending even before gather so it never fights the closing mark.
             glazeMaterial.color.copy(phaseColor).lerp(endWhiteColor, 0.78);
             glazeMaterial.opacity =
               brilliance * MathUtils.lerp(0.92, 0.36, endPhaseMix);

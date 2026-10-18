@@ -10,29 +10,12 @@ type RouteStop = {
   progress: number;
 };
 
-// The drum's bands are the flight's own landings, not a transcription of
-// them. The hand-written list this replaces had drifted twice over: it was
-// still on the pre-layover coordinates (skills 0.22, projects 0.56), and it
-// carried a sixth band, "Resume Builder" at 0.81, for a card that no longer
-// exists — a stop on the map with no place behind it.
-//
-// MAIN_FLIGHT_STOPS also lands on each card's *readable slot* rather than
-// its raw progress stop, which is where the nav and the dial already fly to
-// (getNavTargetProgress). The three instruments now agree. Labels come from
-// the panels' own `eyebrow` strings, so rule 2's shared numbering holds by
-// construction: Hello, Skills, Projects, Experience, Contact.
 const stops: RouteStop[] = MAIN_FLIGHT_STOPS;
 
-// A watch date-wheel, not a straight track: each stop sits on its own band
-// of a vertical cylinder, evenly spaced by ANGLE_STEP regardless of how
-// bunched the underlying scroll progress values are — a real drum's
-// numbers are evenly spaced too, it's the *position within a turn* that
-// varies. `indexPosition` is the drum's continuous rotation, expressed as
-// a fractional stop index (2.4 = 40% of the way from stop 2 to stop 3).
-const ANGLE_STEP = 26; // degrees between adjacent stops
-const RADIUS = 108; // px — translateZ distance, i.e. the drum's radius
-const MAX_VISIBLE_ANGLE = 92; // beyond this a stop has rotated past the edge
-const ROW_HEIGHT = 46; // px of drag per one full stop-to-stop step
+const ANGLE_STEP = 26;
+const RADIUS = 108;
+const MAX_VISIBLE_ANGLE = 92;
+const ROW_HEIGHT = 46;
 
 function clamp(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, v));
@@ -58,17 +41,10 @@ function indexPositionToProgress(x: number) {
   return a + (b - a) * frac;
 }
 
-// Scrolling the real document is what actually drives the flight (see
-// MultiverseFlight's own scrollYProgress) — the drum is just another input
-// onto that same scroll position, same as the cockpit's own scroll dial.
 function scrollToProgress(p: number) {
   const doc = document.documentElement;
   const max = doc.scrollHeight - window.innerHeight;
   if (max <= 0) return;
-  // The drum's stops are flight progress; the document is scroll. They are
-  // different clocks (data/flightTimeline.ts), so a stop dropped straight
-  // into a scroll position lands somewhere else entirely on any leg whose
-  // scroll length has been retimed.
   window.scrollTo({
     top: max * scrollFromProgress(clamp(p, 0, 1)),
     behavior: "auto",
@@ -81,22 +57,11 @@ export default function RouteMap() {
   const draggingRef = useRef(false);
   const dragStartY = useRef(0);
   const dragStartIndex = useRef(0);
-  // indexPosition used to be React state, but the flight broadcasts scroll
-  // progress on every scroll tick (~60/s) — routing that through setState
-  // forced a full re-render (recomputing every stop's transform) on every
-  // frame while scrolling. It's kept in a ref instead and each stop's DOM
-  // node is written to directly; `centeredIndex` stays as state since it
-  // only actually needs to change (and re-render, for its className-driven
-  // styling) when the rounded stop index changes — a handful of times per
-  // scroll, not 60 times a second.
   const indexPositionRef = useRef(0);
   const [centeredIndex, setCenteredIndex] = useState(0);
   const stopRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const labelRefs = useRef<(HTMLSpanElement | null)[]>([]);
 
-  // The drum's angles, written straight to the DOM. Split out from
-  // applyIndexPosition so the after-render pass below can re-assert the
-  // position without also touching state.
   const writeStops = useCallback((x: number) => {
     stops.forEach((_stop, i) => {
       const angle = (i - x) * ANGLE_STEP;
@@ -116,8 +81,6 @@ export default function RouteMap() {
     });
   }, []);
 
-  // Stable across renders, because the scroll-progress listener below is
-  // registered once and would otherwise hold the first render's copy.
   const applyIndexPosition = useCallback(
     (x: number) => {
       indexPositionRef.current = x;
@@ -128,24 +91,10 @@ export default function RouteMap() {
     [writeStops],
   );
 
-  // React renders the drum at the nearest stop; this puts it back on the
-  // exact angle it was on.
-  //
-  // The fractional position lives in a ref, and a render cannot read a ref —
-  // React may throw the render away, and the rule that forbids it is the lint
-  // error this replaced. So the markup is rendered from `centeredIndex`, which
-  // is only ever the *rounded* stop, and every re-render that comes from
-  // something other than scrolling (a drag starting, the rail being toggled)
-  // would otherwise snap the drum up to half a step away from where it sits.
-  // A layout effect runs before the browser paints, so the correction is
-  // never seen.
   useLayoutEffect(() => {
     writeStops(indexPositionRef.current);
   });
 
-  // Shown/hidden from the cockpit tray's own toggle, not owned locally —
-  // kept mounted (opacity/pointer-events only) so scroll position isn't
-  // lost while it's tucked away.
   useEffect(() => {
     const onToggle = (event: Event) => {
       const detail = (event as CustomEvent<{ visible?: boolean }>).detail;
@@ -156,9 +105,6 @@ export default function RouteMap() {
       window.removeEventListener("toggle-route-map", onToggle as EventListener);
   }, []);
 
-  // Follows the same scroll-progress broadcast the cockpit's scroll dial
-  // reads — except while the visitor is actively turning the drum
-  // themselves, so an incoming update doesn't fight their own drag.
   useEffect(() => {
     const handleProgressUpdate = (event: Event) => {
       if (draggingRef.current) return;
@@ -199,8 +145,6 @@ export default function RouteMap() {
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!draggingRef.current) return;
     const deltaY = e.clientY - dragStartY.current;
-    // Dragging up (negative deltaY) turns the drum forward, toward later
-    // stops — the same sense as a real crown: pull the wheel up to advance.
     const nextIndex = clamp(
       dragStartIndex.current - deltaY / ROW_HEIGHT,
       0,
@@ -214,9 +158,6 @@ export default function RouteMap() {
     if (!draggingRef.current) return;
     draggingRef.current = false;
     setDragging(false);
-    // Settles on whichever stop the drum is nearest, like a detent —
-    // dragging is for scrubbing the flight live, but letting go should
-    // still land somewhere identifiable rather than mid-turn.
     const nearest = Math.round(indexPositionRef.current);
     applyIndexPosition(nearest);
     scrollToProgress(stops[nearest].progress);
@@ -240,12 +181,6 @@ export default function RouteMap() {
         isVisible ? "opacity-100" : "pointer-events-none translate-x-6 opacity-0"
       }`}
     >
-      {/* The drum housing — a dark metal tube (matching the cockpit tray's
-         own brushed-steel language) with a perspective window cut into it.
-         Fading top/bottom mask keeps stops from popping in/out abruptly as
-         they rotate past the edge of the visible window, the way a real
-         watch's date window has hard top/bottom edges the wheel disappears
-         behind. */}
       <div
         role="slider"
         tabIndex={0}
@@ -259,10 +194,6 @@ export default function RouteMap() {
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onKeyDown={onKeyDown}
-        // No backdrop-blur: this drum is pinned over the flight scene, which
-        // repaints on every scroll frame — a backdrop-blur-xl here meant the
-        // browser re-blurred a 52vh strip of the scene every one of those
-        // frames, all session. A more opaque plate reads near-identically.
         className="relative h-[52vh] w-36 touch-none select-none rounded-[28px] border border-white/15 bg-slate-950/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-12px_24px_rgba(2,8,23,0.4),0_20px_50px_rgba(2,8,23,0.45)] outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60"
         style={{
           perspective: "700px",
@@ -278,14 +209,9 @@ export default function RouteMap() {
           style={{ transformStyle: "preserve-3d" }}
         >
           {stops.map((stop, i) => {
-            // The rounded stop, not the drum's real angle: the exact position
-            // is a ref, which a render is not allowed to read, so these are
-            // the starting values the layout effect above immediately
-            // corrects. Rendering them at all still matters — they are what a
-            // first paint and a React-driven re-render lay down.
             const angle = (i - centeredIndex) * ANGLE_STEP;
             const rad = (angle * Math.PI) / 180;
-            const facing = Math.cos(rad); // 1 = dead centre, 0 = edge-on
+            const facing = Math.cos(rad);
             const isCentered = i === centeredIndex;
             const isPassed = i <= centeredIndex;
 
@@ -335,9 +261,6 @@ export default function RouteMap() {
           })}
         </div>
 
-        {/* Centre indicator — the "read here" line a watch's date window
-           implies with its own frame, made explicit since this window has
-           no physical edge of its own. */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-2 top-1/2 h-6 -translate-y-1/2 rounded-md border-y border-sky-300/25 bg-sky-300/4"

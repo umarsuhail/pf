@@ -2,17 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-// A finger, not a wheel.
-//
-// Two things in the flight want this answer and they have to agree: the
-// smoothed wheel, which is never engaged on touch because native momentum
-// beats a main-thread lerp (see smooth-scroll.ts), and the camera spring,
-// which is tightened on touch because a thumb is in contact with the thing
-// it is moving and any follow reads as lag.
-//
-// `(pointer: coarse)` asks about the *primary* input, which is the right
-// question: a laptop with a touchscreen still reports `fine`, and it should,
-// because its owner is scrolling with a trackpad.
 export const COARSE_POINTER_QUERY = "(pointer: coarse)";
 
 export function isCoarsePointer() {
@@ -20,10 +9,6 @@ export function isCoarsePointer() {
   return window.matchMedia(COARSE_POINTER_QUERY).matches;
 }
 
-// Starts false so the server render and the first client render agree, then
-// settles in the effect. Nothing here is load-bearing for a first paint — it
-// only tunes how the camera follows — so one render at the desktop default
-// costs nothing even on a phone.
 export function useCoarsePointer() {
   const [coarse, setCoarse] = useState(false);
   useEffect(() => {

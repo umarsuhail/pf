@@ -6,12 +6,6 @@ type SpacetimeFieldProps = {
 const LATITUDES = [74, 126, 182, 242, 306, 374, 446];
 const LONGITUDES = [-30, 42, 114, 186, 258, 330, 402, 474];
 
-/**
- * A lightweight spacetime navigation map for VEGA's communications panel.
- * The geometry is SVG rather than another canvas loop: only dash offset,
- * opacity, and two small transforms animate, and reduced-motion freezes all
- * of them into the same useful composition.
- */
 export default function SpacetimeField({ active, className = "" }: SpacetimeFieldProps) {
   return (
     <svg
@@ -41,8 +35,6 @@ export default function SpacetimeField({ active, className = "" }: SpacetimeFiel
 
       <rect width="460" height="540" fill="url(#spacetime-haze)" />
 
-      {/* Coordinate fabric. Every line bends around the same navigation
-          corridor, so the field reads as warped space rather than graph paper. */}
       <g className="spacetime-grid" fill="none" stroke="#7dd3fc" strokeOpacity="0.13" strokeWidth="0.8">
         {LATITUDES.map((y, index) => (
           <path
@@ -58,8 +50,6 @@ export default function SpacetimeField({ active, className = "" }: SpacetimeFiel
         ))}
       </g>
 
-      {/* Temporal reference rings: open, luminous coordinates rather than a
-          filled centre, deliberately avoiding black-hole imagery. */}
       <g className="spacetime-rings" fill="none" stroke="#a5b4fc" strokeOpacity="0.22">
         <ellipse cx="286" cy="230" rx="102" ry="44" strokeWidth="0.8" strokeDasharray="3 8" />
         <ellipse cx="286" cy="230" rx="70" ry="30" strokeWidth="0.9" strokeDasharray="2 6" />
@@ -67,7 +57,6 @@ export default function SpacetimeField({ active, className = "" }: SpacetimeFiel
         <path d="M286 166v128M198 230h176" stroke="#67e8f9" strokeOpacity="0.12" strokeDasharray="2 7" />
       </g>
 
-      {/* VEGA's active worldline through the coordinate fabric. */}
       <path
         className="spacetime-worldline"
         d="M-24 438 C54 412 96 344 137 334 C187 321 197 374 247 342 C302 307 277 235 326 194 C365 162 410 169 484 84"
@@ -86,7 +75,6 @@ export default function SpacetimeField({ active, className = "" }: SpacetimeFiel
         strokeLinecap="round"
       />
 
-      {/* Signal fixes along the route. */}
       <g transform="translate(137 334)">
         <g className="spacetime-pulse">
           <circle r="20" fill="url(#spacetime-node)" opacity="0.22" />

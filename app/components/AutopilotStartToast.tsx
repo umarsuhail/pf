@@ -6,10 +6,6 @@ import { AirplaneIcon, type AirplaneIconHandle } from "./icons/airplane";
 
 const VISIBLE_MS = 1800;
 
-// A one-shot "Let's go" beat that plays the instant autopilot actually
-// launches — dispatched from MultiverseFlight right as the tour resets to
-// the very beginning, so the announcement and the snap-to-start read as one
-// gesture rather than two disconnected things happening near each other.
 export default function AutopilotStartToast() {
   const [visible, setVisible] = useState(false);
   const iconRef = useRef<AirplaneIconHandle>(null);
@@ -19,14 +15,9 @@ export default function AutopilotStartToast() {
     const onLaunch = () => {
       window.clearTimeout(timeoutRef.current);
       setVisible(true);
-      // Fires on mount too, but the icon only exists once `visible` renders
-      // it — a microtask later is plenty for that to have happened.
       requestAnimationFrame(() => iconRef.current?.startAnimation());
       timeoutRef.current = window.setTimeout(() => setVisible(false), VISIBLE_MS);
     };
-    // flight-autopilot-state fires on every leg (running: true each time),
-    // not just when the tour actually stops — only a running:false means
-    // the tour ended and the toast should clear early if it's still up.
     const onStop = (event: Event) => {
       const running = (event as CustomEvent<{ running?: boolean }>).detail?.running;
       if (running) return;

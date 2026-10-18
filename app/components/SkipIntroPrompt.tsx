@@ -3,32 +3,17 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
-// The intro is the one leg of the tour that does not run on a timer: home
-// holds until intro.aac has actually finished speaking (see the
-// `waitForNarration` leg in MultiverseFlight). That is right for a first
-// visit and wrong for every one after it, where the tour appears to have
-// stalled on the first card with no way past.
-//
-// So: an out, offered rather than demanded. It waits for the launch toast to
-// clear its slot before appearing, and only ever appears on the intro leg —
-// once the flight is actually moving there is nothing to skip.
 const APPEAR_AFTER_MS = 2600;
 
 export default function SkipIntroPrompt() {
   const [shown, setShown] = useState(false);
 
-  // One state, driven entirely from the event. The delay lives in the handler
-  // rather than in a second effect keyed off a second state — that shape reads
-  // more naturally but puts a setState in an effect body, and the appear /
-  // cancel logic is clearer in one place anyway.
   useEffect(() => {
     let timer = 0;
 
     const onState = (event: Event) => {
       const detail = (event as CustomEvent<{ running?: boolean; index?: number }>)
         .detail;
-      // cardIndex 0 is home, i.e. the narrated intro. Any other leg means the
-      // tour is already flying and the offer is moot.
       const onIntro = Boolean(detail?.running) && detail?.index === 0;
 
       if (!onIntro) {
@@ -37,7 +22,6 @@ export default function SkipIntroPrompt() {
         setShown(false);
         return;
       }
-      // autopilot-state re-fires for every leg; only arm the countdown once.
       if (timer) return;
       timer = window.setTimeout(() => {
         timer = 0;
@@ -54,10 +38,6 @@ export default function SkipIntroPrompt() {
 
   const skip = () => {
     setShown(false);
-    // CockpitTray owns the audio and answers this by handing the intro over to
-    // the main track. That hand-over emits the narration-complete event the
-    // autopilot is already waiting on, so the tour releases and flies to
-    // Skills on its own — nothing here has to know about legs or progress.
     window.dispatchEvent(new CustomEvent("flight-skip-intro"));
   };
 

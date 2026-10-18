@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { ProjectVisual } from "./ProjectVisual";
 import type { CSSProperties } from "react";
 import type { FlightCard } from "../data/sections";
 
@@ -31,33 +32,31 @@ function ProjectPreview({
   return (
     <article
       style={desktopStyle}
-      className="group relative min-w-[82%] snap-center overflow-hidden rounded-2xl border border-sky-100/15 bg-slate-950/90 shadow-[0_18px_42px_rgba(2,8,23,0.48)] transition-[transform,border-color,box-shadow] duration-300 ease-out hover:border-sky-300/35 hover:shadow-[0_24px_58px_rgba(14,165,233,0.24)] sm:min-w-[66%] lg:absolute lg:left-[var(--stack-left)] lg:top-[var(--stack-top)] lg:h-[19%] lg:w-[93%] lg:min-w-0 lg:rotate-[var(--stack-rotate)] lg:hover:z-50 lg:hover:-translate-x-3 lg:hover:rotate-0 lg:hover:scale-[1.015]"
+      className="detail-project-card group relative min-w-[82%] snap-center overflow-hidden rounded-2xl border transition-[transform,border-color,box-shadow] duration-300 ease-out sm:min-w-[66%] lg:absolute lg:left-[var(--stack-left)] lg:top-[var(--stack-top)] lg:h-[19%] lg:w-[93%] lg:min-w-0 lg:rotate-[var(--stack-rotate)] lg:hover:z-50 lg:hover:-translate-x-3 lg:hover:rotate-0 lg:hover:scale-[1.015]"
     >
       <div className="grid h-full grid-rows-[7.5rem_auto] lg:grid-cols-[34%_1fr] lg:grid-rows-1">
-        <div className="relative overflow-hidden border-b border-white/10 bg-slate-900 lg:border-b-0 lg:border-r">
-          <Image
-            src={project.image}
-            alt=""
-            fill
-            sizes="(max-width: 640px) 82vw, (max-width: 1024px) 66vw, 18vw"
-            className={`${
-              project.imageFit === "contain" ? "object-contain p-2" : "object-cover"
-            } opacity-80 saturate-[0.85] transition-transform duration-500 ease-out group-hover:scale-[1.04]`}
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(15,23,42,0.05),rgba(2,6,23,0.5))]" />
-          <span className="absolute left-2.5 top-2.5 rounded-full border border-white/15 bg-slate-950/70 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.2em] text-sky-100/75">
+        <div className="detail-project-visual relative overflow-hidden border-b lg:border-b-0 lg:border-r">
+          <div className="absolute inset-0 opacity-80 saturate-[0.85] transition-transform duration-500 ease-out group-hover:scale-[1.04]">
+            <ProjectVisual
+              project={project}
+              sizes="(max-width: 640px) 82vw, (max-width: 1024px) 66vw, 18vw"
+              padding="p-2"
+            />
+          </div>
+          <div className="detail-project-veil absolute inset-0" />
+          <span className="detail-project-tag absolute left-2.5 top-2.5 rounded-full border px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.2em]">
             Preview {String(index + 1).padStart(2, "0")}
           </span>
         </div>
 
         <div className="flex min-w-0 flex-col justify-center px-4 py-3 lg:px-3.5 lg:py-2">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.24em] text-sky-300/70">
+          <p className="detail-accent text-[9px] font-semibold uppercase tracking-[0.24em]">
             {project.category}
           </p>
-          <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-sky-50 lg:text-[13px]">
+          <h3 className="detail-ink mt-1 line-clamp-2 text-sm font-semibold leading-snug lg:text-[13px]">
             {project.title}
           </h3>
-          <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-slate-200/65 lg:text-[10px] lg:leading-[1.45]">
+          <p className="detail-copy mt-1.5 line-clamp-2 text-xs leading-relaxed lg:text-[10px] lg:leading-[1.45]">
             {project.description}
           </p>
         </div>
@@ -68,25 +67,25 @@ function ProjectPreview({
 
 export function ProjectStackShowcase({ projects }: { projects: Project[] }) {
   return (
-    <figure className="relative isolate overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/40 px-4 pb-5 pt-7 shadow-[0_32px_90px_-28px_rgba(14,165,233,0.48)] sm:px-8 sm:pb-8 lg:min-h-[620px] lg:p-0">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_45%,rgba(56,189,248,0.2),transparent_28%),radial-gradient(circle_at_78%_24%,rgba(37,99,235,0.2),transparent_34%),linear-gradient(145deg,rgba(15,23,42,0.35),rgba(2,6,23,0.9))]" />
+    <figure className="detail-project-stage relative isolate overflow-hidden rounded-[2rem] border px-4 pb-5 pt-7 sm:px-8 sm:pb-8 lg:min-h-[620px] lg:p-0">
+      <div className="detail-project-stage-glow absolute inset-0" />
       <div
         aria-hidden="true"
-        className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(125,211,252,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(125,211,252,0.08)_1px,transparent_1px)] [background-size:30px_30px] [mask-image:linear-gradient(to_right,black,transparent_68%)]"
+        className="detail-project-grid absolute inset-0 opacity-30 [background-size:30px_30px] [mask-image:linear-gradient(to_right,black,transparent_68%)]"
       />
 
       <div className="relative z-10 mx-auto aspect-square w-[min(54vw,13rem)] lg:absolute lg:left-[7%] lg:top-1/2 lg:w-[36%] lg:max-w-[17rem] lg:-translate-y-1/2">
         <span
           aria-hidden="true"
-          className="absolute inset-[2%] rounded-full border border-sky-300/20 shadow-[0_0_55px_rgba(56,189,248,0.2),inset_0_0_40px_rgba(59,130,246,0.12)]"
+          className="detail-project-orbit-primary absolute inset-[2%] rounded-full border"
         />
         <span
           aria-hidden="true"
-          className="absolute inset-[14%] rounded-full border border-dashed border-emerald-300/20"
+          className="detail-project-orbit-secondary absolute inset-[14%] rounded-full border border-dashed"
         />
         <span
           aria-hidden="true"
-          className="absolute left-1/2 top-1/2 h-[46%] w-[116%] -translate-x-1/2 -translate-y-1/2 rotate-[-13deg] rounded-[50%] border border-sky-200/25"
+          className="detail-project-orbit-tertiary absolute left-1/2 top-1/2 h-[46%] w-[116%] -translate-x-1/2 -translate-y-1/2 rotate-[-13deg] rounded-[50%] border"
         />
         <div className="absolute inset-[17%]">
           <Image
@@ -94,10 +93,10 @@ export function ProjectStackShowcase({ projects }: { projects: Project[] }) {
             alt="US2 portfolio mark"
             fill
             sizes="(max-width: 1024px) 54vw, 17rem"
-            className="object-contain drop-shadow-[0_20px_34px_rgba(14,165,233,0.3)]"
+            className="detail-project-logo object-contain"
           />
         </div>
-        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.34em] text-sky-100/45">
+        <span className="detail-muted absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.34em]">
           Selected work archive
         </span>
       </div>

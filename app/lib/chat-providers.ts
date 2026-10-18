@@ -49,7 +49,6 @@ export async function generateWithFallback(system: string, messages: ChatTurn[],
       if (message) return { message, provider: provider.name };
       console.warn(`Chat ${provider.name}: empty response; trying fallback.`);
     } catch {
-      // Never log provider payloads: they can contain credentials or user data.
       console.warn(`Chat ${provider.name}: request failed; trying fallback.`);
     }
   }

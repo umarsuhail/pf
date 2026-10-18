@@ -20,26 +20,11 @@ import {
 } from "../lib/camera";
 import RadarScope, { useToolPresence } from "./RadarScope";
 
-// The toolkit, as a card in the corridor: a radar that finds the tools one at
-// a time, with the copy for the one it has found beside it.
-//
-// It flies like a billboard and then docks at each tool. It comes up out of
-// the distance as the Skills card clears, reaches reading depth at every tool
-// stop, and eases a little deeper into the corridor between them while the
-// spring of tool marks travels around it. At the last tool it lets go and the
-// flight passes through it into Projects. Which tool it shows is the same pure
-// function of progress as everything else in the corridor (see
-// technologyFocusWindow), so the dial, gear snapping and the autopilot's
-// per-tool stops all land on the tool the radar is showing, and scrolling
-// back steps the list backwards.
 
 const SKILLS_INDEX = cards.findIndex((card) => card.id === "skills");
 const TOTAL = TECHNOLOGY_FOCUS_STOPS.length;
 const pad = (value: number) => String(value).padStart(2, "0");
 
-// One tool's copy. All of them are mounted, stacked in one grid cell (which
-// is sized by the tallest), and each fades on its own window — the version
-// that cannot drift, as the history rail beside the corridor already does.
 function RadarCopy({
   index,
   progress,
@@ -113,9 +98,6 @@ export default function RadarCard({
 }) {
   const travel = cameraTravelFor(compact);
 
-  // Arrives once the Skills card has cleared, and is fully up by the first
-  // tool. Leaves on the billboards' own depart depths, measured from the
-  // last tool, so it is gone before Projects is close enough to read.
   const revealStart = Math.max(
     getDepartWindow(SKILLS_INDEX).end,
     TECHNOLOGY_LAYOVER_START - 0.03,
@@ -125,17 +107,6 @@ export default function RadarCard({
   const departEnd =
     TECHNOLOGY_LAYOVER_END + (CARD_PASS_THROUGH_Z - CARD_READING_DEPTH) / travel;
 
-  // The hold, in the corridor's own depth units. A billboard sits at one
-  // depth and the camera carries it past; this card follows the camera through
-  // the layover, but relaxes away from the lens between neighbouring tools and
-  // returns to CARD_READING_DEPTH at every exact focus stop. The camera's own
-  // smoothing makes that repeated settle feel spring-loaded without adding a
-  // second clock that could drift from the copy, history rail or dial.
-  // Clamped short of the projection plane on the way out, as the billboards
-  // are, and parked like them once it has been flown through:
-  // back at reading depth, off the top of the frame (PARKED_OFFSET), still
-  // drawn, so the way back scales the raster it was read at instead of
-  // re-rasterising it at the pass-through.
   const isParked = (value: number) => value >= departEnd;
   const translateZ = useTransform(progress, (value) => {
     if (isParked(value)) return CARD_READING_DEPTH - value * travel;
@@ -167,9 +138,6 @@ export default function RadarCard({
   const opacity = useTransform(() =>
     isParked(progress.get()) ? PARKED_OPACITY : fade.get(),
   );
-  // Out of the layer tree before its stretch, not merely transparent. It
-  // first draws while still far off and small, so its raster starts small
-  // and grows with it, the way an approaching billboard's does.
   const visibility = useTransform(progress, (value) =>
     value < revealStart ? "hidden" : "visible",
   );
@@ -184,8 +152,6 @@ export default function RadarCard({
     return progress.on("change", update);
   }, [progress, departEnd]);
 
-  // Whether anything of the card is on screen: the sweep only runs then.
-  // Flipped on the threshold, so it is a handful of renders a flight.
   const [onScreen, setOnScreen] = useState(false);
   useEffect(() => {
     const update = (value: number) =>
@@ -210,8 +176,6 @@ export default function RadarCard({
         visibility,
         background: cardGradients[SKILLS_INDEX],
         transformStyle: "preserve-3d",
-        // Promoted and raster-locked like every billboard: it is painted at
-        // its reading size and the GPU carries it from there.
         willChange: "transform",
         width: stacked
           ? "min(86vw, 400px)"
@@ -219,9 +183,6 @@ export default function RadarCard({
             ? "min(80vw, 560px)"
             : "clamp(520px, 52vw, 880px)",
       }}
-      // The nudge right keeps it clear of the history rail down the left
-      // edge. It rides `translate`, not framer's `transform`, so the two
-      // compose. Centred on phones, where the rail is a strip above it.
       className={`mission-flight-card pointer-events-none absolute flex rounded-3xl border sm:rounded-4xl ${
         compact ? "p-4" : "translate-x-[min(10vw,160px)] p-5 sm:p-8 lg:p-10"
       }`}
@@ -239,9 +200,6 @@ export default function RadarCard({
         style={{ transform: `translateZ(${depth.wall}px)`, willChange: "transform" }}
       />
 
-      {/* Words first in the markup, radar last — it leads visually (on top
-         when stacked, on the right otherwise) but the copy is what a screen
-         reader reaches first. */}
       <div
         className={`flex w-full ${
           stacked ? "flex-col-reverse gap-4" : `items-stretch ${compact ? "gap-4" : "gap-6 sm:gap-10"}`

@@ -16,7 +16,6 @@ export default function NeonText({
 
   return (
     <div className={`absolute inline-block ${className}`}>
-      {/* Main text */}
       <motion.div
         className="relative font-bold tracking-[0.12em] text-[#39ff14]"
         initial="hidden"
@@ -62,7 +61,6 @@ export default function NeonText({
         ))}
       </motion.div>
 
-      {/* Neon flicker overlay */}
       <motion.div
         aria-hidden
         className="pointer-events-none absolute inset-0 font-bold tracking-[0.12em] text-[#39ff14]"

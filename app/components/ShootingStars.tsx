@@ -10,8 +10,6 @@ import {
 } from "react";
 
 const LAUNCH_INTERVAL_MS = 3_000;
-// However many are already mid-flight, never more than this many streaks
-// on screen at once.
 const MAX_ACTIVE_STARS = 5;
 const MIN_FLIGHT_SECONDS = 1.35;
 const MAX_FLIGHT_SECONDS = 2.15;
@@ -23,9 +21,6 @@ type StarAsset = {
   width: string;
 };
 
-// A single, separately timed placeholder for the star that approaches along
-// the viewer's depth axis. Replace this source when the final artwork lands;
-// its motion and cadence live on `.ambient-depth-star` in globals.css.
 const depthStarAsset: StarAsset = {
   src: "/space/star2.svg",
   intrinsicWidth: 89,
@@ -77,8 +72,6 @@ function createStar(id: number): ActiveStar {
   return {
     ...asset,
     id,
-    // Restore the original top-left to bottom-right flight. The lane still
-    // varies so successive stars do not trace one identical diagonal.
     top: `${randomBetween(-42, 8).toFixed(1)}vh`,
     left: `${randomBetween(-48, -20).toFixed(1)}vw`,
     duration: randomBetween(MIN_FLIGHT_SECONDS, MAX_FLIGHT_SECONDS),
@@ -106,8 +99,6 @@ export default function ShootingStars() {
       if (disposed) return;
 
       const star = createStar(nextId.current++);
-      // Up to MAX_ACTIVE_STARS at once; each flight is deliberately shorter
-      // than the cadence, so in practice they rarely stack up that deep.
       setActiveStars((current) =>
         current.length >= MAX_ACTIVE_STARS ? current : [...current, star],
       );

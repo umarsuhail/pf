@@ -2,15 +2,11 @@
 
 import { useEffect, useRef } from "react";
 
-const BACKGROUND = "#020617"; // matches --background in globals.css
+const BACKGROUND = "#020617";
 const STARS_PER_PIXEL = 1 / 3800;
 const MAX_DPR = 1.5;
 const TINTED_STAR_CHANCE = 0.18;
-// Fraction of the canvas box a resize has to move before the star field is
-// rebuilt rather than scaled. See resize() for why this is not zero.
 const RESIZE_TOLERANCE = 0.1;
-// Redraw rate for the twinkle (see the render loop). The slack absorbs vsync
-// jitter so 60Hz lands on every other frame and 120Hz on every fourth.
 const TWINKLE_FPS = 30;
 const TWINKLE_FRAME_MS = 1000 / TWINKLE_FPS;
 const TWINKLE_FRAME_SLACK_MS = 4;
@@ -41,11 +37,6 @@ export default function Space({
   active = true,
 }: {
   tint?: string;
-  // Lets a parent that already knows its own scroll-driven visibility
-  // (e.g. CardPortal's reveal/fade) short-circuit drawing directly,
-  // without waiting on IntersectionObserver — which only reacts to actual
-  // geometry, not a card that's simply faded to opacity 0 in place. See
-  // the comment on the RAF loop below.
   active?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -67,10 +58,6 @@ export default function Space({
     let width = 0;
     let height = 0;
     let dpr = 1;
-    // The nebula wash never changes frame-to-frame (tint/width/height are
-    // fixed once seeded) — building a fresh CanvasGradient for it on every
-    // single draw() call, times six cards, times sixty frames a second,
-    // was pure waste. Built once in resize() below, reused here.
     let nebulaGradient: CanvasGradient | null = null;
 
     const seed = () => {
@@ -78,7 +65,6 @@ export default function Space({
       stars = Array.from({ length: count }, () => ({
         x: Math.random() * width,
         y: Math.random() * height,
-        // Mostly faint pinpricks, a few brighter stars
         radius: Math.random() < 0.85 ? 0.4 + Math.random() * 0.5 : 0.9 + Math.random() * 0.6,
         baseAlpha: 0.25 + Math.random() * 0.65,
         twinkleSpeed: 0.3 + Math.random() * 0.9,
@@ -91,7 +77,6 @@ export default function Space({
       ctx.fillStyle = BACKGROUND;
       ctx.fillRect(0, 0, width, height);
 
-      // Bake this portal's accent color into the space as a soft nebula wash
       if (nebulaGradient) {
         ctx.fillStyle = nebulaGradient;
         ctx.fillRect(0, 0, width, height);
@@ -112,9 +97,6 @@ export default function Space({
       ctx.globalAlpha = 1;
     };
 
-    // True once the canvas has been given a real backing store, so the first
-    // call always applies even if the box measures the same as the initial
-    // zeroes.
     let sized = false;
 
     const resize = () => {
@@ -122,20 +104,6 @@ export default function Space({
       const nextHeight = canvas.clientHeight;
       const nextDpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
 
-      // Writing canvas.width/height reallocates the backing store, clears it
-      // and forces a reseed of the whole star field — and this runs once per
-      // portal, so seven of them at a time. A phone fires `resize` every time
-      // the URL bar slides during a scroll, so that storm lands squarely on
-      // the frames that can least afford it.
-      //
-      // The tolerance is what keeps it off the main thread. The portal's box
-      // is partly sized in vh, so a URL-bar slide can nudge it by a few
-      // percent; the canvas holds its existing bitmap and is scaled to the
-      // new box by the compositor instead, which for a field of soft round
-      // dots with no hard edges is not a visible difference. A real resize —
-      // rotation, a desktop window drag — clears the threshold and reseeds
-      // properly, and dpr is compared exactly because dragging a window to a
-      // second monitor genuinely does need a new backing store.
       const settled =
         sized &&
         nextDpr === dpr &&
@@ -172,16 +140,6 @@ export default function Space({
     resize();
     window.addEventListener("resize", resize);
 
-    // Every card in the flight mounts its own Space instance up front (see
-    // MultiverseFlight/CardPortal), so with seven of these all drawing every
-    // frame the six the visitor isn't looking at were burning main-thread
-    // time for nothing. This IntersectionObserver only catches a card that's
-    // geometrically left the viewport (translated off to the side, or
-    // scaled toward the perspective vanishing point) — it says nothing
-    // about a card that's sitting in place at opacity 0, which is the
-    // common case for most of the scroll (a card faded out but not yet
-    // moved). `active` (the caller's own reveal*fade signal, see CardPortal)
-    // covers that gap; both gates have to pass for a frame to actually draw.
     let isVisible = true;
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -197,10 +155,6 @@ export default function Space({
       const animate = (time: number) => {
         rafId = requestAnimationFrame(animate);
         if (!isVisible || !activeRef.current) return;
-        // The twinkle moves a star's alpha by at most ~0.3 a second, so at
-        // TWINKLE_FPS it is indistinguishable from every frame — and every
-        // frame is 120 a second on a ProMotion display, each one a fresh
-        // canvas upload for the compositor.
         if (time - lastDraw < TWINKLE_FRAME_MS - TWINKLE_FRAME_SLACK_MS) return;
         lastDraw = time;
         draw(time);

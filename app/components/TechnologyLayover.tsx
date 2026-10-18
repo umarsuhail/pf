@@ -13,42 +13,17 @@ import { CSS_PERSPECTIVE_Z, cameraTravelFor } from "../lib/camera";
 import RadarCard from "./RadarCard";
 import { BrandIcon } from "./icons/brand-icon";
 
-// The Skills layover: the stretch of corridor between the Skills and Projects
-// cards, which the toolkit owns outright.
-//
-// The toolkit itself is RadarCard — a card in the corridor that holds at
-// reading distance while its radar finds the tools one at a time. The tool
-// marks keep travelling around it on a 3D spring: each one sits at its own
-// focus depth, corkscrews out of the distance, and is flown past. That keeps
-// the radar readable without flattening this long stretch into a static HUD.
-//
-// What remains in this file is screen-space, deliberately: the layover's
-// title, and the history of the tool the radar is showing. Text this small
-// has to stay on the pixel grid to be read.
-
-// How far either side of the layover its screen-space words live. The title
-// and the history arrive and leave together.
 const CAPTION_LEAD = 0.03;
 const CAPTION_TAIL = 0.02;
 
 type Technology = (typeof TECHNOLOGY_FOCUS_STOPS)[number]["technology"];
 
-// The spring uses the geometry of the earlier corridor helix, but only the
-// marks remain: the radar already owns the label and the copy for the current
-// tool. Forty-two degrees makes consecutive tools read as one coil without
-// stacking them on exact radial spokes; the whole coil turns twice across the
-// layover so the flight corkscrews through it rather than following a fixed
-// tube.
 const SPRING_STEP_DEGREES = 42;
 const SPRING_TWIST_DEGREES = 720;
 const SPRING_RADIUS = { desktop: 680, mobile: 172 } as const;
 const SPRING_Y_RATIO = { desktop: 0.58, mobile: 1 } as const;
 const SPRING_TILE_SPIN_TURNS = 1.5;
 
-// A small off-axis mark can safely come much closer than a billboard. At this
-// depth perspective carries it beyond the viewport instead of leaving it
-// parked in a corner. The exit start is derived from the capped end so the
-// Framer input range can never invert if camera travel changes again.
 const SPRING_MAX_CAMERA_Z = CSS_PERSPECTIVE_Z * 0.72;
 const springPassSpan = (compact: boolean) =>
   SPRING_MAX_CAMERA_Z / cameraTravelFor(compact);
@@ -60,9 +35,6 @@ const springFadeOutEnd = (compact: boolean) =>
 const springFadeOutStart = (compact: boolean) =>
   Math.min(1.5 * TECHNOLOGY_NODE_GAP, springFadeOutEnd(compact) * 0.55);
 
-// Browser transforms retain roughly hundredth-pixel precision. Rounding the
-// trigonometric positions before they reach markup keeps server and client
-// transforms identical while remaining visually lossless.
 const px = (value: number) => Math.round(value * 100) / 100;
 
 function TechnologySpringNode({
@@ -83,9 +55,6 @@ function TechnologySpringNode({
   const travel = cameraTravelFor(compact);
   const baseZ = -stop * travel;
 
-  // The corridor parent moves by +progress*travel. Parking this node at
-  // -stop*travel therefore brings it level with the camera at exactly the same
-  // focus stop used by the radar, copy, history rail, dial and autopilot.
   const translateZ = useTransform(progress, (value) =>
     px(Math.min(baseZ, SPRING_MAX_CAMERA_Z - value * travel)),
   );
@@ -188,9 +157,6 @@ function TechnologySpring({
   compact: boolean;
   progress: MotionValue<number>;
 }) {
-  // The long approach needed for visible depth would otherwise leak tool
-  // marks over the Skills and Projects panels. This envelope keeps the whole
-  // spring inside the layover that owns it.
   const envelope = useTransform(
     progress,
     [
@@ -222,21 +188,6 @@ function TechnologySpring({
   );
 }
 
-// A tool's history with Umar — the versions he came up through — for the
-// tools that have one (`timeline` in skillGroups.ts). Lives on the same
-// window as the radar's copy, so the history on screen is always the tool
-// the radar is showing.
-//
-// Down the left edge — the one margin the title (top right) and the radar
-// card leave free; the card is nudged right to keep it so. The rail draws in
-// from the first entry to today as the flight arrives at the tool, a pure
-// function of progress like the rest of this file. Desktop only: a phone has
-// no margin beside the card, and the strip this used to become there sat
-// straight across the card's top edge.
-// Height one milestone needs with its note (date, version, a two-line note
-// and the gap). Below this per entry the notes are dropped and the list
-// reads as dates and versions only — decided per tool, since a five-entry
-// history keeps its notes on a screen where a six-entry one cannot.
 const MILESTONE_WITH_NOTE_PX = 76;
 
 function TechnologyTimeline({
@@ -248,7 +199,6 @@ function TechnologyTimeline({
   technology: Technology;
   stop: number;
   progress: MotionValue<number>;
-  /** Height the list may use. */
   room: number;
 }) {
   const focusWindow = technologyFocusWindow(stop);
@@ -263,11 +213,7 @@ function TechnologyTimeline({
   const showNotes = room >= milestones.length * MILESTONE_WITH_NOTE_PX;
 
   return (
-    // Sized by its own entries (not stretched to the box), so the rail
-    // below runs exactly from the first dot to the last.
     <motion.ol style={{ opacity }} className="absolute inset-x-0 top-0 pl-6">
-      {/* The rail: faint all the way down, drawn bright from the start to
-         now as the flight arrives. */}
       <span aria-hidden="true" className="absolute bottom-2 left-[5px] top-2 w-px bg-sky-200/15" />
       <motion.span
         aria-hidden="true"
@@ -290,8 +236,6 @@ function TechnologyTimeline({
             {i === last && last > 0 && <span className="ml-2 text-cyan-200/80">· Now</span>}
           </p>
           <p className="mt-0.5 text-base font-semibold leading-tight text-sky-50">{m.version}</p>
-          {/* Dropped when the whole list would not fit the rail's box (see
-             MILESTONE_WITH_NOTE_PX); dates and versions still read. */}
           {showNotes && (
             <p className="mt-0.5 text-[13px] leading-snug text-sky-100/75">{m.note}</p>
           )}
@@ -301,16 +245,6 @@ function TechnologyTimeline({
   );
 }
 
-// The layover's words. Screen-space, because text this small has to stay
-// pinned to the pixel grid to be readable — but with no panel behind it, so
-// the corridor keeps flying underneath. Contrast comes from a text shadow
-// instead: a panel would wall the corridor off, and the words have to sit on
-// the starfield the way a title card sits on a frame.
-//
-// The title takes the top-right corner and the history the left edge, which
-// leaves the middle to the radar card. A portrait phone keeps only the title,
-// centred above the card; a landscape phone has no height to give either, so
-// there the card — which already names the tool and its group — stands alone.
 function LayoverCaption({
   progress,
   isMobile,
@@ -322,9 +256,6 @@ function LayoverCaption({
 }) {
   const showHistory = !isMobile;
 
-  // The space the tool histories have to fit into, measured rather than
-  // assumed — and re-measured if the rail appears after mount, when a window
-  // is widened past the phone layout.
   const timelineBoxRef = useRef<HTMLDivElement>(null);
   const [timelineRoom, setTimelineRoom] = useState(0);
   useEffect(() => {
@@ -361,9 +292,6 @@ function LayoverCaption({
             : "right-8 top-[12%] w-[min(34rem,44vw)] text-right lg:right-14"
         }`}
       >
-        {/* Tracked caps carry their letter-space past the last glyph, so
-           right-aligned the eyebrow hangs a full 0.42em off the heading's
-           edge. Pulled back by exactly that. */}
         <p
           className={`text-xs font-semibold uppercase tracking-[0.42em] text-emerald-200/90 sm:text-sm ${
             isMobile ? "" : "-mr-[0.42em]"
@@ -376,10 +304,6 @@ function LayoverCaption({
         </h2>
       </motion.div>
 
-      {/* Tool histories, for the tools that have one. Same caption envelope
-         and text shadow as the title; see TechnologyTimeline. From under the
-         top margin to the bottom margin, so `room` is exactly the space the
-         rail has. */}
       {showHistory && (
         <motion.div
           ref={timelineBoxRef}
@@ -404,9 +328,6 @@ function LayoverCaption({
   );
 }
 
-// Rendered *inside* the corridor's perspective group — see MultiverseFlight.
-// Outside it, the card and spring would be a flat picture laid over the
-// flight; inside, they are a place the flight comes to and moves through.
 export default function TechnologyLayover({
   compact,
   stacked,
