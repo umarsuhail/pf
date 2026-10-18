@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FLIGHT_SECTION_STOPS } from "../data/flightStops";
 import { progressFromScroll } from "../data/flightTimeline";
 import { playTick, primeTicks } from "../lib/tick-sound";
-import DialChatButton from "./DialChatButton";
+import DialPlayButton from "./DialPlayButton";
 
 function scrollToProgress(p: number) {
   window.dispatchEvent(
@@ -28,6 +28,11 @@ const DETENT_DEGREES = TURN / DETENTS;
 
 const DEGREES_PER_SECTION = 360;
 const MIN_TRAVEL = 0.0004;
+
+// How far the ring turns to skip one autopilot leg. A sixth of a revolution:
+// deliberate enough that a nudge does not throw the tour forward, loose
+// enough that a full turn covers the flight.
+const AUTOPILOT_SEEK_DEGREES = 60;
 
 const BEZEL_RETURN_TRANSITION = "transform 380ms cubic-bezier(0.2,0.8,0.2,1)";
 
@@ -127,6 +132,11 @@ export default function ScrollDial() {
   const gestureRotationRef = useRef(0);
   const bezelAngleRef = useRef(0);
   const lastDetentRef = useRef(0);
+  // While the tour is flying, the ring seeks through it instead of scrubbing
+  // the document — the autopilot owns the scroll position for its duration,
+  // so two hands on it would fight every frame.
+  const autopilotRef = useRef(false);
+  const seekAccumRef = useRef(0);
   const isTouchDragRef = useRef(false);
   const pointersRef = useRef(
     new Map<number, { x: number; y: number; type: string }>(),
@@ -148,6 +158,20 @@ export default function ScrollDial() {
     if (rootRef.current) {
       rootRef.current.style.transform = `scale(${scale})`;
     }
+  }, []);
+
+  useEffect(() => {
+    const onState = (event: Event) => {
+      autopilotRef.current = Boolean(
+        (event as CustomEvent<{ running?: boolean }>).detail?.running,
+      );
+    };
+    window.addEventListener("flight-autopilot-state", onState as EventListener);
+    return () =>
+      window.removeEventListener(
+        "flight-autopilot-state",
+        onState as EventListener,
+      );
   }, []);
 
   const commitScale = useCallback(
@@ -276,6 +300,7 @@ export default function ScrollDial() {
     draggingRef.current = true;
     setDragging(true);
     announceTurning(true);
+    seekAccumRef.current = 0;
     if (bezelRef.current) bezelRef.current.style.transition = "none";
     lastAngleRef.current = pointerAngle(e.clientX, e.clientY);
     turnStartRef.current = turnFromProgress(progressRef.current);
@@ -331,6 +356,24 @@ export default function ScrollDial() {
 
     const detent = Math.round(bezelAngleRef.current / DETENT_DEGREES);
     if (detent !== lastDetentRef.current) detentFeedback(detent);
+
+    // Mid-tour the ring is a transport, not a scrubber: every
+    // AUTOPILOT_SEEK_DEGREES of turn skips a leg and the tour flies on from
+    // there. The bezel still rotates and still clicks, so the gesture feels
+    // the same; only what it means changes.
+    if (autopilotRef.current) {
+      seekAccumRef.current += delta;
+      while (Math.abs(seekAccumRef.current) >= AUTOPILOT_SEEK_DEGREES) {
+        const direction = seekAccumRef.current > 0 ? 1 : -1;
+        seekAccumRef.current -= direction * AUTOPILOT_SEEK_DEGREES;
+        window.dispatchEvent(
+          new CustomEvent("flight-autopilot-seek", {
+            detail: { delta: direction },
+          }),
+        );
+      }
+      return;
+    }
 
     const travelled =
       turnStartRef.current + gestureRotationRef.current / DEGREES_PER_SECTION;
@@ -654,7 +697,7 @@ export default function ScrollDial() {
           );
         })}
 
-        <DialChatButton compact={compact} />
+        <DialPlayButton compact={compact} />
 
         {!compact && (
           <circle cx="60" cy="60" r="49" fill="url(#dial-crystal)" pointerEvents="none" />

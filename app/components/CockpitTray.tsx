@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { cards } from "../data/sections";
 import { NARRATION_SPANS } from "../data/narration";
 import {
@@ -12,6 +12,11 @@ import {
   MISSION_THEME_STORAGE_KEY,
   type MissionTheme,
 } from "../lib/mission-theme";
+import {
+  setAutoplayEnabled,
+  shouldOfferAutoplayToggle,
+  useAutoplayEnabled,
+} from "../lib/visit-history";
 import { CardIcon } from "./icons/card-icon";
 import type { AnimatedIconHandle } from "./icons/card-icon";
 
@@ -162,6 +167,14 @@ function EquipmentBay({
 }
 
 export default function CockpitTray() {
+  const autoplayEnabled = useAutoplayEnabled();
+  // Read when the prompt opens rather than on every render: the visit count
+  // does not change while the page is open.
+  const offerAutoplayToggle = useSyncExternalStore(
+    () => () => {},
+    shouldOfferAutoplayToggle,
+    () => false,
+  );
   const pathname = usePathname();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -647,6 +660,23 @@ export default function CockpitTray() {
                   Stay in this window
                 </button>
               </div>
+
+              {/* Only for someone who has been here a few times *and* has
+                  actually flown the tour. A first-time visitor has no
+                  opinion to express yet, and offering to switch off a thing
+                  they have not seen is noise in the one prompt that has to
+                  stay short. */}
+              {offerAutoplayToggle && (
+                <label className="relative z-10 mt-5 flex cursor-pointer items-center justify-center gap-2.5 border-t border-white/10 pt-4 text-[11px] text-slate-300/80">
+                  <input
+                    type="checkbox"
+                    checked={autoplayEnabled}
+                    onChange={(event) => setAutoplayEnabled(event.target.checked)}
+                    className="h-3.5 w-3.5 accent-sky-300"
+                  />
+                  Offer the tour on future visits
+                </label>
+              )}
             </motion.div>
           </motion.div>
         )}
@@ -964,6 +994,40 @@ export default function CockpitTray() {
               </>
             )}
 
+
+            <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
+
+            {/* The assistant. It spent a while in the middle of the dial;
+                that seat is the autopilot's transport now, and this bar is
+                the one piece of chrome that never closes, so the way in to
+                VEGA lives here. HoloChat owns the panel — this only flips it. */}
+            <button
+              type="button"
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent("toggle-holochat"))
+              }
+              aria-label="Open VEGA, the portfolio assistant"
+              className="relative z-10 flex h-5 w-5 items-center justify-center rounded-full text-slate-500 transition-colors hover:text-sky-200"
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 6V2H8" />
+                <path d="M2 12h2" />
+                <path d="M20 12h2" />
+                <path d="M20 16a2 2 0 0 1-2 2H8.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 4 20.286V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z" />
+                <path d="M9 11v2" />
+                <path d="M15 11v2" />
+              </svg>
+            </button>
 
             <span aria-hidden="true" className="relative z-10 h-3 w-px bg-white/15" />
 

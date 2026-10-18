@@ -15,6 +15,24 @@ const FACE = { x: 1.1, y: 1.0, w: 41.3, h: 40.8 };
 const GLASS = { x: 2.7, y: 2.7, w: 37.9, h: 37.4 };
 const FACE_CENTRE = { x: 20.6, y: 20.4 };
 
+// The three concentric rings of the face, measured off radar_lines.svg in its
+// own 41.3-unit viewBox: 12.4%, 34.2% and 44.8% of the face box.
+//
+// They are drawn rather than animated in place because the art cannot be
+// taken apart — radar_lines.svg is 86 flattened paths with no addressable
+// rings, and it is consumed as a CSS mask-image, which rasterises whatever is
+// inside it. So the etched rings stay as the static face and these light up
+// over them in the beam colour, one at a time, smallest first.
+const FACE_RINGS = [5.15, 14.11, 18.49];
+
+// 30ms between one ring lighting and the next.
+const RING_STEP_S = 0.03;
+// How long the full set stays lit before it resets and runs again. Without
+// this the whole cycle is 90ms — about five frames at 60Hz — which reads as a
+// strobe rather than a sweep. Set it to 0 for the literal no-hold version.
+const RING_HOLD_S = 0.9;
+const RING_CYCLE_S = RING_STEP_S * FACE_RINGS.length + RING_HOLD_S;
+
 const inRing = (r: { x: number; y: number; w: number; h: number }) => ({
   left: `${(r.x / RING.w) * 100}%`,
   top: `${(r.y / RING.h) * 100}%`,
@@ -201,6 +219,43 @@ export default function RadarScope({
             WebkitMaskSize: "100% 100%",
           }}
         />
+
+        {/* The rings lighting in sequence. Pointer-events-none and purely
+            decorative, so it sits between the etched face and the contacts. */}
+        <div className="absolute" style={inRing(FACE)} aria-hidden="true">
+          <svg
+            viewBox={`0 0 ${FACE.w} ${FACE.h}`}
+            className="pointer-events-none h-full w-full"
+            fill="none"
+          >
+            {FACE_RINGS.map((radius, index) => {
+              // Each ring turns on `index * RING_STEP_S` into the cycle and
+              // they all go out together at the end, which is what makes the
+              // reset read as "back to the first" rather than a reverse
+              // cascade. A short ramp rather than a hard cut, so the smallest
+              // ring does not pop at 60Hz.
+              const onAt = (index * RING_STEP_S) / RING_CYCLE_S;
+              return (
+                <motion.circle
+                  key={radius}
+                  cx={FACE_CENTRE.x}
+                  cy={FACE_CENTRE.y}
+                  r={radius}
+                  stroke="var(--radar-beam)"
+                  strokeWidth={0.18}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 0, 0.85, 0.85, 0] }}
+                  transition={{
+                    duration: RING_CYCLE_S,
+                    times: [0, onAt, onAt + 0.012, 0.96, 1],
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                />
+              );
+            })}
+          </svg>
+        </div>
 
         <div className="absolute" style={inRing(FACE)}>
           {TECHNOLOGY_FOCUS_STOPS.map((focus, index) => (

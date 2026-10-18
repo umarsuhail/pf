@@ -39,6 +39,7 @@ import {
   scrollFromProgress,
 } from "../data/flightTimeline";
 import { useCoarsePointer } from "../lib/pointer";
+import { recordVisit, shouldSkipIntro } from "../lib/visit-history";
 import { flightScrollTo, setFlightSnapPoints } from "../lib/smooth-scroll";
 import TechnologyLayover, { LayoverCaption } from "./TechnologyLayover";
 import {
@@ -833,6 +834,13 @@ export default function MultiverseFlight() {
   const isMobile = compact;
   const isCoarsePointer = useCoarsePointer();
 
+  // Counted once per load of the flight. Two things read it: whether the
+  // autopilot sits through the narrated intro, and whether the settings
+  // prompt offers the autoplay toggle at all.
+  useEffect(() => {
+    recordVisit();
+  }, []);
+
   const wheelIsSmoothed = !isCoarsePointer;
 
   useEffect(() => {
@@ -1205,6 +1213,8 @@ export default function MultiverseFlight() {
     let lifecycle: "idle" | "running" | "paused" = "idle";
     let pauseFlight: (() => void) | undefined;
     let resumeFlight: (() => void) | undefined;
+    // Set by the running tour; the dial seeks through it (see ScrollDial).
+    let seekLeg: ((direction: 1 | -1) => void) | undefined;
 
     const emit = (running: boolean, index: number, paused = false) =>
       window.dispatchEvent(
@@ -1228,6 +1238,7 @@ export default function MultiverseFlight() {
       lifecycle = "idle";
       pauseFlight = undefined;
       resumeFlight = undefined;
+      seekLeg = undefined;
       if (hadSession) emit(false, -1);
     };
 
@@ -1304,7 +1315,12 @@ export default function MultiverseFlight() {
             linear: true,
             holdMs: 1,
             cardIndex: i,
-            waitForNarration: true,
+            // The narrated Home beat is the story on a first visit and a
+            // toll on a fourth. Past a couple of visits the tour opens on
+            // Home and flies straight on rather than holding for the voice
+            // — which is what SkipIntroPrompt offers by hand, taken
+            // automatically for someone who has demonstrably heard it.
+            waitForNarration: !shouldSkipIntro(),
           });
           legs.push({
             target: next,
@@ -1374,6 +1390,24 @@ export default function MultiverseFlight() {
         phaseStarted = now;
         phase = "travel";
         if (legs[index].cardIndex < cards.length) emit(true, legs[index].cardIndex);
+      };
+
+      // Turning the ring mid-tour skips a leg, like chapter skip on a player
+      // — the tour keeps flying, it just flies the next one. Jumping back a
+      // leg starts it from where the previous one began rather than from the
+      // current position, otherwise "back" would re-fly the few percent you
+      // had already crossed and land you where you started.
+      seekLeg = (direction: 1 | -1) => {
+        if (lifecycle !== "running") return;
+        const next = index + direction;
+        if (next < 0 || next >= legs.length) return;
+        if (direction < 0) currentProgress = legs[index].target;
+        index = next;
+        dwellRemaining = 0;
+        beginLeg(performance.now());
+        // The dwell path parks the scroll itself; the travel path needs the
+        // camera put where the new leg starts before its first frame.
+        smoothScrollProgress.jump(currentProgress);
       };
 
       let holdFrames = 6;
@@ -1495,6 +1529,12 @@ export default function MultiverseFlight() {
       runFlight();
     };
 
+    const onSeek = (event: Event) => {
+      const delta = (event as CustomEvent<{ delta?: number }>).detail?.delta;
+      if (delta === 1 || delta === -1) seekLeg?.(delta);
+    };
+
+    window.addEventListener("flight-autopilot-seek", onSeek as EventListener);
     window.addEventListener("flight-autopilot", onCommand as EventListener);
     window.addEventListener("narration-progress", onNarrationProgress as EventListener);
 
@@ -1504,6 +1544,7 @@ export default function MultiverseFlight() {
     }
 
     return () => {
+      window.removeEventListener("flight-autopilot-seek", onSeek as EventListener);
       window.removeEventListener("flight-autopilot", onCommand as EventListener);
       window.removeEventListener("narration-progress", onNarrationProgress as EventListener);
       finish();
