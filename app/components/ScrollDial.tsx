@@ -6,6 +6,7 @@ import { FLIGHT_SECTION_STOPS } from "../data/flightStops";
 import { progressFromScroll } from "../data/flightTimeline";
 import { playTick, primeTicks } from "../lib/tick-sound";
 import DialPlayButton from "./DialPlayButton";
+import NavigatorShell from "./NavigatorShell";
 
 function scrollToProgress(p: number) {
   window.dispatchEvent(
@@ -519,6 +520,7 @@ export default function ScrollDial() {
           {activeLabel}
         </span>
       </div>
+      <NavigatorShell label="rotary dial" placement="inline">
       <div
         className={
           compact
@@ -734,6 +736,7 @@ export default function ScrollDial() {
         />
         </svg>
       </div>
+      </NavigatorShell>
     </div>
   );
 }

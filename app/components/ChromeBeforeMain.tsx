@@ -14,12 +14,13 @@ const ScrollDial = dynamic(() => import("./ScrollDial"), { ssr: false });
 const InfinityNavigator = dynamic(() => import("./InfinityNavigator"), {
   ssr: false,
 });
+const RouteMap = dynamic(() => import("./RouteMap"), { ssr: false });
 const SkipIntroPrompt = dynamic(() => import("./SkipIntroPrompt"), { ssr: false });
 
 export default function ChromeBeforeMain() {
-  // One navigator at a time. Both write the same navigate-flight-progress
-  // event, so the flight never learns which is mounted — and only one is, so
-  // the gradient ids they share inside the transport button cannot collide.
+  // One navigator at a time. All three write the same navigation events, so
+  // the flight never learns which is mounted — and only one is, so the
+  // gradient ids they share inside the transport button cannot collide.
   const navigatorUi = useNavigatorUi();
 
   return (
@@ -29,7 +30,13 @@ export default function ChromeBeforeMain() {
       <CockpitTray />
       <AutopilotStartToast />
       <SkipIntroPrompt />
-      {navigatorUi === "infinity" ? <InfinityNavigator /> : <ScrollDial />}
+      {navigatorUi === "infinity" ? (
+        <InfinityNavigator />
+      ) : navigatorUi === "cylinder" ? (
+        <RouteMap />
+      ) : (
+        <ScrollDial />
+      )}
     </>
   );
 }

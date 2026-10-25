@@ -3,6 +3,22 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { MAIN_FLIGHT_STOPS } from "../data/flightStops";
 import { scrollFromProgress } from "../data/flightTimeline";
+import { flightScrollTo } from "../lib/smooth-scroll";
+import DialPlayButton from "./DialPlayButton";
+import NavigatorShell, { useNavigatorScale } from "./NavigatorShell";
+
+// The third instrument: the route as a drum you roll.
+//
+// The bezel gives you a position and the lemniscate gives you the whole
+// path; this gives you the running order, the five panels stacked on a
+// cylinder that turns under the thumb like a combination lock. It is the
+// only one of the three that names where you are going rather than drawing
+// it, which is why it earns its place beside them.
+//
+// It existed for a long time without ever being on screen — mounted only in
+// a chrome component nothing imported — and its drag wrote scroll positions
+// with a bare window.scrollTo, which Lenis overwrites on its next frame. So
+// it has never actually scrolled anything. Both are fixed here.
 
 type RouteStop = {
   id: string;
@@ -45,13 +61,18 @@ function scrollToProgress(p: number) {
   const doc = document.documentElement;
   const max = doc.scrollHeight - window.innerHeight;
   if (max <= 0) return;
-  window.scrollTo({
-    top: max * scrollFromProgress(clamp(p, 0, 1)),
-    behavior: "auto",
-  });
+  // Through flightScrollTo, never window.scrollTo: Lenis animates the real
+  // scroll position every frame and would overwrite a bare write on the
+  // next one.
+  flightScrollTo(max * scrollFromProgress(clamp(p, 0, 1)));
 }
 
 export default function RouteMap() {
+  // A pixel of drag is worth fewer rows when the drum is shrunk, because the
+  // drum on screen is smaller than the drum it is drawn as. Angles and
+  // ratios elsewhere are scale-free; travel measured in pixels is not.
+  const scale = useNavigatorScale();
+
   const [isVisible, setIsVisible] = useState(true);
   const [dragging, setDragging] = useState(false);
   const draggingRef = useRef(false);
@@ -144,7 +165,7 @@ export default function RouteMap() {
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!draggingRef.current) return;
-    const deltaY = e.clientY - dragStartY.current;
+    const deltaY = (e.clientY - dragStartY.current) / scale;
     const nextIndex = clamp(
       dragStartIndex.current - deltaY / ROW_HEIGHT,
       0,
@@ -174,11 +195,12 @@ export default function RouteMap() {
   };
 
   return (
+    <NavigatorShell label="route drum" grow={false}>
     <nav
       aria-label="Journey route map"
       aria-hidden={!isVisible}
-      className={`fixed right-4 top-1/2 z-50 hidden -translate-y-1/2 transition-all duration-300 sm:block lg:right-8 ${
-        isVisible ? "opacity-100" : "pointer-events-none translate-x-6 opacity-0"
+      className={`transition-opacity duration-300 ${
+        isVisible ? "opacity-100" : "pointer-events-none opacity-0"
       }`}
     >
       <div
@@ -194,7 +216,12 @@ export default function RouteMap() {
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onKeyDown={onKeyDown}
-        className="relative h-[52vh] w-36 touch-none select-none rounded-[28px] border border-white/15 bg-slate-950/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-12px_24px_rgba(2,8,23,0.4),0_20px_50px_rgba(2,8,23,0.45)] outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60"
+        // Full size always, so the footprint is the thing that has to be
+        // modest. At phone width the slab was 144px of opaque panel laid
+        // over the card and its Next control; the drum is narrower now, and
+        // on small screens it drops the panel entirely and rides as type on
+        // the sky, which is what a heads-up readout should look like.
+        className="relative h-[38vh] max-h-[340px] w-28 touch-none select-none rounded-[24px] outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60 sm:w-36 sm:border sm:border-white/15 sm:bg-slate-950/85 sm:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-12px_24px_rgba(2,8,23,0.4),0_20px_50px_rgba(2,8,23,0.45)]"
         style={{
           perspective: "700px",
           cursor: dragging ? "grabbing" : "grab",
@@ -236,7 +263,7 @@ export default function RouteMap() {
                   ref={(el) => {
                     labelRefs.current[i] = el;
                   }}
-                  className={`whitespace-nowrap font-semibold uppercase tracking-[0.18em] transition-colors ${
+                  className={`whitespace-nowrap font-semibold uppercase tracking-[0.18em] transition-colors [text-shadow:0_1px_6px_rgba(2,8,23,0.9)] sm:[text-shadow:none] ${
                     isCentered
                       ? "text-[12px] text-sky-100"
                       : isPassed
@@ -263,9 +290,16 @@ export default function RouteMap() {
 
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-2 top-1/2 h-6 -translate-y-1/2 rounded-md border-y border-sky-300/25 bg-sky-300/4"
+          className="pointer-events-none absolute inset-x-1 top-1/2 h-6 -translate-y-1/2 rounded-md border-y border-sky-300/25 bg-sky-300/4 sm:inset-x-2"
         />
       </div>
+
+      {/* Every instrument carries the transport: switching to this one must
+          not be a way to lose the autopilot. */}
+      <svg viewBox="0 0 120 120" className="mt-2 h-14 w-full touch-none select-none">
+        <DialPlayButton compact />
+      </svg>
     </nav>
+    </NavigatorShell>
   );
 }

@@ -6,6 +6,7 @@ import { MAIN_FLIGHT_STOPS } from "../data/flightStops";
 import { progressFromScroll } from "../data/flightTimeline";
 import { playTick, primeTicks } from "../lib/tick-sound";
 import DialPlayButton from "./DialPlayButton";
+import NavigatorShell from "./NavigatorShell";
 
 // The flight's route, drawn as the path it actually is.
 //
@@ -227,7 +228,7 @@ export default function InfinityNavigator() {
   if (pathname !== "/") return null;
 
   return (
-    <div className="pointer-events-none fixed right-4 top-1/2 z-50 -translate-y-1/2 lg:right-8">
+    <NavigatorShell label="route track">
       <svg
         ref={svgRef}
         viewBox={`0 0 ${VIEW.w} ${VIEW.h}`}
@@ -321,6 +322,6 @@ export default function InfinityNavigator() {
           <DialPlayButton compact />
         </g>
       </svg>
-    </div>
+    </NavigatorShell>
   );
 }

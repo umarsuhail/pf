@@ -1014,16 +1014,19 @@ export default function CockpitTray() {
                 <button
                   type="button"
                   onClick={toggleSidenav}
-                  aria-pressed={navigatorUi === "infinity"}
+                  // Three instruments now, so the press is a ring rather
+                  // than a switch and the label names the next one along.
                   aria-label={
                     navigatorUi === "dial"
                       ? "Switch to the route track"
-                      : "Switch to the bezel dial"
+                      : navigatorUi === "infinity"
+                        ? "Switch to the route drum"
+                        : "Switch to the bezel dial"
                   }
                   className={`relative z-10 flex h-5 w-5 items-center justify-center rounded-full transition-colors ${
-                    navigatorUi === "infinity"
-                      ? "text-sky-200"
-                      : "text-slate-500 hover:text-sky-200"
+                    navigatorUi === "dial"
+                      ? "text-slate-500 hover:text-sky-200"
+                      : "text-sky-200"
                   }`}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
