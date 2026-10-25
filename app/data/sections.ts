@@ -32,6 +32,18 @@ export type FlightCard = {
     period: string;
     location: string;
     summary: string;
+    // `start`/`end` are the machine-readable half of `period`, as YYYY-MM.
+    // `period` stays because it is the line a reader sees; these exist so the
+    // timeline can lay entries out against a real time axis rather than
+    // spacing them evenly, which is what makes a four-year run look like four
+    // years. `end: null` means still there.
+    start: string;
+    end: string | null;
+    // What was actually shipped. Kept separate from `summary` so the UI can
+    // show the one-liner collapsed and the detail on demand.
+    highlights?: string[];
+    stack?: string[];
+    projects?: { name: string; note: string }[];
   }[];
 };
 
@@ -111,6 +123,7 @@ export const cards: FlightCard[] = [
         title: "Enterprise Dashboard — Transaction & Revenue Monitoring",
         description:
           "A multi-tenant analytics dashboard for real-time transaction monitoring, revenue tracking, and advanced reporting.",
+        image: "/images/projects/4.png",
         category: "Dashboards",
         stack: ["Next.js", "React", "TypeScript", "Node.js"],
       },
@@ -143,6 +156,8 @@ export const cards: FlightCard[] = [
         title: "AI-Powered Visual Assistant",
         description:
           "A real-time monitoring dashboard for automated accident assessment, pairing computer vision with visual reporting.",
+        image: "/images/projects/5.png",
+        imageFit: "contain",
         category: "AI/ML",
         stack: ["React.js", "JavaScript", "HTML/CSS", "Bootstrap"],
       },
@@ -150,7 +165,7 @@ export const cards: FlightCard[] = [
         title: "Tenant & Configuration Management Platform",
         description:
           "A dynamic platform for tenant onboarding, configuration workflows, and role-based access management.",
-        image: "/3.png",
+        image: "/images/projects/3.png",
         imageFit: "contain",
         category: "Enterprise",
         stack: ["Next.js", "TypeScript", "Node.js"],
@@ -159,7 +174,7 @@ export const cards: FlightCard[] = [
         title: "AI Chatbot & Monitoring Systems",
         description:
           "AI-powered chatbot interfaces paired with a real-time monitoring dashboard for operational reporting.",
-        image: "/2.png",
+        image: "/images/projects/2.png",
         imageFit: "contain",
         category: "Productivity",
         stack: ["React.js", "JavaScript", "Socket.io"],
@@ -197,32 +212,78 @@ export const cards: FlightCard[] = [
       {
         company: "Emirates Face Recognition",
         role: "Application Developer",
-        period: "Nov 2024 – Present",
+        period: "Nov 2024 \u2013 Present",
+        start: "2024-11",
+        end: null,
         location: "Abu Dhabi",
         summary:
           "AI-powered face recognition systems and enterprise dashboards. Scalable React and Next.js applications, real-time biometric monitoring, modern UI/UX, computer vision integrations.",
+        highlights: [
+          "Built real-time biometric monitoring surfaces against a computer-vision backend.",
+          "Took enterprise dashboards from design to production in React and Next.js.",
+          "Owned the UI layer for identity and recognition tooling.",
+        ],
+        stack: ["Next.js", "React", "TypeScript", "Computer Vision"],
+        projects: [
+          { name: "Biometric Identity Platform", note: "PLACEHOLDER \u2014 describe this." },
+          { name: "Recognition Dashboard", note: "PLACEHOLDER \u2014 describe this." },
+        ],
       },
       {
         company: "Epixel Solutions",
         role: "Development Team Lead",
-        period: "Nov 2022 – May 2024",
+        period: "Nov 2022 \u2013 May 2024",
+        start: "2022-11",
+        end: "2024-05",
         location: "Kochi",
         summary:
           "Led MLM software and enterprise frontend delivery. Improved code quality by 40%, mentored developers, set coding standards, delivered React and Next.js solutions.",
+        highlights: [
+          "Improved code quality by 40% across the frontend codebase.",
+          "Mentored developers and set the team's coding standards.",
+          "Led delivery of MLM and enterprise frontend products.",
+        ],
+        stack: ["Next.js", "React", "TypeScript", "Node.js"],
+        projects: [
+          { name: "MLM Platform", note: "PLACEHOLDER \u2014 describe this." },
+          { name: "Tenant & Configuration Management", note: "PLACEHOLDER \u2014 describe this." },
+        ],
       },
       {
         company: "Aspire Systems",
         role: "Software Engineer",
-        period: "Nov 2020 – Oct 2022",
+        period: "Nov 2020 \u2013 Oct 2022",
+        start: "2020-11",
+        end: "2022-10",
         location: "Kochi",
         summary: "React apps, Redux workflows, REST API integrations, client delivery.",
+        highlights: [
+          "Built client-facing React applications end to end.",
+          "Modelled application state with Redux workflows.",
+          "Integrated REST APIs across multiple client engagements.",
+        ],
+        stack: ["React", "Redux", "JavaScript", "REST"],
+        projects: [
+          { name: "Client Delivery Work", note: "PLACEHOLDER \u2014 name the engagements." },
+        ],
       },
       {
         company: "Uvionics Tech India Pvt Ltd",
         role: "UI Developer",
-        period: "Aug 2018 – Nov 2020",
+        period: "Aug 2018 \u2013 Nov 2020",
+        start: "2018-08",
+        end: "2020-11",
         location: "Koratty",
         summary: "HTML, CSS, JavaScript, Bootstrap, React, reusable components.",
+        highlights: [
+          "Where it started: hand-written HTML, CSS and JavaScript.",
+          "Built reusable component libraries for internal reuse.",
+          "Moved from Bootstrap templates into React.",
+        ],
+        stack: ["React", "JavaScript", "HTML/CSS", "Bootstrap"],
+        projects: [
+          { name: "Component Library", note: "PLACEHOLDER \u2014 describe this." },
+        ],
       },
     ],
   },

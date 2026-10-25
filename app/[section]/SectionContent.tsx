@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, stagger, type Variants } from "framer-motion";
+import { CareerTimeline } from "./CareerTimeline";
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useRef } from "react";
@@ -298,22 +299,7 @@ export function SectionContent({
               </h2>
               <div className="detail-rule h-px flex-1" />
             </div>
-            <div className="detail-timeline relative mt-10 space-y-10 border-l pl-8">
-              {(card.timeline ?? []).map((job) => (
-                <motion.div variants={itemVariants} key={job.company} className="relative">
-                  <span className="detail-timeline-dot absolute -left-[2.375rem] top-1.5 h-3 w-3 rounded-full" />
-                  <p className="detail-muted text-xs font-semibold uppercase tracking-widest">
-                    {job.period} · {job.location}
-                  </p>
-                  <h3 className="detail-ink mt-1.5 text-lg font-semibold">
-                    {job.role} — {job.company}
-                  </h3>
-                  <p className="detail-copy mt-2 max-w-[72ch] text-base leading-relaxed">
-                    {job.summary}
-                  </p>
-                </motion.div>
-              ))}
-            </div>
+            <CareerTimeline jobs={card.timeline ?? []} />
           </motion.section>
         )}
 

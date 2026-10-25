@@ -12,6 +12,7 @@ import {
   MISSION_THEME_STORAGE_KEY,
   type MissionTheme,
 } from "../lib/mission-theme";
+import { toggleNavigatorUi, useNavigatorUi } from "../lib/navigator-ui";
 import {
   setAutoplayEnabled,
   shouldOfferAutoplayToggle,
@@ -36,7 +37,14 @@ const TRAY_SPRING = {
 const CONSOLE_OPEN = { duration: 0.42, ease: [0.22, 1, 0.36, 1] } as const;
 const CONSOLE_CLOSE = { duration: 0.24, ease: [0.4, 0, 1, 1] } as const;
 
-const MAIN_SRC = "/music/tomoon.mp3";
+// The soundtrack, as a bag rather than a single looping file.
+//
+// Add a track by adding a line. Order here does not matter — playback draws
+// from a reshuffled bag, so the list is a set, not a sequence.
+const MAIN_TRACKS = [
+  "/music/tomoon.webm",
+  "/music/she-break.webm",
+] as const;
 const TARGET_VOLUME = 0.42;
 
 const METAL_SURFACE = "mission-metal-surface relative overflow-hidden border";
@@ -168,6 +176,7 @@ function EquipmentBay({
 
 export default function CockpitTray() {
   const autoplayEnabled = useAutoplayEnabled();
+  const navigatorUi = useNavigatorUi();
   // Read when the prompt opens rather than on every render: the visit count
   // does not change while the page is open.
   const offerAutoplayToggle = useSyncExternalStore(
@@ -185,7 +194,6 @@ export default function CockpitTray() {
   const [leg, setLeg] = useState(-1);
   const [track, setTrack] = useState<"intro" | "main" | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [isSidenavVisible, setIsSidenavVisible] = useState(true);
   const [missionTheme, setMissionTheme] = useState<MissionTheme>(() => {
     if (typeof window === "undefined") return DEFAULT_MISSION_THEME;
     try {
@@ -202,6 +210,18 @@ export default function CockpitTray() {
   const narrationRef = useRef<HTMLAudioElement>(null);
   const spanIndexRef = useRef(0);
   const mainRef = useRef<HTMLAudioElement>(null);
+  // Never played. It exists only to pull the upcoming file into the HTTP
+  // cache while the current one is still going, so swapping `src` on the
+  // real element is near-instant instead of a silent gap. Alternating two
+  // *playback* elements would be truly gapless, but the volume ramp targets
+  // mainRef specifically — one preloader keeps that logic untouched.
+  const preloadRef = useRef<HTMLAudioElement>(null);
+  // Remaining picks. Refilled, reshuffled, when it empties.
+  const trackBagRef = useRef<string[]>([]);
+  const lastTrackRef = useRef<string | null>(null);
+  // One warm per track. `timeupdate` fires several times a second and the
+  // element loops, so without this the preload would be re-issued forever.
+  const warmedRef = useRef(false);
   const levelsRef = useRef({ intro: 0, main: 0 });
   const rampRef = useRef(0);
 
@@ -266,6 +286,53 @@ export default function CockpitTray() {
 
   useEffect(() => () => cancelAnimationFrame(rampRef.current), []);
 
+  // Fisher-Yates over a copy. Pure random would repeat the same track
+  // back-to-back roughly one time in four at this list length; a bag that
+  // plays through everything before reshuffling never does.
+  const takeNextTrack = useCallback(() => {
+    if (!trackBagRef.current.length) {
+      const bag = [...MAIN_TRACKS];
+      for (let i = bag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [bag[i], bag[j]] = [bag[j], bag[i]];
+      }
+      // Avoid a repeat across the seam between two bags.
+      if (bag.length > 1 && bag[bag.length - 1] === lastTrackRef.current) {
+        [bag[bag.length - 1], bag[0]] = [bag[0], bag[bag.length - 1]];
+      }
+      trackBagRef.current = bag;
+    }
+    const next = trackBagRef.current.pop() ?? MAIN_TRACKS[0];
+    lastTrackRef.current = next;
+    return next;
+  }, []);
+
+  /** Warms whatever is up next without playing it. */
+  const warmNextTrack = useCallback(() => {
+    const preloader = preloadRef.current;
+    if (!preloader) return;
+    // Peek at the bag without consuming it. An empty bag means the next
+    // journey will refill and reshuffle, and which track wins is not decided
+    // yet — nothing to warm, and the switch is rare enough to afford a load.
+    const upcoming = trackBagRef.current[trackBagRef.current.length - 1];
+    if (!upcoming || preloader.src.endsWith(upcoming)) return;
+    preloader.src = upcoming;
+    preloader.load();
+  }, []);
+
+  // Warmed part-way through rather than at track start: at start it would
+  // compete for bandwidth with the track actually playing, which is the one
+  // the listener is waiting on. By 40% the current file is comfortably
+  // buffered and the next journey is still minutes away.
+  const onMainTimeUpdate = useCallback(() => {
+    if (warmedRef.current) return;
+    const main = mainRef.current;
+    if (!main || !Number.isFinite(main.duration) || !main.duration) return;
+    if (main.currentTime / main.duration < 0.4) return;
+    warmedRef.current = true;
+    warmNextTrack();
+  }, [warmNextTrack]);
+
   const runRamp = useCallback(() => {
     cancelAnimationFrame(rampRef.current);
 
@@ -305,6 +372,12 @@ export default function CockpitTray() {
     if (!main || !main.paused) return;
 
     main.volume = 0;
+    // The src is chosen here, not during render: Math.random() in a component
+    // body is non-deterministic and Next refuses to prerender it — the same
+    // thing that broke the career timeline on `new Date()`. handOverToMain
+    // only ever runs from a gesture, so there is nothing to prerender.
+    main.src = takeNextTrack();
+    warmedRef.current = false;
     void main
       .play()
       .then(() => {
@@ -313,7 +386,31 @@ export default function CockpitTray() {
         runRamp();
       })
       .catch(() => setTrack(null));
-  }, [runRamp]);
+  }, [runRamp, takeNextTrack]);
+
+  // One track per journey, not per track-length.
+  //
+  // The element loops, so a single track covers a whole pass of the flight
+  // however long that pass takes — someone who lingers in the toolkit hears
+  // the same piece throughout rather than a cut halfway down the corridor.
+  // The track only changes when the flight itself wraps back to the origin,
+  // which `flight-loop-rush` announces (see runLoop in MultiverseFlight).
+  const advanceJourneyTrack = useCallback(() => {
+    const main = mainRef.current;
+    // Nothing playing means the visitor never started the tour; the next one
+    // to start will draw from the bag on its own.
+    if (!main || main.paused) return;
+    main.src = takeNextTrack();
+    warmedRef.current = false;
+    main.volume = levelsRef.current.main;
+    void main.play().catch(() => setTrack(null));
+  }, [takeNextTrack]);
+
+  useEffect(() => {
+    window.addEventListener("flight-loop-rush", advanceJourneyTrack);
+    return () =>
+      window.removeEventListener("flight-loop-rush", advanceJourneyTrack);
+  }, [advanceJourneyTrack]);
 
   const playNextSpanRef = useRef<() => void>(() => {});
   const playNextSpan = useCallback(() => {
@@ -484,7 +581,9 @@ export default function CockpitTray() {
   const launchAutopilot = useCallback(
     (useFullscreen: boolean) => {
       fullscreenChoiceRef.current = useFullscreen;
-      requestPlayback();
+      // Audio is armed by the launch event now (see onLaunch), which covers
+      // this path and the dial's alike. Calling it here as well restarted
+      // the narration from span zero a frame after it had already begun.
       setIsOpen(false);
       setAskFullscreen(false);
       if (useFullscreen) enterFullscreen();
@@ -499,7 +598,7 @@ export default function CockpitTray() {
         new CustomEvent("flight-autopilot", { detail: { action: "start" } }),
       );
     },
-    [enterFullscreen, pathname, requestPlayback, router],
+    [enterFullscreen, pathname, router],
   );
 
   const toggleAutopilot = useCallback(() => {
@@ -557,13 +656,25 @@ export default function CockpitTray() {
       }
     };
 
+    // The tour can be launched from places that do not go through
+    // launchAutopilot — the dial's transport button dispatches the command
+    // straight to the flight. Arming the audio there too means the
+    // soundtrack is tied to the tour actually starting rather than to one
+    // particular button having started it. `flight-autopilot-launch` fires
+    // once per start, synchronously inside the gesture that caused it, so
+    // the play() this leads to still counts as user-initiated.
+    const onLaunch = () => requestPlayback();
+
+    window.addEventListener("flight-autopilot-launch", onLaunch);
     window.addEventListener("flight-autopilot-state", onState as EventListener);
-    return () =>
+    return () => {
+      window.removeEventListener("flight-autopilot-launch", onLaunch);
       window.removeEventListener(
         "flight-autopilot-state",
         onState as EventListener,
       );
-  }, [pauseAudio, stopAudio, exitFullscreen]);
+    };
+  }, [pauseAudio, stopAudio, exitFullscreen, requestPlayback]);
 
   const navigate = (id: string) => {
     setActiveId(id);
@@ -579,12 +690,11 @@ export default function CockpitTray() {
     );
   };
 
+  // Swaps the navigator rather than hiding it. Removing it entirely left the
+  // flight with no visible way to move through it, which is a worse use of
+  // the press than offering the other instrument.
   const toggleSidenav = () => {
-    const next = !isSidenavVisible;
-    setIsSidenavVisible(next);
-    window.dispatchEvent(
-      new CustomEvent("toggle-route-map", { detail: { visible: next } }),
-    );
+    toggleNavigatorUi();
   };
 
   const routeId = pathname.split("/").filter(Boolean)[0];
@@ -682,17 +792,27 @@ export default function CockpitTray() {
         )}
       </AnimatePresence>
 
-      {audioReady && (
-        <>
-          <audio
-            ref={narrationRef}
-            preload="none"
-            onTimeUpdate={onNarrationProgress}
-            onEnded={onNarrationEnded}
-          />
-          <audio ref={mainRef} src={MAIN_SRC} loop preload="none" />
-        </>
-      )}
+      {/* Always mounted, never preloaded.
+          These used to render only once `audioReady` flipped, which made
+          starting the soundtrack a two-step dance: arm the flag, wait for a
+          render, then play from an effect. Playing from an effect is a
+          different task to the click that asked for it, so the browser no
+          longer sees a user gesture and rejects the play() outright.
+          `preload="none"` means an element that is mounted but never played
+          costs nothing — no request is made until play() is called — so
+          there is no reason to gate them. refs exist from first paint, and
+          every caller can play synchronously inside the gesture. */}
+      <audio
+        ref={narrationRef}
+        preload="none"
+        onTimeUpdate={onNarrationProgress}
+        onEnded={onNarrationEnded}
+      />
+      {/* `loop` is deliberate: a journey has no fixed length, so the track
+          has to outlast whatever pace the visitor takes. The next one is
+          drawn when the flight wraps, not when the file ends. */}
+      <audio ref={mainRef} preload="none" loop onTimeUpdate={onMainTimeUpdate} />
+      <audio ref={preloadRef} preload="auto" aria-hidden="true" />
 
       <AnimatePresence initial={false}>
         {isOpen && (
@@ -980,10 +1100,16 @@ export default function CockpitTray() {
                 <button
                   type="button"
                   onClick={toggleSidenav}
-                  aria-pressed={isSidenavVisible}
-                  aria-label={isSidenavVisible ? "Hide journey dial" : "Show journey dial"}
+                  aria-pressed={navigatorUi === "infinity"}
+                  aria-label={
+                    navigatorUi === "dial"
+                      ? "Switch to the route track"
+                      : "Switch to the bezel dial"
+                  }
                   className={`relative z-10 flex h-5 w-5 items-center justify-center rounded-full transition-colors ${
-                    isSidenavVisible ? "text-sky-200" : "text-slate-500 hover:text-sky-200"
+                    navigatorUi === "infinity"
+                      ? "text-sky-200"
+                      : "text-slate-500 hover:text-sky-200"
                   }`}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">

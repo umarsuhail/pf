@@ -11,7 +11,9 @@ export function configuredProviders(): Provider[] {
     name: 'gemini',
     async generate(system, messages) {
       const result = await generateText({
-        model: createGoogleGenerativeAI({ apiKey: geminiKey })(process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash'),
+        model: createGoogleGenerativeAI({ apiKey: geminiKey })(
+  process.env.GEMINI_MODEL?.trim() || 'gemini-flash-latest'
+),
         system, messages, temperature: 0.3, maxOutputTokens: 700,
         maxRetries: 0, abortSignal: AbortSignal.timeout(10000),
       });

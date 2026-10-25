@@ -44,6 +44,11 @@ export default function ExpandableText({
   return (
     <div className={className}>
       <div
+        // Same reason as the chat transcript: Lenis preventDefaults the wheel
+        // on `window` to drive the document, so an expanded bio would never
+        // scroll — the flight would move instead. Only meaningful while this
+        // is actually scrollable, but the attribute is inert otherwise.
+        data-lenis-prevent={expanded && scrollExpanded ? "" : undefined}
         className={`relative transition-[max-height] duration-500 ease-in-out ${expanded && scrollExpanded ? "overflow-y-auto overscroll-contain" : "overflow-hidden"}`}
         style={{ maxHeight: expanded ? expandedHeight : collapsedHeight }}
       >

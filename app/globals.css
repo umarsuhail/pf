@@ -1249,3 +1249,23 @@ html {
     animation: none;
   }
 }
+
+/* VEGA's speaker icon while audio is playing. Opacity only — the arcs are
+   stroked paths inside a 14px icon, so animating anything geometric at that
+   size reads as flicker rather than motion. */
+@keyframes vegaVoiceWave {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+.vega-voice-wave {
+  animation: vegaVoiceWave 1.1s ease-in-out infinite;
+}
+
+.vega-voice-wave:nth-of-type(2) {
+  animation-delay: 0.18s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vega-voice-wave { animation: none; }
+}

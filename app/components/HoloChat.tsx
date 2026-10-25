@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ELASTIC_OUT_SPRING, POWER3_IN } from "../lib/easings";
 import { SendIcon } from "./icons/send";
@@ -39,6 +39,13 @@ export default function HoloChat() {
   const sendRef = useRef<AnimatedIconHandle>(null);
   const transmitRef = useRef<AnimatedIconHandle>(null);
   const closeRef = useRef<AnimatedIconHandle>(null);
+  // VEGA's voice. Off by default — a panel that starts talking the moment it
+  // opens is a worse first impression than a silent one, and the audio costs
+  // a request per reply.
+  const [voiceOn, setVoiceOn] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const speakAbortRef = useRef<AbortController | null>(null);
   const resetRef = useRef<AnimatedIconHandle>(null);
 
   useEffect(() => {
@@ -83,6 +90,63 @@ export default function HoloChat() {
     inputRef.current?.focus();
   };
 
+  // Imperative teardown only — no state. Effects call this directly, because
+  // setState inside an effect body cascades renders; the handlers that *are*
+  // events pair it with setSpeaking below.
+  const tearDownAudio = useCallback(() => {
+    speakAbortRef.current?.abort();
+    speakAbortRef.current = null;
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.pause();
+    if (audio.src.startsWith("blob:")) URL.revokeObjectURL(audio.src);
+    audioRef.current = null;
+  }, []);
+
+  const stopSpeaking = useCallback(() => {
+    tearDownAudio();
+    setSpeaking(false);
+  }, [tearDownAudio]);
+
+  const speak = useCallback(
+    async (text: string) => {
+      tearDownAudio();
+      const controller = new AbortController();
+      speakAbortRef.current = controller;
+      setSpeaking(true);
+      try {
+        const res = await fetch("/api/speak", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const blob = await res.blob();
+        if (controller.signal.aborted) return;
+        // A fresh element per utterance. Reusing one meant mutating the value
+        // held in a ref, and the object URL has to be revoked per blob anyway.
+        const audio = new Audio(URL.createObjectURL(blob));
+        audio.onended = () => setSpeaking(false);
+        audioRef.current = audio;
+        await audio.play();
+      } catch {
+        // No voice is not an error worth interrupting the conversation for —
+        // the reply is already on screen and readable.
+        setSpeaking(false);
+      }
+    },
+    [tearDownAudio],
+  );
+
+  // The panel closing should stop the voice with it. `speaking` is left to
+  // the onended/next-utterance paths so this stays free of setState.
+  useEffect(() => {
+    if (!isOpen) tearDownAudio();
+  }, [isOpen, tearDownAudio]);
+
+  useEffect(() => () => tearDownAudio(), [tearDownAudio]);
+
   const sendMessage = async (override?: string) => {
     const text = (override ?? input).trim();
     if (!text || isSending) return;
@@ -102,14 +166,18 @@ export default function HoloChat() {
         body: JSON.stringify({ message: text, history }),
       });
       const data = await res.json();
+      const reply = data.message || "I'm temporarily unavailable — try again in a moment.";
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          text: data.message || "I'm temporarily unavailable — try again in a moment.",
+          text: reply,
           sources: Array.isArray(data.sources) ? data.sources : [],
         },
       ]);
+      // After the text is on screen, never before: speech is a slow
+      // round-trip and the reply should not wait on it.
+      if (voiceOn) void speak(reply);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -191,6 +259,51 @@ export default function HoloChat() {
               className="mr-1 rotate-90 text-cyan-300/75"
               aria-label="Transmission status"
             />
+            {/* Voice. Switching it off mid-sentence stops the current
+                utterance too, which is the behaviour a mute button implies. */}
+            <button
+              type="button"
+              onClick={() => {
+                setVoiceOn((prev) => {
+                  if (prev) stopSpeaking();
+                  return !prev;
+                });
+              }}
+              aria-pressed={voiceOn}
+              aria-label={voiceOn ? "Turn VEGA's voice off" : "Turn VEGA's voice on"}
+              title={voiceOn ? "Voice on" : "Voice off"}
+              className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+                voiceOn
+                  ? "border-cyan-200/40 bg-cyan-200/10 text-cyan-100"
+                  : "border-cyan-100/10 text-cyan-100/40 hover:text-cyan-100/70"
+              }`}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M11 5 6 9H2v6h4l5 4z" />
+                {voiceOn ? (
+                  <>
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" className={speaking ? "vega-voice-wave" : ""} />
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" className={speaking ? "vega-voice-wave" : ""} />
+                  </>
+                ) : (
+                  <>
+                    <line x1="22" y1="9" x2="16" y2="15" />
+                    <line x1="16" y1="9" x2="22" y2="15" />
+                  </>
+                )}
+              </svg>
+            </button>
+
             <button
               type="button"
               onClick={resetConversation}
@@ -218,7 +331,18 @@ export default function HoloChat() {
         <div
           ref={messagesRef}
           aria-live="polite"
-          className="vega-scrollbar relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto scroll-smooth px-4 py-5 sm:px-5"
+          // Lenis takes the wheel on `window` at `passive: false` and
+          // preventDefaults it to drive the document, so a nested scroller
+          // never sees the gesture — the transcript stayed put and the flight
+          // moved underneath it. `data-lenis-prevent` is the library's own
+          // opt-out: it finds the attribute on the event's composed path and
+          // hands the gesture back to the browser.
+          //
+          // `overscroll-contain` is the second half. Without it, reaching
+          // either end of the transcript chains the remaining scroll to the
+          // page, so a flick at the bottom still flew the corridor.
+          data-lenis-prevent
+          className="vega-scrollbar relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain scroll-smooth px-4 py-5 sm:px-5"
         >
           {messages.map((message, index) =>
             message.role === "assistant" ? (
