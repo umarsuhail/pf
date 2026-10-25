@@ -269,11 +269,7 @@ when the viewport meaningfully changes, and yields immediately to real wheel,
 touch, or keyboard input. The Home leg waits for actual narration completion
 rather than a guessed duration.
 
-Audio starts only from a qualifying user gesture. The cockpit owns narration
-and soundtrack playback, mute state, pause/resume, and optional fullscreen.
-Fullscreen is offered rather than forced and is skipped where the API is not
-available. A paused tour preserves audio position; a completed or cancelled
-tour tears playback down.
+
 
 Short dial ticks share a round-robin audio pool so close ticks can overlap.
 The pool and externally owned burst clips are primed muted on the first

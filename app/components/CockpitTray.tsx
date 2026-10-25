@@ -6,6 +6,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExter
 import { cards } from "../data/sections";
 import { NARRATION_SPANS } from "../data/narration";
 import {
+  SOUNDTRACK_LENGTH_TOLERANCE,
+  SOUNDTRACK_SECONDS,
+  SOUNDTRACK_SRCS,
+} from "../data/soundtrack";
+import {
   DEFAULT_MISSION_THEME,
   isMissionTheme,
   MISSION_THEMES,
@@ -13,13 +18,23 @@ import {
   type MissionTheme,
 } from "../lib/mission-theme";
 import { toggleNavigatorUi, useNavigatorUi } from "../lib/navigator-ui";
+import { clearSoundtrackClock, setSoundtrackClock } from "../lib/soundtrack-clock";
 import {
-  setAutoplayEnabled,
+  getTrackChoice,
   shouldOfferAutoplayToggle,
-  useAutoplayEnabled,
+  shouldSkipIntro,
+  TRACK_RANDOM,
 } from "../lib/visit-history";
+import AutopilotPrompt from "./AutopilotPrompt";
 import { CardIcon } from "./icons/card-icon";
 import type { AnimatedIconHandle } from "./icons/card-icon";
+import {
+  BrushedGrain,
+  METAL_SURFACE,
+  Rivets,
+  Sheen,
+  TRAY_SPRING,
+} from "./mission-surface";
 
 const stops = cards.map((card) => ({
   id: card.id,
@@ -27,84 +42,13 @@ const stops = cards.map((card) => ({
   label: card.eyebrow.split("/").slice(1).join("/").trim() || card.id,
 }));
 
-const TRAY_SPRING = {
-  type: "spring",
-  stiffness: 260,
-  damping: 28,
-  mass: 0.8,
-} as const;
-
 const CONSOLE_OPEN = { duration: 0.42, ease: [0.22, 1, 0.36, 1] } as const;
 const CONSOLE_CLOSE = { duration: 0.24, ease: [0.4, 0, 1, 1] } as const;
 
-// The soundtrack, as a bag rather than a single looping file.
-//
-// Add a track by adding a line. Order here does not matter — playback draws
-// from a reshuffled bag, so the list is a set, not a sequence.
-const MAIN_TRACKS = [
-  "/music/tomoon.webm",
-  "/music/she-break.webm",
-] as const;
+// The list and the length contract both live in data/soundtrack.ts, because
+// the autopilot has to read the same numbers to stay in sync with them.
+const MAIN_TRACKS = SOUNDTRACK_SRCS;
 const TARGET_VOLUME = 0.42;
-
-const METAL_SURFACE = "mission-metal-surface relative overflow-hidden border";
-
-function BrushedGrain() {
-  return (
-    <span
-      aria-hidden="true"
-      className="mission-metal-grain pointer-events-none absolute inset-0 opacity-[0.55]"
-    />
-  );
-}
-
-const SHEEN_REST_S = 4.2;
-
-function Sheen({
-  delay = 0,
-  duration = 3.2,
-  active = true,
-}: {
-  delay?: number;
-  duration?: number;
-  active?: boolean;
-}) {
-  if (!active) return null;
-  const cycle = duration + SHEEN_REST_S;
-  return (
-    <motion.span
-      aria-hidden="true"
-      style={{ willChange: "transform" }}
-      className="pointer-events-none absolute inset-y-0 -left-[45%] w-[38%] -skew-x-12 bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.05)_35%,rgba(255,255,255,0.2)_50%,rgba(255,255,255,0.05)_65%,transparent_100%)]"
-      animate={{
-        transform: ["translateX(0%)", "translateX(420%)", "translateX(420%)"],
-      }}
-      transition={{
-        duration: cycle,
-        times: [0, duration / cycle, 1],
-        ease: ["easeInOut", "linear"],
-        delay,
-        repeat: Infinity,
-      }}
-    />
-  );
-}
-
-function Rivets({ className = "" }: { className?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`pointer-events-none absolute flex justify-between ${className}`}
-    >
-      {Array.from({ length: 2 }).map((_, i) => (
-        <span
-          key={i}
-          className="mission-rivet h-1.5 w-1.5 rounded-full shadow-[0_1px_1px_rgba(0,0,0,0.8)]"
-        />
-      ))}
-    </span>
-  );
-}
 
 const NOTCH_EAR = 14;
 function notchEarStyle(corner: "top right" | "top left") {
@@ -175,7 +119,6 @@ function EquipmentBay({
 }
 
 export default function CockpitTray() {
-  const autoplayEnabled = useAutoplayEnabled();
   const navigatorUi = useNavigatorUi();
   // Read when the prompt opens rather than on every render: the visit count
   // does not change while the page is open.
@@ -290,6 +233,14 @@ export default function CockpitTray() {
   // back-to-back roughly one time in four at this list length; a bag that
   // plays through everything before reshuffling never does.
   const takeNextTrack = useCallback(() => {
+    // A pinned track is pinned for the whole journey and every journey
+    // after it, so the bag is never consulted — drawing from it would mean
+    // the choice held for one pass and then quietly stopped holding.
+    const chosen = getTrackChoice();
+    if (chosen !== TRACK_RANDOM) {
+      lastTrackRef.current = chosen;
+      return chosen;
+    }
     if (!trackBagRef.current.length) {
       const bag = [...MAIN_TRACKS];
       for (let i = bag.length - 1; i > 0; i--) {
@@ -314,6 +265,7 @@ export default function CockpitTray() {
     // Peek at the bag without consuming it. An empty bag means the next
     // journey will refill and reshuffle, and which track wins is not decided
     // yet — nothing to warm, and the switch is rare enough to afford a load.
+    if (getTrackChoice() !== TRACK_RANDOM) return;
     const upcoming = trackBagRef.current[trackBagRef.current.length - 1];
     if (!upcoming || preloader.src.endsWith(upcoming)) return;
     preloader.src = upcoming;
@@ -324,6 +276,22 @@ export default function CockpitTray() {
   // compete for bandwidth with the track actually playing, which is the one
   // the listener is waiting on. By 40% the current file is comfortably
   // buffered and the next journey is still minutes away.
+  // The autopilot times a whole tour against SOUNDTRACK_SECONDS, so a file
+  // of a different length silently desynchronises the closing mark. Nothing
+  // else would surface that — the tour would just end early or late.
+  const onMainMetadata = useCallback(() => {
+    const main = mainRef.current;
+    if (!main || !Number.isFinite(main.duration)) return;
+    const drift = Math.abs(main.duration - SOUNDTRACK_SECONDS);
+    if (drift > SOUNDTRACK_LENGTH_TOLERANCE) {
+      console.warn(
+        `Soundtrack: ${main.currentSrc.split("/").pop()} is ${main.duration.toFixed(2)}s, ` +
+          `but the autopilot is timed against ${SOUNDTRACK_SECONDS}s. ` +
+          `Update SOUNDTRACK_SECONDS or re-render the track.`,
+      );
+    }
+  }, []);
+
   const onMainTimeUpdate = useCallback(() => {
     if (warmedRef.current) return;
     const main = mainRef.current;
@@ -376,12 +344,17 @@ export default function CockpitTray() {
     // body is non-deterministic and Next refuses to prerender it — the same
     // thing that broke the career timeline on `new Date()`. handOverToMain
     // only ever runs from a gesture, so there is nothing to prerender.
-    main.src = takeNextTrack();
+    const src = takeNextTrack();
+    main.src = src;
     warmedRef.current = false;
     void main
       .play()
       .then(() => {
         setTrack("main");
+        // Published only once the element is really playing: the flight
+        // reads this as its clock, and a src that was set but refused would
+        // hand it a time that never advances.
+        setSoundtrackClock(main, src);
         levelsRef.current = { intro: 0, main: TARGET_VOLUME };
         runRamp();
       })
@@ -400,10 +373,14 @@ export default function CockpitTray() {
     // Nothing playing means the visitor never started the tour; the next one
     // to start will draw from the bag on its own.
     if (!main || main.paused) return;
-    main.src = takeNextTrack();
+    const src = takeNextTrack();
+    main.src = src;
     warmedRef.current = false;
     main.volume = levelsRef.current.main;
-    void main.play().catch(() => setTrack(null));
+    void main
+      .play()
+      .then(() => setSoundtrackClock(main, src))
+      .catch(() => setTrack(null));
   }, [takeNextTrack]);
 
   useEffect(() => {
@@ -411,6 +388,20 @@ export default function CockpitTray() {
     return () =>
       window.removeEventListener("flight-loop-rush", advanceJourneyTrack);
   }, [advanceJourneyTrack]);
+
+  // The dial's chapter skip, once the flight is flying to the music: the
+  // tour follows the song, so skipping a beat means moving the song.
+  useEffect(() => {
+    const onSeek = (event: Event) => {
+      const to = (event as CustomEvent<{ to?: number }>).detail?.to;
+      const main = mainRef.current;
+      if (!main || main.paused || typeof to !== "number") return;
+      main.currentTime = to;
+    };
+    window.addEventListener("flight-soundtrack-seek", onSeek as EventListener);
+    return () =>
+      window.removeEventListener("flight-soundtrack-seek", onSeek as EventListener);
+  }, []);
 
   const playNextSpanRef = useRef<() => void>(() => {});
   const playNextSpan = useCallback(() => {
@@ -484,10 +475,21 @@ export default function CockpitTray() {
     narration.volume = 0;
     levelsRef.current = { intro: TARGET_VOLUME, main: 0 };
 
+    // Skipping is decided here rather than by stopping the voice later: the
+    // flight departs on the music, so handing straight over starts the track
+    // and releases the Home leg in one beat, with no silence between them.
+    if (shouldSkipIntro()) {
+      spanIndexRef.current = NARRATION_SPANS.length;
+      levelsRef.current = { intro: 0, main: TARGET_VOLUME };
+      handOverToMain();
+      runRamp();
+      return;
+    }
+
     spanIndexRef.current = 0;
     playNextSpan();
     runRamp();
-  }, [playNextSpan, runRamp]);
+  }, [handOverToMain, playNextSpan, runRamp]);
 
   const requestPlayback = useCallback(() => {
     if (narrationRef.current) {
@@ -506,6 +508,7 @@ export default function CockpitTray() {
   }, [audioReady, startAudio]);
 
   const stopAudio = useCallback(() => {
+    clearSoundtrackClock();
     levelsRef.current = { intro: 0, main: 0 };
     runRamp();
     setTrack(null);
@@ -559,19 +562,8 @@ export default function CockpitTray() {
     }
   }, []);
 
-  const [askFullscreen, setAskFullscreen] = useState(false);
+  const [askLaunch, setAskLaunch] = useState(false);
   const fullscreenChoiceRef = useRef(false);
-  const fullscreenAskRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!askFullscreen) return;
-    fullscreenAskRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setAskFullscreen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [askFullscreen]);
 
   const canFullscreen = () =>
     typeof document !== "undefined" &&
@@ -585,7 +577,7 @@ export default function CockpitTray() {
       // this path and the dial's alike. Calling it here as well restarted
       // the narration from span zero a frame after it had already begun.
       setIsOpen(false);
-      setAskFullscreen(false);
+      setAskLaunch(false);
       if (useFullscreen) enterFullscreen();
 
       if (pathname !== "/") {
@@ -619,20 +611,12 @@ export default function CockpitTray() {
       return;
     }
 
-    if (!canFullscreen()) {
-      launchAutopilot(false);
-      return;
-    }
-
-    setAskFullscreen(true);
-  }, [
-    isPaused,
-    isRunning,
-    pathname,
-    resumeAudio,
-    enterFullscreen,
-    launchAutopilot,
-  ]);
+    // Opened whether or not fullscreen is available: the prompt carries the
+    // journey's settings now, so skipping it on a browser that cannot go
+    // fullscreen would hide them from exactly the visitors with the least
+    // room to spare.
+    setAskLaunch(true);
+  }, [isPaused, isRunning, pathname, resumeAudio, enterFullscreen]);
 
   useEffect(() => {
     const onState = (event: Event) => {
@@ -708,89 +692,13 @@ export default function CockpitTray() {
       ref={containerRef}
       className="mission-chrome pointer-events-none fixed inset-x-0 top-0 z-50"
     >
-      <AnimatePresence>
-        {askFullscreen && (
-          <motion.div
-            key="fullscreen-ask"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            onClick={() => setAskFullscreen(false)}
-            className="pointer-events-auto fixed inset-0 z-60 flex items-center justify-center bg-slate-950/75 px-6 "
-          >
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="fullscreen-ask-title"
-              aria-describedby="fullscreen-ask-copy"
-              onClick={(event) => event.stopPropagation()}
-              initial={{ opacity: 0, scale: 0.94, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              transition={TRAY_SPRING}
-              className={`w-[min(92vw,430px)] rounded-3xl px-6 pb-6 pt-7 text-center ${METAL_SURFACE}`}
-            >
-              <BrushedGrain />
-              <Sheen delay={0.12} />
-              <Rivets className="inset-x-4 top-2.5" />
-
-              <p className="relative z-10 text-[10px] font-semibold uppercase tracking-[0.42em] text-sky-200/60">
-                Autopilot
-              </p>
-              <h2
-                id="fullscreen-ask-title"
-                className="relative z-10 mt-3 text-xl font-semibold text-sky-50"
-              >
-                Fly full screen?
-              </h2>
-              <p
-                id="fullscreen-ask-copy"
-                className="relative z-10 mx-auto mt-2 max-w-[36ch] text-xs leading-5 text-slate-300/80"
-              >
-                The tour runs either way. Full screen hands the whole display
-                to the flight; staying in the window leaves your tabs and
-                toolbar exactly where they are.
-              </p>
-
-              <div className="relative z-10 mt-6 flex flex-col gap-2 sm:flex-row-reverse sm:justify-center">
-                <button
-                  ref={fullscreenAskRef}
-                  type="button"
-                  onClick={() => launchAutopilot(true)}
-                  className="min-h-11 rounded-full border border-sky-200/35 bg-sky-200/15 px-5 text-xs font-semibold uppercase tracking-[0.22em] text-sky-50 transition-colors hover:bg-sky-200/25"
-                >
-                  Full screen
-                </button>
-                <button
-                  type="button"
-                  onClick={() => launchAutopilot(false)}
-                  className="min-h-11 rounded-full border border-white/15 px-5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-300 transition-colors hover:border-white/25 hover:text-sky-100"
-                >
-                  Stay in this window
-                </button>
-              </div>
-
-              {/* Only for someone who has been here a few times *and* has
-                  actually flown the tour. A first-time visitor has no
-                  opinion to express yet, and offering to switch off a thing
-                  they have not seen is noise in the one prompt that has to
-                  stay short. */}
-              {offerAutoplayToggle && (
-                <label className="relative z-10 mt-5 flex cursor-pointer items-center justify-center gap-2.5 border-t border-white/10 pt-4 text-[11px] text-slate-300/80">
-                  <input
-                    type="checkbox"
-                    checked={autoplayEnabled}
-                    onChange={(event) => setAutoplayEnabled(event.target.checked)}
-                    className="h-3.5 w-3.5 accent-sky-300"
-                  />
-                  Offer the tour on future visits
-                </label>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <AutopilotPrompt
+        open={askLaunch}
+        canFullscreen={canFullscreen()}
+        offerAutoplayToggle={offerAutoplayToggle}
+        onLaunch={launchAutopilot}
+        onDismiss={() => setAskLaunch(false)}
+      />
 
       {/* Always mounted, never preloaded.
           These used to render only once `audioReady` flipped, which made
@@ -811,7 +719,13 @@ export default function CockpitTray() {
       {/* `loop` is deliberate: a journey has no fixed length, so the track
           has to outlast whatever pace the visitor takes. The next one is
           drawn when the flight wraps, not when the file ends. */}
-      <audio ref={mainRef} preload="none" loop onTimeUpdate={onMainTimeUpdate} />
+      <audio
+        ref={mainRef}
+        preload="none"
+        loop
+        onLoadedMetadata={onMainMetadata}
+        onTimeUpdate={onMainTimeUpdate}
+      />
       <audio ref={preloadRef} preload="auto" aria-hidden="true" />
 
       <AnimatePresence initial={false}>

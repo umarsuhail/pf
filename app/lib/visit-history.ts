@@ -2,6 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 
+import { SOUNDTRACK_SRCS } from "../data/soundtrack";
+
 // What this browser already knows about the flight.
 //
 // Three facts, and they only matter in combination: how many times someone
@@ -21,10 +23,14 @@ import { useSyncExternalStore } from "react";
 // has to work anyway. A blocked browser simply reads as a first-time
 // visitor every time, which is the safe end to fail at.
 
+const PREFERENCE_EVENT = "flight-autoplay-preference";
+
 const VISITS_COOKIE = "pf_visits";
 const SESSION_COOKIE = "pf_session";
 const TRIED_COOKIE = "pf_autopilot_tried";
 const ENABLED_COOKIE = "pf_autoplay";
+const SKIP_INTRO_COOKIE = "pf_skip_intro";
+const TRACK_COOKIE = "pf_track";
 
 const YEAR_SECONDS = 60 * 60 * 24 * 365;
 
@@ -88,9 +94,46 @@ export function isAutoplayEnabled() {
   return readCookie(ENABLED_COOKIE) !== "0";
 }
 
-/** Past the first visit, the narration is a toll rather than a story. */
+/** The selector's value when no particular track is pinned. */
+export const TRACK_RANDOM = "random";
+
+/**
+ * Whether the tour opens straight into the flight rather than the narration.
+ *
+ * An explicit answer from the settings prompt wins outright. With no answer
+ * on file it is inferred, and either half is enough: someone who has flown
+ * the tour has heard the voice, and someone on their third visit has had
+ * every chance to. The checkbox renders this same function, so the box and
+ * the behaviour cannot disagree.
+ */
 export function shouldSkipIntro() {
-  return getVisitCount() > INTRO_FAMILIAR_AFTER;
+  const explicit = readCookie(SKIP_INTRO_COOKIE);
+  if (explicit === "1") return true;
+  if (explicit === "0") return false;
+  return hasTriedAutopilot() || getVisitCount() > INTRO_FAMILIAR_AFTER;
+}
+
+export function setSkipIntro(skip: boolean) {
+  writeCookie(SKIP_INTRO_COOKIE, skip ? "1" : "0", YEAR_SECONDS);
+  window.dispatchEvent(new CustomEvent(PREFERENCE_EVENT));
+}
+
+/**
+ * The pinned track, or TRACK_RANDOM.
+ *
+ * Validated against the current list on every read: a cookie written when a
+ * file existed outlives the file, and an unknown src would otherwise be set
+ * as an audio source that 404s in silence.
+ */
+export function getTrackChoice() {
+  const stored = readCookie(TRACK_COOKIE);
+  if (stored && SOUNDTRACK_SRCS.includes(stored)) return stored;
+  return TRACK_RANDOM;
+}
+
+export function setTrackChoice(choice: string) {
+  writeCookie(TRACK_COOKIE, choice, YEAR_SECONDS);
+  window.dispatchEvent(new CustomEvent(PREFERENCE_EVENT));
 }
 
 /**
@@ -104,8 +147,6 @@ export function shouldSkipIntro() {
 export function shouldOfferAutoplayToggle() {
   return getVisitCount() > INTRO_FAMILIAR_AFTER && hasTriedAutopilot();
 }
-
-const PREFERENCE_EVENT = "flight-autoplay-preference";
 
 export function setAutoplayEnabled(enabled: boolean) {
   writeCookie(ENABLED_COOKIE, enabled ? "1" : "0", YEAR_SECONDS);
@@ -127,5 +168,17 @@ export function useAutoplayEnabled() {
     subscribePreference,
     isAutoplayEnabled,
     () => true,
+  );
+}
+
+export function useSkipIntro() {
+  return useSyncExternalStore(subscribePreference, shouldSkipIntro, () => false);
+}
+
+export function useTrackChoice() {
+  return useSyncExternalStore(
+    subscribePreference,
+    getTrackChoice,
+    () => TRACK_RANDOM,
   );
 }

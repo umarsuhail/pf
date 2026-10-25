@@ -14,12 +14,25 @@ export const SIGNATURE_FACES = [
 const FACES = SIGNATURE_FACES;
 const HOLD_MS = 2100;
 
+// The traveller's title, carried wherever the signature goes.
+//
+// It lives here rather than at the four call sites so the name and the title
+// cannot drift apart, and so a fifth placement gets it without being told.
+// Deliberately *not* set in a handwriting face: two scripts stacked read as
+// two signatures arguing. It is the chrome's own eyebrow treatment instead,
+// sized in `em` so it follows whatever size each caller asks the signature
+// for, with a floor that keeps it legible on the mobile entry card.
+export const SIGNATURE_TITLE = "Skyline Nomad";
+
 export default function SignatureName({
   text = "Umar Suhail",
+  title = SIGNATURE_TITLE,
   className = "",
   active = true,
 }: {
   text?: string;
+  /** `null` drops the title where there is genuinely no room for it. */
+  title?: string | null;
   className?: string;
   active?: boolean;
 }) {
@@ -37,11 +50,8 @@ export default function SignatureName({
 
   const face = FACES[index];
 
-  return (
-    <span
-      className={`relative block h-[1.3em] w-full ${className}`}
-      aria-label={text}
-    >
+  const signature = (
+    <span className="relative block h-[1.3em] w-full" aria-label={text}>
       <AnimatePresence initial={false}>
         <motion.span
           key={face.varName}
@@ -67,6 +77,20 @@ export default function SignatureName({
           {text}
         </motion.span>
       </AnimatePresence>
+    </span>
+  );
+
+  if (!title) return <span className={`block w-full ${className}`}>{signature}</span>;
+
+  return (
+    <span className={`block w-full ${className}`}>
+      {/* The signature keeps its own 1.3em box untouched: the loader pins
+          its position against the US mark's geometry, and a wrapper that
+          changed that height would move the mark's neighbour. */}
+      {signature}
+      <span className="mt-[0.35em] block whitespace-nowrap text-center font-semibold uppercase leading-none text-sky-200/55 text-[max(9px,0.26em)] tracking-[0.42em] indent-[0.42em]">
+        {title}
+      </span>
     </span>
   );
 }

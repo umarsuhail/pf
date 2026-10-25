@@ -40,6 +40,17 @@ import {
 } from "../data/flightTimeline";
 import { useCoarsePointer } from "../lib/pointer";
 import { recordVisit, shouldSkipIntro } from "../lib/visit-history";
+import { AUTOPILOT_TARGET_SECONDS, SOUNDTRACK_SECONDS } from "../data/soundtrack";
+import {
+  buildKeyframes,
+  resolveKeyframes,
+  TRACK_BEATS,
+  type FlightKeyframe,
+} from "../data/flightBeats";
+import {
+  getSoundtrackSource,
+  getSoundtrackTime,
+} from "../lib/soundtrack-clock";
 import { flightScrollTo, setFlightSnapPoints } from "../lib/smooth-scroll";
 import TechnologyLayover, { LayoverCaption } from "./TechnologyLayover";
 import {
@@ -1362,8 +1373,63 @@ export default function MultiverseFlight() {
         cardIndex: cards.length,
       });
 
+      // Fit the tour to the track.
+      //
+      // The constants above are written as a *shape* — how long a section
+      // deserves relative to a tool stop — not as absolute seconds. Scaling
+      // them all by one factor preserves that shape while making the tour
+      // last exactly as long as a soundtrack minus its logo lead, so the
+      // closing mark lands with LOGO_LEAD_SECONDS of music still running.
+      //
+      // The scale is derived rather than written down: at the current
+      // constants the natural tour is ~88.8s against a ~78.9s target, so it
+      // compresses by ~0.89. Change a hold, add a tool, swap in a longer
+      // track, and the sync still holds without anything here being retuned.
+      //
+      // Narration is not in this sum. The soundtrack starts at the handover
+      // *after* the narration, so a first visit's extra 35s sits before the
+      // clock this is matching, not inside it.
+      const naturalMs = legs.reduce(
+        (total, leg) => total + leg.travelMs + leg.holdMs,
+        0,
+      );
+      const syncScale =
+        naturalMs > 0 ? (AUTOPILOT_TARGET_SECONDS * 1000) / naturalMs : 1;
+      legs.forEach((leg) => {
+        leg.travelMs *= syncScale;
+        leg.holdMs *= syncScale;
+      });
+
       flightScrollTo(toScrollTop(0));
       smoothScrollProgress.jump(0);
+
+      // The track is not known until the music starts — it is drawn from a
+      // bag, or pinned in the settings — so the schedule is built on the
+      // first frame that has one, and rebuilt if the track changes under a
+      // loop. No map for this file (a new track, not yet measured) simply
+      // leaves the legs above in charge.
+      let schedule: FlightKeyframe[] | null = null;
+      let scheduleSource: string | null = null;
+      let lastSong = 0;
+
+      const ensureSchedule = (source: string) => {
+        if (source === scheduleSource) return;
+        scheduleSource = source;
+        const beats = TRACK_BEATS[source];
+        schedule = beats
+          ? buildKeyframes(
+              beats,
+              {
+                skills: getNavTargetProgress("skills") ?? 0,
+                projects: getNavTargetProgress("projects") ?? 0,
+                experience: getNavTargetProgress("experience") ?? 0,
+                contact: getNavTargetProgress("contact") ?? 0,
+                tools: TECHNOLOGY_FOCUS_STOPS.map((stop) => stop.progress),
+              },
+              cards.length,
+            )
+          : null;
+      };
 
       let index = 0;
       let from = 0;
@@ -1374,6 +1440,13 @@ export default function MultiverseFlight() {
       let phaseStarted = 0;
       let phase: "starting" | "travel" | "dwell" = "starting";
       let currentProgress = 0;
+
+      // Which panel the tour is on, whichever clock is driving it.
+      const currentCardIndex = () =>
+        Math.min(
+          (schedule ? schedule[index] : legs[index])?.cardIndex ?? 0,
+          cards.length - 1,
+        );
 
       const holdCurrentProgress = () => {
         refreshScrollGeometryIfNeeded();
@@ -1399,6 +1472,21 @@ export default function MultiverseFlight() {
       // had already crossed and land you where you started.
       seekLeg = (direction: 1 | -1) => {
         if (lifecycle !== "running") return;
+
+        // Flying to the music means the music is the thing to move. Jumping
+        // the camera alone would be undone on the very next frame, when the
+        // song is asked where it is and answers from where it still was.
+        if (schedule) {
+          const step = index + direction;
+          if (step < 0 || step >= schedule.length) return;
+          window.dispatchEvent(
+            new CustomEvent("flight-soundtrack-seek", {
+              detail: { to: Math.max(0, schedule[step].at - schedule[step].travel) },
+            }),
+          );
+          return;
+        }
+
         const next = index + direction;
         if (next < 0 || next >= legs.length) return;
         if (direction < 0) currentProgress = legs[index].target;
@@ -1424,6 +1512,39 @@ export default function MultiverseFlight() {
 
       const tick = (now: number) => {
         raf = requestAnimationFrame(tick);
+
+        // Flown to the music where there is music to fly to.
+        //
+        // Nothing accumulates here: the song is asked for its position and
+        // the camera is put where that position says, so a dropped frame,
+        // a throttled tab or a slow decode costs this frame and nothing
+        // after it. The rAF path below stays for the narration, for a
+        // browser that refused to play, and for a track with no map.
+        const source = getSoundtrackSource();
+        const song = source === null ? null : getSoundtrackTime();
+        if (source !== null && song !== null) {
+          ensureSchedule(source);
+          if (schedule) {
+            // `loop` is set on the element, so time runs backwards at the
+            // seam. The tour is over by then; wrapping is the end of it.
+            if (song < lastSong - 1 || song >= SOUNDTRACK_SECONDS - 0.4) {
+              finish();
+              return;
+            }
+            lastSong = song;
+
+            const at = resolveKeyframes(schedule, song, ease);
+            if (at.index !== index) {
+              index = at.index;
+              if (at.cardIndex < cards.length) emit(true, at.cardIndex);
+            }
+            currentProgress = at.progress;
+            refreshScrollGeometryIfNeeded();
+            flightScrollTo(toScrollTop(at.progress));
+            smoothScrollProgress.jump(at.progress);
+            return;
+          }
+        }
 
         if (phase === "dwell") {
           holdCurrentProgress();
@@ -1469,11 +1590,7 @@ export default function MultiverseFlight() {
 
         halt();
         lifecycle = "paused";
-        const cardIndex = Math.min(
-          legs[index]?.cardIndex ?? 0,
-          cards.length - 1,
-        );
-        emit(false, cardIndex, true);
+        emit(false, currentCardIndex(), true);
       };
 
       resumeFlight = () => {
@@ -1481,11 +1598,7 @@ export default function MultiverseFlight() {
         lifecycle = "running";
         armHandback();
         const now = performance.now();
-        const cardIndex = Math.min(
-          legs[index]?.cardIndex ?? 0,
-          cards.length - 1,
-        );
-        emit(true, cardIndex);
+        emit(true, currentCardIndex());
 
         if (phase === "starting") {
           raf = requestAnimationFrame(holdAtStart);

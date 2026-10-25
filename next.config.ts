@@ -3,6 +3,15 @@ import { withSerwist } from "@serwist/turbopack";
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
+  async redirects() {
+    return [
+      {
+        source: "/about",
+        destination: "/",
+        permanent: true,
+      },
+    ];
+  },
   images: {
     // Next 16 defaults this to [75] and refuses any other value outright —
     // a `quality` prop the list does not contain does not fall back, the
